@@ -5,16 +5,16 @@
   <p><b>Real-Time IoT Diagnostics & AR-Enhanced Care Powered by AI Computer Vision</b></p>
 
   <p>
-    <a href="https://github.com/your-username/leaf-check-ai/stargazers"><img src="https://img.shields.io/github/stars/your-username/leaf-check-ai?style=for-the-badge&color=2e7d32" alt="Stars"></a>
-    <a href="https://github.com/your-username/leaf-check-ai/network/members"><img src="https://img.shields.io/github/forks/your-username/leaf-check-ai?style=for-the-badge&color=2e7d32" alt="Forks"></a>
-    <a href="https://github.com/your-username/leaf-check-ai/blob/main/LICENSE"><img src="https://img.shields.io/github/license/your-username/leaf-check-ai?style=for-the-badge&color=2e7d32" alt="License"></a>
+    <a href="https://github.com/ImRoniel/Agri-Sense-AI/stargazers"><img src="https://img.shields.io/github/stars/ImRoniel/Agri-Sense-AI?style=for-the-badge&color=2e7d32" alt="Stars"></a>
+    <a href="https://github.com/ImRoniel/Agri-Sense-AI/network/members"><img src="https://img.shields.io/github/forks/ImRoniel/Agri-Sense-AI?style=for-the-badge&color=2e7d32" alt="Forks"></a>
+    <a href="https://github.com/ImRoniel/Agri-Sense-AI/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ImRoniel/Agri-Sense-AI?style=for-the-badge&color=2e7d32" alt="License"></a>
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/IoT-Multi--Sensor%20Array-388e3c?style=flat-square&logo=arduino&logoColor=white" alt="IoT">
-    <img src="https://img.shields.io/badge/AI-Computer%20Vision-1b5e20?style=flat-square&logo=opencv&logoColor=white" alt="Computer Vision">
-    <img src="https://img.shields.io/badge/AR-Augmented%20Reality-4caf50?style=flat-square&logo=unity&logoColor=white" alt="Augmented Reality">
-    <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+    <img src="https://img.shields.io/badge/React_Native-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React Native">
+    <img src="https://img.shields.io/badge/Expo-1B1F23?style=flat-square&logo=expo&logoColor=white" alt="Expo">
+    <img src="https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white" alt="ESP32">
+    <img src="https://img.shields.io/badge/Gemini_API-8E75B2?style=flat-square&logo=googlebard&logoColor=white" alt="Gemini">
   </p>
 
   <hr width="80%" />
@@ -27,6 +27,22 @@
 **Leaf-Check-AI** bridges nature and modern technology by transforming houseplant maintenance. Utilizing a continuous multi-sensor IoT network paired with AI-driven computer vision, the platform monitors plant vital signs in real time.
 
 By projecting **Augmented Reality (AR) 3D overlays** directly over physical houseplants, Leaf-Check-AI empowers both home "plant parents" and commercial office managers to optimize care, prolong plant longevity, maximize indoor air purification, and enhance psychological well-being.
+
+---
+
+## 💻 Tech Stack
+
+Our architecture is built for real-time responsiveness, seamless cross-platform delivery, and edge-computing capabilities.
+
+- **📱 Frontend & Mobile:** React Native | Expo
+- **🕶️ Augmented Reality:** Expo GL (Three.js) or React Three Fiber (R3F) for rendering 3D plant health overlays.
+- **🧠 Artificial Intelligence:**
+  - _Primary:_ Gemini API for seamless integration and intelligent diagnostics.
+  - _Fallback/Custom:_ Open-source Python models trained for specific species/pest recognition.
+- **🗄️ Backend & Database:**
+  - _Cloud BaaS:_ Supabase or Firebase (Main database for real-time telemetry and user auth).
+  - _Local Storage:_ SQLite3 (Utilized for system logs, admin controls, and offline data caching).
+- **⚙️ Hardware:** ESP32 Microcontroller (Powers the IoT multi-sensor array).
 
 ---
 
@@ -104,4 +120,17 @@ Leaf-Check-AI intelligently adjusts its threshold alerts based on standard indoo
 
 ---
 
-## 🛠️ System Architecture
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Hardware:** ESP32 board equipped with soil moisture, pH, and PAR light sensor modules.
+- **Software:** Node.js, Expo CLI, and a mobile device for testing the React Native AR environment.
+
+### Installation & Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/ImRoniel/Agri-Sense-AI.git](https://github.com/ImRoniel/Agri-Sense-AI.git)
+   cd Agri-Sense-AI
+   ```
