@@ -3,6 +3,7 @@
   "slug": "leaf-check-ai",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "homepage": "https://github.com/ImRoniel/LeafCheck-AI/blob/main/README.md",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
