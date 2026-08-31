@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --------------------------------------------------------
+// ENUMS
+// --------------------------------------------------------
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum AlertType {
+  MOISTURE_LOW
+  MOISTURE_HIGH
+  TEMP_HIGH
+  TEMP_LOW
+  DISEASE_DETECTED
+  BATTERY_LOW
+}
+
+enum HealthStatus {
+  HEALTHY
+  WARNING
+  CRITICAL
+  UNKNOWN
+}
+
+// --------------------------------------------------------
+// MODELS
+// --------------------------------------------------------
+model User {
+  id          String        @id @default(uuid()) @db.Uuid
+  email       String        @unique
+  name        String?
+  avatarUrl   String?       @map("avatar_url")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  plants      Plant[]
+  devices     Device[]
+  aiDiagnoses AiDiagnosis[]
+  alerts      Alert[]
+
+  @@map("users")
+}
+
+model Device {
+  id           String       @id @default(uuid()) @db.Uuid
+  macAddress   String?      @unique @map("mac_address")
+  name         String
+  status       DeviceStatus @default(OFFLINE)
+  batteryLevel Float?       @map("battery_level")
+  lastSeenAt   DateTime?    @map("last_seen_at") @db.Timestamptz
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  userId       String       @map("user_id") @db.Uuid
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plants       Plant[]
+  sensorData   SensorData[]
+
+  @@map("devices")
+}
+
+model Plant {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  species      String?
+  imageUrl     String?      @map("image_url")
+  location     String?
+  healthStatus HealthStatus @default(HEALTHY) @map("health_status")
+  
+  minMoisture  Float?       @default(20.0) @map("min_moisture")
+  maxMoisture  Float?       @default(80.0) @map("max_moisture")
+  minTemp      Float?       @default(15.0) @map("min_temp")
+  maxTemp      Float?       @default(35.0) @map("max_temp")
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  userId       String       @map("user_id") @db.Uuid
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deviceId     String?      @map("device_id") @db.Uuid
+  device       Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  sensorData   SensorData[]
+  aiDiagnoses  AiDiagnosis[]
+  alerts       Alert[]
+
+  @@map("plants")
+}
+
+model SensorData {
+  id          String   @id @default(uuid()) @db.Uuid
+  moisture    Float
+  temperature Float?
+  humidity    Float?
+  lightLux    Float?   @map("light_lux")
+  recordedAt  DateTime @default(now()) @map("recorded_at") @db.Timestamptz
+
+  plantId     String?  @map("plant_id") @db.Uuid
+  plant       Plant?   @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  deviceId    String?  @map("device_id") @db.Uuid
+  device      Device?  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, recordedAt(sort: Desc)])
+  @@index([plantId, recordedAt(sort: Desc)])
+  @@map("sensor_data")
+}
+
+model AiDiagnosis {
+  id             String   @id @default(uuid()) @db.Uuid
+  imageUrl       String   @map("image_url")
+  diseaseName    String   @map("disease_name")
+  confidence     Float
+  diagnosisText  String   @map("diagnosis_text")
+  recommendation String?
+  rawAiResponse  String?  @map("raw_ai_response")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  plantId        String?  @map("plant_id") @db.Uuid
+  plant          Plant?   @relation(fields: [plantId], references: [id], onDelete: SetNull)
+
+  userId         String   @map("user_id") @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_diagnoses")
+}
+
+model Alert {
+  id        String    @id @default(uuid()) @db.Uuid
+  type      AlertType
+  title     String
+  message   String
+  isRead    Boolean   @default(false) @map("is_read")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plantId   String?   @map("plant_id") @db.Uuid
+  plant     Plant?    @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}

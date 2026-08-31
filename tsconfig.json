@@ -6,7 +6,13 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "**/*.ts",
