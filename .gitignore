@@ -58,3 +58,11 @@ app-example
 
 
 /src/generated/prisma
+
+
+# AI Tooling Directories
+.agents/
+.claude/
+.cursor/
+.devin/
+.windsurf/
