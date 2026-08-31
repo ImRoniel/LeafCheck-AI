@@ -6,6 +6,7 @@ README_custom.txt
 
 #Environment Variable
 .env
+.env.*
 
 # dependencies
 node_modules/
@@ -48,3 +49,12 @@ app-example
 # generated native folders
 /ios
 /android
+
+#AI coding assistant
+.agents/
+.claude/
+.cursor/
+.devin/
+
+
+/src/generated/prisma
