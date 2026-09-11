@@ -66,3 +66,6 @@ app-example
 .cursor/
 .devin/
 .windsurf/
+
+#structure
+structure.txt 
