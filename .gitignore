@@ -69,3 +69,6 @@ app-example
 
 #structure
 structure.txt 
+
+#mongodb atalas crendetials
+atlas-credentials.env
