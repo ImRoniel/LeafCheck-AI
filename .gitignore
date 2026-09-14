@@ -4,9 +4,13 @@
 README_custom.txt
 
 
-#Environment Variable
+# Environment Variables — NEVER commit secrets
 .env
 .env.*
+!.env.example
+backend/.env
+frontend/.env
+atlas-credentials.env
 
 # dependencies
 node_modules/
@@ -50,25 +54,21 @@ app-example
 /ios
 /android
 
-#AI coding assistant
-.agents/
-.claude/
-.cursor/
-.devin/
-
-
-/src/generated/prisma
-
-
-# AI Tooling Directories
+# AI coding assistant tooling
 .agents/
 .claude/
 .cursor/
 .devin/
 .windsurf/
 
+# Prisma generated client
+/src/generated/prisma
+backend/node_modules/
+frontend/node_modules/
+backend/dist/
+
 #structure
 structure.txt 
 
-#mongodb atalas crendetials
+# MongoDB Atlas credentials (already covered by .env.* above — explicit guard)
 atlas-credentials.env
