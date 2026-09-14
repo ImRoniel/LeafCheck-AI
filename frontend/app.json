@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "agri-sense-ai",
-    "slug": "agri-sense-ai",
+    "name": "Leaf-Check-AI",
+    "slug": "leaf-check-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "agrisenseai",
+    "scheme": "leafcheckai",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

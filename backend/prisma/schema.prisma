@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+enum Role {
+  USER
+  ADMIN
+  LEAD_DEV
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  name      String?
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  devices   Device[]
+  plants    Plant[]
+}
+
+model Device {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  macAddress String   @unique
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     String   @default("OFFLINE")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  readings   SensorReading[]
+}
+
+model SensorReading {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  deviceId     String   @db.ObjectId
+  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  temperature  Float
+  humidity     Float
+  soilMoisture Float
+  soilMoistureRaw Int?
+  lightLevel   Float?
+  phLevel      Float?
+  timestamp    DateTime @default(now())
+}
+
+model Plant {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  species     String
+  location    String?
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthStatus String  @default("healthy")
+  minMoisture Float    @default(30.0)
+  maxMoisture Float    @default(80.0)
+  lastScannedAt DateTime?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -1,0 +1,29 @@
+{
+  "name": "leaf-check-ai-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx/esm src/server.ts",
+    "dev:watch": "node --watch --import tsx/esm src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:generate": "prisma generate --config prisma7.config.ts",
+    "db:push": "prisma db push --config prisma7.config.ts"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^7.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.3",
+    "@types/node": "^26.4.0",
+    "prisma": "^7.10.0",
+    "tsx": "^4.23.12",
+    "typescript": "~6.0.3"
+  },
+  "private": true
+}
