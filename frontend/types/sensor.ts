@@ -1,36 +1,19 @@
-export interface SoilMoisture {
-  percentage: number;       // 0 to 100 %
-  rawAnalogValue: number;
-  status: "optimal" | "dry" | "overwatered";
-}
-
-export interface PHLevel {
-  value: number;            // e.g. 6.5
-  status: "acidic" | "neutral" | "alkaline" | "optimal";
-}
-
-export interface PARLight {
-  ppfd: number;             // Photosynthetic Photon Flux Density (µmol/m²/s)
-  dailyLightIntegral?: number; // DLI (mol/m²/day)
-  status: "insufficient" | "optimal" | "excessive";
-}
-
-export interface EnvironmentalReadings {
-  temperatureCelsius: number;
-  humidityPercentage: number;
-}
-
-/**
- * TelemetryPayload — canonical shape matching:
- *   - ESP32 firmware serial output (hardware/firmware/src/main.cpp)
- *   - Backend POST /api/telemetry body
- *   - Frontend useSensorData hook
- */
+export interface SoilMoisture { percentage: number; rawAnalogValue: number; status: "optimal" | "dry" | "overwatered" }
+export interface LightLevel { lux: number; status: "insufficient" | "optimal" | "excessive" }
+export interface EnvironmentalReadings { temperatureCelsius: number; humidityPercentage: number }
+/** Live lux readings are not PAR; pH is species reference data, not telemetry. */
 export interface TelemetryPayload {
   deviceId: string;
   timestamp: string;
   soilMoisture: SoilMoisture;
-  phLevel: PHLevel;
-  parLight: PARLight;
-  environment?: EnvironmentalReadings;
+  lightLevel: LightLevel;
+  environment: EnvironmentalReadings;
+}
+export interface SensorReading {
+  id: string; deviceId: string; temperature: number; humidity: number;
+  soilMoisture: number; soilMoistureRaw: number | null; lightLevel: number | null; timestamp: string;
+}
+export interface TelemetryHistory {
+  data: SensorReading[];
+  pagination: { total: number; limit: number; offset: number; hasMore: boolean };
 }

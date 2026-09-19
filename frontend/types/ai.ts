@@ -1,4 +1,5 @@
-import { HealthStatus, TelemetryPayload } from "./sensor.js";
+import type { HealthStatus } from "./plant";
+import type { TelemetryPayload } from "./sensor";
 
 export type { HealthStatus, TelemetryPayload };
 

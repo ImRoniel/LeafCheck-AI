@@ -1,17 +1,14 @@
 // Canonical type barrel for the frontend package
 export type {
-  SoilMoisture,
-  PHLevel,
-  PARLight,
-  EnvironmentalReadings,
-  TelemetryPayload,
+  EnvironmentalReadings, LightLevel,
+  SensorReading, SoilMoisture, TelemetryHistory, TelemetryPayload
 } from "./sensor";
 
 export type {
-  HealthStatus,
-  PathogenDiagnosis,
-  CareRecommendation,
-  Plant,
+  CareRecommendation, HealthStatus,
+  PathogenDiagnosis, Plant
 } from "./plant";
 
 export type { AIDiagnosisRequest, AIDiagnosisResponse } from "./ai";
+export type { PlantHealthUpdate, ScanRequest, ScanResponse } from "./scan";
+
