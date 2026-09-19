@@ -61,8 +61,12 @@ app-example
 .devin/
 .windsurf/
 
-# Prisma generated client
+# Prisma generated clients
 /src/generated/prisma
+backend/src/generated/
+
+# ESP32 firmware credentials (copy config.example.h → config.h)
+hardware/firmware/src/config.h
 backend/node_modules/
 frontend/node_modules/
 backend/dist/

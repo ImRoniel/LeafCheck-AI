@@ -1,68 +1,28 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// LeafCheck — MongoDB Schema (Time-Series Telemetry Only)
+//
+// This schema contains ONLY sensor readings from ESP32 hardware.
+// All relational domain entities live in schema.postgres.prisma.
+// ─────────────────────────────────────────────────────────────────────────────
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mongodb"
-}
-
-enum Role {
-  USER
-  ADMIN
-  LEAD_DEV
-}
-
-model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  email     String   @unique
-  name      String?
-  password  String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  devices   Device[]
-  plants    Plant[]
-}
-
-model Device {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  name       String
-  macAddress String   @unique
-  userId     String   @db.ObjectId
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status     String   @default("OFFLINE")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  readings   SensorReading[]
+  url      = env("DATABASE_URL")
 }
 
 model SensorReading {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  deviceId     String   @db.ObjectId
-  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  temperature  Float
-  humidity     Float
-  soilMoisture Float
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  deviceId        String
+  temperature     Float
+  humidity        Float
+  soilMoisture    Float
   soilMoistureRaw Int?
-  lightLevel   Float?
-  phLevel      Float?
-  timestamp    DateTime @default(now())
-}
+  lightLevel      Float?
+  timestamp       DateTime @default(now())
 
-model Plant {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  species     String
-  location    String?
-  userId      String   @db.ObjectId
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  healthStatus String  @default("healthy")
-  minMoisture Float    @default(30.0)
-  maxMoisture Float    @default(80.0)
-  lastScannedAt DateTime?
-  imageUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  @@index([deviceId, timestamp(sort: Desc)])
 }

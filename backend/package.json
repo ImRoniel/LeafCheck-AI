@@ -7,12 +7,16 @@
     "dev:watch": "node --watch --import tsx/esm src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "db:generate": "prisma generate --config prisma7.config.ts",
-    "db:push": "prisma db push --config prisma7.config.ts"
+    "db:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:push": "prisma db push --schema=prisma/schema.prisma",
+    "db:generate:pg": "prisma generate --schema=prisma/schema.postgres.prisma",
+    "db:push:pg": "prisma db push --schema=prisma/schema.postgres.prisma",
+    "db:generate:all": "npm run db:generate && npm run db:generate:pg",
+    "db:push:all": "npm run db:push && npm run db:push:pg"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@prisma/client": "^7.10.0",
+    "@prisma/client": "^6.19.3",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.21.2"
@@ -21,7 +25,8 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
     "@types/node": "^26.4.0",
-    "prisma": "^7.10.0",
+    "effect": "^3.20.0",
+    "prisma": "^6.19.3",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3"
   },

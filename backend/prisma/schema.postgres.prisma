@@ -1,0 +1,124 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// LeafCheck — PostgreSQL Schema (Relational Domain Entities)
+//
+// All domain entities live here. MongoDB handles only SensorReading telemetry.
+// Generator outputs to a custom path to avoid collision with the MongoDB client.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/postgres-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+  LEAD_DEV
+}
+
+// ─── Core Domain Models ───────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  devices Device[]
+  plants  Plant[]
+}
+
+model Device {
+  id         String   @id @default(uuid())
+  name       String
+  macAddress String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     String   @default("OFFLINE")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  plants Plant[]
+}
+
+model Plant {
+  id            String    @id @default(uuid())
+  name          String
+  species       String
+  location      String?
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId      String?
+  device        Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  healthStatus  String    @default("healthy")
+  minMoisture   Float     @default(30.0)
+  maxMoisture   Float     @default(80.0)
+  lastScannedAt DateTime?
+  imageUrl      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  identifications PlantIdentification[]
+  analyses        AIAnalysis[]
+}
+
+// ─── AI Scanner Pipeline Models ───────────────────────────────────────────────
+
+/// Cached ideal environmental specs per species (populated from Perenual API).
+/// pH values here are botanical reference data, NOT live sensor readings.
+model PlantSpecCache {
+  id                String   @id @default(uuid())
+  speciesName       String   @unique
+  commonName        String?
+  idealLuxMin       Int?
+  idealLuxMax       Int?
+  idealTempMinC     Float?
+  idealTempMaxC     Float?
+  idealHumidityMin  Float?
+  idealHumidityMax  Float?
+  idealPhMin        Float?
+  idealPhMax        Float?
+  wateringFrequency String?
+  sunlight          String?
+  rawJson           Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// Records each Pl@ntNet species identification attempt.
+model PlantIdentification {
+  id          String   @id @default(uuid())
+  plantId     String
+  plant       Plant    @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  speciesName String
+  commonName  String?
+  confidence  Float
+  imageUrl    String?
+  rawResponse Json?
+  createdAt   DateTime @default(now())
+}
+
+/// Stores Gemini AI diagnostic reports with telemetry snapshots.
+model AIAnalysis {
+  id                String   @id @default(uuid())
+  plantId           String
+  plant             Plant    @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  healthStatus      String
+  diagnoses         Json
+  recommendations   Json
+  rawAnalysisText   String?
+  speciesName       String?
+  telemetrySnapshot Json?
+  idealSpecs        Json?
+  createdAt         DateTime @default(now())
+}

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../lib/prisma.js";
+import { prismaPg } from "../lib/prisma-pg.js";
 import { Plant } from "../types/plant.js";
 
 export const plantsRouter = Router();
@@ -10,7 +10,7 @@ export const plantsRouter = Router();
  */
 plantsRouter.get("/", async (_req: Request, res: Response) => {
   try {
-    const plants = await prisma.plant.findMany({
+    const plants = await prismaPg.plant.findMany({
       orderBy: { updatedAt: "desc" },
     });
 
@@ -39,9 +39,9 @@ plantsRouter.get("/", async (_req: Request, res: Response) => {
  * Returns a single plant by ID.
  */
 plantsRouter.get("/:id", async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   try {
-    const plant = await prisma.plant.findUnique({ where: { id } });
+    const plant = await prismaPg.plant.findUnique({ where: { id } });
     if (!plant) {
       res.status(404).json({ error: "Plant not found." });
       return;
@@ -51,7 +51,7 @@ plantsRouter.get("/:id", async (req: Request, res: Response) => {
       name: plant.name,
       species: plant.species,
       location: plant.location ?? undefined,
-      healthStatus: plant.healthStatus,
+      healthStatus: plant.healthStatus as Plant["healthStatus"],
       lastScannedAt: plant.lastScannedAt?.toISOString() ?? undefined,
       imageUrl: plant.imageUrl ?? undefined,
       createdAt: plant.createdAt.toISOString(),
@@ -68,11 +68,11 @@ plantsRouter.get("/:id", async (req: Request, res: Response) => {
  * Updates the healthStatus of a plant (called after AI diagnosis completes).
  */
 plantsRouter.patch("/:id/health", async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { healthStatus } = req.body as { healthStatus: Plant["healthStatus"] };
 
   try {
-    const updated = await prisma.plant.update({
+    const updated = await prismaPg.plant.update({
       where: { id },
       data: {
         healthStatus,

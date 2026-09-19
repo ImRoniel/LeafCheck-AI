@@ -38,8 +38,7 @@ aiRouter.post("/analyze", async (req: Request, res: Response) => {
     const telemetrySummary = request.telemetry
       ? `Associated Sensor Telemetry:
   - Soil Moisture: ${request.telemetry.soilMoisture.percentage.toFixed(1)}% (${request.telemetry.soilMoisture.status})
-  - pH Level: ${request.telemetry.phLevel.value.toFixed(2)} (${request.telemetry.phLevel.status})
-  - PAR Light: ${request.telemetry.parLight.ppfd.toFixed(1)} PPFD (${request.telemetry.parLight.status})
+  ${request.telemetry.lightLevel ? `- Light Level: ${request.telemetry.lightLevel.lux.toFixed(1)} lux (${request.telemetry.lightLevel.status})` : ""}
   ${request.telemetry.environment ? `- Temperature: ${request.telemetry.environment.temperatureCelsius}°C, Humidity: ${request.telemetry.environment.humidityPercentage}%` : ""}`
       : "";
 
