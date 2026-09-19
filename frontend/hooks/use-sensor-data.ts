@@ -1,30 +1,6 @@
-import { useState, useEffect } from "react";
-import { TelemetryPayload } from "../types";
-import { fetchLatestTelemetry } from "../services";
-
-export const useSensorData = (deviceId: string) => {
-  const [telemetry, setTelemetry] = useState<TelemetryPayload | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refreshData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchLatestTelemetry(deviceId);
-      setTelemetry(data);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load telemetry data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (deviceId) {
-      refreshData();
-    }
-  }, [deviceId]);
-
-  return { telemetry, loading, error, refreshData };
-};
+import { fetchLatestTelemetry } from "../services/api";
+import { usePollingResource, type PollingOptions } from "../services/use-polling-resource";
+export function useSensorData(deviceId: string | null | undefined, options: PollingOptions = {}) {
+  const resource=usePollingResource(deviceId ?? "",signal=>fetchLatestTelemetry(deviceId!,{signal}),options);
+  return {telemetry:resource.data,loading:resource.loading,error:resource.error,refreshData:resource.refresh};
+}

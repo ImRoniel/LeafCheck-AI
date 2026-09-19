@@ -1,2 +1,4 @@
-// Public API surface for all frontend services
-export { fetchLatestTelemetry, fetchUserPlants, analyzePlant } from "./api";
+export * from "./api";
+export * from "./errors";
+export * from "./scan-flow";
+
