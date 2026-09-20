@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node --import tsx/esm src/server.ts",
     "dev:watch": "node --watch --import tsx/esm src/server.ts",
-    "build": "tsc",
+    "build": "npm run db:generate:all && tsc && node scripts/package-prisma-client.mjs",
+    "test": "node --import tsx/esm --experimental-test-module-mocks --test tests/*.test.mjs",
     "start": "node dist/server.js",
     "db:generate": "prisma generate --schema=prisma/schema.prisma",
     "db:push": "prisma db push --schema=prisma/schema.prisma",
@@ -19,7 +20,9 @@
     "@prisma/client": "^6.19.3",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
