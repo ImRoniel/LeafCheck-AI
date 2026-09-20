@@ -26,15 +26,22 @@
 #include <ArduinoJson.h>
 #include <Adafruit_SHT31.h>
 #include <BH1750.h>
+#include <cmath>
 #include "config.h"
 
 // ─── Sensor Instances ────────────────────────────────────────────────────────
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 BH1750 lightMeter;
+bool sht31Ready = false;
+bool lightMeterReady = false;
+constexpr int SOIL_ADC_BITS = 12;
+constexpr int SOIL_ADC_MAX = (1 << SOIL_ADC_BITS) - 1;
 
 // ─── Forward Declarations ────────────────────────────────────────────────────
 void connectWiFi();
-float mapSoilMoisture(int rawValue);
+void initializeSensors();
+void skipTelemetryCycle(const char* reason);
+bool mapSoilMoisture(int rawValue, float& percentage);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SETUP
@@ -54,24 +61,12 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL);
   Serial.printf("[I2C] Bus initialized (SDA=%d, SCL=%d)\n", I2C_SDA, I2C_SCL);
 
-  // ── Initialize SHT31 (Temperature & Humidity) ──────────────────────────
-  if (!sht31.begin(0x44)) {
-    Serial.println("[ERROR] SHT31 not found at 0x44! Check wiring.");
-  } else {
-    Serial.println("[  OK ] SHT31 initialized (temp + humidity).");
-    // Enable the internal heater briefly to clear condensation on first boot
-    sht31.heater(false);
-  }
-
-  // ── Initialize BH1750 (Ambient Light) ──────────────────────────────────
-  if (!lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
-    Serial.println("[ERROR] BH1750 not found! Check wiring.");
-  } else {
-    Serial.println("[  OK ] BH1750 initialized (ambient light).");
-  }
+  // Initialization status is retained for bounded retries in the main loop.
+  initializeSensors();
 
   // ── Initialize Soil Moisture Pin ───────────────────────────────────────
   pinMode(SOIL_MOISTURE_PIN, INPUT);
+  analogReadResolution(SOIL_ADC_BITS);
   Serial.printf("[  OK ] Soil moisture pin GPIO %d configured.\n", SOIL_MOISTURE_PIN);
 
   // ── Connect to WiFi ────────────────────────────────────────────────────
@@ -99,26 +94,48 @@ void loop() {
     }
   }
 
+  // Retry only failed sensors, at most once per telemetry cycle.
+  initializeSensors();
+  if (!sht31Ready || !lightMeterReady) {
+    skipTelemetryCycle("Required digital sensor is not initialized.");
+    return;
+  }
+  // Use the library's maximum conversion time, including after recovery.
+  if (!lightMeter.measurementReady(true)) {
+    skipTelemetryCycle("BH1750 measurement is not ready yet.");
+    return;
+  }
+
   // ── Read SHT31 (Temperature & Humidity) ────────────────────────────────
   float temperature = sht31.readTemperature();
   float humidity    = sht31.readHumidity();
 
-  if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("[WARN] SHT31 returned NaN — sensor may be disconnected.");
-    delay(READ_INTERVAL_MS);
+  if (!std::isfinite(temperature) || temperature < -40.0f || temperature > 125.0f) {
+    sht31Ready = false;
+    skipTelemetryCycle("SHT31 temperature is non-finite or outside -40..125 C.");
+    return;
+  }
+  if (!std::isfinite(humidity) || humidity < 0.0f || humidity > 100.0f) {
+    sht31Ready = false;
+    skipTelemetryCycle("SHT31 humidity is non-finite or outside 0..100%.");
     return;
   }
 
   // ── Read BH1750 (Ambient Light) ────────────────────────────────────────
   float lux = lightMeter.readLightLevel();
-  if (lux < 0) {
-    Serial.println("[WARN] BH1750 returned negative value — using 0.");
-    lux = 0;
+  if (!std::isfinite(lux) || lux < 0.0f) {
+    lightMeterReady = false;
+    skipTelemetryCycle("BH1750 returned a non-finite or negative error reading.");
+    return;
   }
 
   // ── Read Capacitive Soil Moisture ──────────────────────────────────────
   int soilRaw = analogRead(SOIL_MOISTURE_PIN);
-  float soilPct = mapSoilMoisture(soilRaw);
+  float soilPct;
+  if (!mapSoilMoisture(soilRaw, soilPct)) {
+    skipTelemetryCycle("Soil measurement or calibration is invalid.");
+    return;
+  }
 
   // ── Build JSON Payload ─────────────────────────────────────────────────
   // Keys MUST match the Express backend validation schema exactly.
@@ -168,6 +185,30 @@ void loop() {
 // HELPER FUNCTIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
+void initializeSensors() {
+  if (!sht31Ready) {
+    sht31Ready = sht31.begin(0x44);
+    if (sht31Ready) {
+      // Keep the heater disabled so ambient readings are not biased.
+      sht31.heater(false);
+      Serial.println("[  OK ] SHT31 initialized (temp + humidity).");
+    } else {
+      Serial.println("[ERROR] SHT31 initialization failed at 0x44; check wiring.");
+    }
+  }
+  if (!lightMeterReady) {
+    lightMeterReady = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
+    Serial.println(lightMeterReady
+        ? "[  OK ] BH1750 initialized (ambient light)."
+        : "[ERROR] BH1750 initialization failed at 0x23; check wiring.");
+  }
+}
+
+void skipTelemetryCycle(const char* reason) {
+  Serial.printf("[WARN] %s Telemetry skipped; no HTTP POST.\n", reason);
+  delay(READ_INTERVAL_MS);
+}
+
 /**
  * Connects to WiFi with retry logic.
  * Blocks until connected or max attempts (20s) exceeded.
@@ -201,9 +242,26 @@ void connectWiFi() {
  *   - HIGH ADC in air (dry)   → SOIL_CAL_DRY
  *   - LOW  ADC in water (wet) → SOIL_CAL_WET
  */
-float mapSoilMoisture(int rawValue) {
-  float percentage =
+bool mapSoilMoisture(int rawValue, float& percentage) {
+  if (!(SOIL_CAL_WET > 0 && SOIL_CAL_WET < SOIL_CAL_DRY &&
+        SOIL_CAL_DRY < SOIL_ADC_MAX)) {
+    Serial.println("[ERROR] Soil calibration requires 0 < wet < dry < 4095.");
+    return false;
+  }
+  // Rail readings can indicate a short, disconnection, or saturation.
+  // A floating disconnected input can still be midrange; this is not a
+  // complete analog disconnect detector.
+  if (rawValue <= 0 || rawValue >= SOIL_ADC_MAX) {
+    Serial.printf("[WARN] Soil ADC reading %d is at/outside a rail.\n", rawValue);
+    return false;
+  }
+  percentage =
       (float)(SOIL_CAL_DRY - rawValue) /
       (float)(SOIL_CAL_DRY - SOIL_CAL_WET) * 100.0f;
-  return constrain(percentage, 0.0f, 100.0f);
+  if (!std::isfinite(percentage)) {
+    Serial.println("[ERROR] Soil conversion produced a non-finite percentage.");
+    return false;
+  }
+  percentage = constrain(percentage, 0.0f, 100.0f);
+  return true;
 }

@@ -1,0 +1,5 @@
+# Local credentials, regardless of their location within this firmware project.
+config.h
+
+# PlatformIO build products and downloaded dependencies.
+.pio/
