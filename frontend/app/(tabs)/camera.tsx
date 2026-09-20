@@ -21,7 +21,7 @@ export default function Camera() {
   const data = useAppData(); const flow = useScan(); const busy = capturing || flow.scanning || flow.synchronizing;
   const enabled = focused && active; const enabledRef = useRef(enabled);
   useEffect(() => { if (plantId && !flow.report && !lock.current) { setSelected(plantId); setPhoto(null); } }, [plantId, flow.report]);
-  useEffect(() => { alive.current = true; const subscription = AppState.addEventListener('change', state => { setActive(state === 'active'); if (state !== 'active') { enabledRef.current = false; ++generation.current; setReady(false); } }); return () => { alive.current = false; ++generation.current; subscription.remove(); }; }, []);
+  useEffect(() => { alive.current = true; const subscription = AppState.addEventListener('change', state => { setActive(state === 'active'); if (state !== 'active') { enabledRef.current = false; ++generation.current; setReady(false); } }); return () => { alive.current = false; subscription.remove(); }; }, []);
   // Readiness belongs to the mounted native preview and must reset when it unmounts.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { enabledRef.current = enabled; if (!enabled) { ++generation.current; setReady(false); } }, [enabled]);

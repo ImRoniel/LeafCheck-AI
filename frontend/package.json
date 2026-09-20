@@ -8,6 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
     "reset-project": "node ./scripts/reset-project.js"
   },
   "dependencies": {
@@ -47,6 +49,7 @@
     "@types/react": "~19.2.4",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.2",
+    "tsx": "^4.23.12",
     "typescript": "~6.0.3"
   },
   "private": true
