@@ -15,12 +15,12 @@
 //   7. Return    → diagnostic report to client
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Router, Request, Response } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { prisma } from "../lib/prisma.js";
-import { prismaPg } from "../lib/prisma-pg.js";
-import { identifyPlant } from "../lib/plantnet.js";
+import { Request, Response, Router } from "express";
 import { fetchPlantSpecs } from "../lib/perenual.js";
+import { identifyPlant } from "../lib/plantnet.js";
+import { prismaPg } from "../lib/prisma-pg.js";
+import { prisma } from "../lib/prisma.js";
 import type { ScanRequest } from "../types/scan.js";
 
 export const scanRouter = Router();
@@ -37,7 +37,9 @@ scanRouter.post("/", async (req: Request, res: Response) => {
 
   // ── Input Validation ──────────────────────────────────────────────────────
   if (!imageBase64 || typeof imageBase64 !== "string") {
-    res.status(400).json({ error: "imageBase64 is required (base64-encoded JPEG)." });
+    res
+      .status(400)
+      .json({ error: "imageBase64 is required (base64-encoded JPEG)." });
     return;
   }
   if (!plantId || typeof plantId !== "string") {
@@ -45,7 +47,9 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     return;
   }
   if (!genAI) {
-    res.status(503).json({ error: "Gemini API key is not configured. Set GEMINI_API_KEY in .env." });
+    res.status(503).json({
+      error: "Gemini API key is not configured. Set GEMINI_API_KEY in .env.",
+    });
     return;
   }
 
@@ -82,26 +86,53 @@ scanRouter.post("/", async (req: Request, res: Response) => {
 
         if (!cached) {
           console.log("[Scan] Cache miss — fetching from Perenual API...");
-          const perenualData = await fetchPlantSpecs(identification.speciesName);
+          const perenualData = await fetchPlantSpecs(
+            identification.speciesName,
+          );
           if (perenualData) {
-            cached = await prismaPg.plantSpecCache.create({
-              data: {
-                speciesName: perenualData.speciesName,
-                commonName: perenualData.commonName,
-                idealLuxMin: perenualData.idealLuxMin,
-                idealLuxMax: perenualData.idealLuxMax,
-                idealTempMinC: perenualData.idealTempMinC,
-                idealTempMaxC: perenualData.idealTempMaxC,
-                idealHumidityMin: perenualData.idealHumidityMin,
-                idealHumidityMax: perenualData.idealHumidityMax,
-                idealPhMin: perenualData.idealPhMin,
-                idealPhMax: perenualData.idealPhMax,
-                wateringFrequency: perenualData.wateringFrequency,
-                sunlight: perenualData.sunlight,
-                rawJson: perenualData.rawJson as object,
-              },
-            });
-            console.log("[Scan] Cached specs for %s.", perenualData.speciesName);
+            try {
+              cached = await prismaPg.plantSpecCache.create({
+                data: {
+                  speciesName: perenualData.speciesName,
+                  commonName: perenualData.commonName,
+                  idealLuxMin: perenualData.idealLuxMin,
+                  idealLuxMax: perenualData.idealLuxMax,
+                  idealTempMinC: perenualData.idealTempMinC,
+                  idealTempMaxC: perenualData.idealTempMaxC,
+                  idealHumidityMin: perenualData.idealHumidityMin,
+                  idealHumidityMax: perenualData.idealHumidityMax,
+                  idealPhMin: perenualData.idealPhMin,
+                  idealPhMax: perenualData.idealPhMax,
+                  wateringFrequency: perenualData.wateringFrequency,
+                  sunlight: perenualData.sunlight,
+                  rawJson: perenualData.rawJson as object,
+                },
+              });
+              console.log(
+                "[Scan] Cached specs for %s.",
+                perenualData.speciesName,
+              );
+            } catch (error: unknown) {
+              if (
+                typeof error !== "object" ||
+                error === null ||
+                !("code" in error) ||
+                (error.code !== "P2002" && error.code !== "P2034")
+              ) {
+                throw error;
+              }
+
+              // Another scan may have inserted this species after our cache miss.
+              // Read the insertion key: Perenual may return a different name.
+              cached = await prismaPg.plantSpecCache.findUnique({
+                where: { speciesName: perenualData.speciesName },
+              });
+              if (!cached) throw error;
+              console.log(
+                "[Scan] Reused concurrently cached specs for %s.",
+                cached.speciesName,
+              );
+            }
           }
         } else {
           console.log("[Scan] Cache hit for %s.", cached.speciesName);
@@ -131,7 +162,8 @@ scanRouter.post("/", async (req: Request, res: Response) => {
       const isStale = ageMinutes > 30;
 
       if (ageMinutes < 1) {
-        freshnessContext = "Sensor reading is from less than 1 minute ago (FRESH — highly reliable).";
+        freshnessContext =
+          "Sensor reading is from less than 1 minute ago (FRESH — highly reliable).";
       } else if (isStale) {
         freshnessContext = `Sensor reading is ${ageMinutes} minutes old (STALE — readings may not reflect current conditions. Treat with lower confidence).`;
       } else {
