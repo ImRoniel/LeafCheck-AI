@@ -48,7 +48,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-app-example
+
 
 # generated native folders
 /ios
@@ -75,4 +75,4 @@ backend/dist/
 structure.txt 
 
 # MongoDB Atlas credentials (already covered by .env.* above — explicit guard)
-atlas-credentials.env
+atlas-credentials.envapp-example
