@@ -117,6 +117,14 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
       return;
     }
 
+    // Virtual devices only accept the authenticated, owner-scoped demo generator.
+    if (device.macAddress?.startsWith("DEMO:")) {
+      res
+        .status(403)
+        .json({ error: "Virtual devices do not accept hardware ingestion." });
+      return;
+    }
+
     // Step 3: Insert into MongoDB with server-authoritative timestamp
     const reading = await prisma.sensorReading.create({
       data: {

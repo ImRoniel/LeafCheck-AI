@@ -112,6 +112,75 @@ test("URL environment precedence and platform defaults", () => {
     "https://example.test",
   );
 });
+
+test("plant updates trim fields, preserve clearing and moisture bounds, and attach bearer tokens", async () => {
+  const api = createApiClient({
+    baseUrl: "http://test",
+    fetch: async (url, init) => {
+      assert.equal(String(url), "http://test/api/plants/a%2Fb");
+      assert.equal(init?.method, "PATCH");
+      assert.equal(
+        new Headers(init?.headers).get("Authorization"),
+        "Bearer access",
+      );
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        name: "Fern",
+        location: "",
+        minMoisture: 0,
+        maxMoisture: 100,
+      });
+      return new Response(
+        JSON.stringify({ ...plant, minMoisture: 0, maxMoisture: 100 }),
+      );
+    },
+  });
+  const result = await api.updatePlant(
+    "a/b",
+    {
+      name: " Fern ",
+      location: " ",
+      minMoisture: 0,
+      maxMoisture: 100,
+    },
+    { accessToken: "access" },
+  );
+  assert.equal(result.maxMoisture, 100);
+});
+
+test("plant updates reject invalid fields and propagate missing plants", async () => {
+  let calls = 0;
+  const api = createApiClient({
+    fetch: async () => {
+      calls++;
+      return new Response("{}");
+    },
+  });
+  for (const body of [
+    {},
+    { name: " " },
+    { species: "" },
+    { minMoisture: -1 },
+    { maxMoisture: 101 },
+    { minMoisture: NaN },
+    { maxMoisture: Infinity },
+    { imageUrl: "file:///secret" },
+    { userId: "other" },
+    { minMoisture: "30" },
+  ])
+    assert.throws(
+      () => api.updatePlant("p", body as Parameters<typeof api.updatePlant>[1]),
+      kind("validation"),
+    );
+  assert.equal(calls, 0);
+  await assert.rejects(
+    client({}, 404).updatePlant("p", { name: "Fern" }),
+    (e: unknown) => e instanceof ApiError && e.status === 404,
+  );
+  await assert.rejects(
+    client({ ...plant, minMoisture: 101 }).fetchPlant("p"),
+    kind("validation"),
+  );
+});
 test("all seven operations use correct routes and bodies", async () => {
   const responses = [
     [plant],

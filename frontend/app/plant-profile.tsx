@@ -1,8 +1,9 @@
 import { DeletePlantAction } from "@/components/delete-plant-action";
+import { EditPlantForm } from "@/components/edit-plant-form";
 import { PlantTelemetry } from "@/components/plant-telemetry";
 import { Action, Notice, Screen, ui } from "@/components/screen";
 import { useAppData } from "@/context/app-data";
-import { fetchPlant } from "@/services/api";
+import { fetchPlant, seedTelemetry } from "@/services/api";
 import type { Plant } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -12,16 +13,21 @@ import { Image, Text, View } from "react-native";
 export default function PlantProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { devices } = useAppData();
+  const { devices, refresh } = useAppData();
+  const [seeding, setSeeding] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
+  const [telemetryVersion, setTelemetryVersion] = useState(0);
   const [plant, setPlant] = useState<Plant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [editing, setEditing] = useState(false);
   useFocusEffect(
     useCallback(() => {
       void attempt;
       const controller = new AbortController();
       setPlant(null);
+      setEditing(false);
       setLoading(true);
       setError(null);
       if (!id) {
@@ -81,6 +87,26 @@ export default function PlantProfile() {
                 : "Not recorded"}
             </Text>
           </View>
+          {editing ? (
+            <EditPlantForm
+              key={plant.id}
+              plant={plant}
+              onCancel={() => setEditing(false)}
+              onSaved={(updated) => {
+                setPlant(updated);
+                setEditing(false);
+              }}
+            />
+          ) : (
+            <Action
+              label="Edit plant details"
+              onPress={() => setEditing(true)}
+            />
+          )}
+          <Text style={ui.text}>
+            Moisture thresholds: {plant.minMoisture ?? 30}% –{" "}
+            {plant.maxMoisture ?? 80}%
+          </Text>
           <Action
             label="Scan this plant"
             onPress={() =>
@@ -99,17 +125,52 @@ export default function PlantProfile() {
               })
             }
           />
-          {devices[plant.id] ? (
+          {(!plant.deviceId || plant.simulated) && (
+            <Action
+              label={
+                seeding
+                  ? "Generating demo readings..."
+                  : "Generate Demo Readings"
+              }
+              disabled={seeding}
+              onPress={async () => {
+                setSeeding(true);
+                setSeedError(null);
+                try {
+                  const updated = await seedTelemetry(plant.id);
+                  setPlant(updated);
+                  setTelemetryVersion((version) => version + 1);
+                  await refresh();
+                } catch (e) {
+                  setSeedError(
+                    e instanceof Error
+                      ? e.message
+                      : "Unable to generate readings.",
+                  );
+                } finally {
+                  setSeeding(false);
+                }
+              }}
+            />
+          )}
+          {seedError && <Notice>{seedError}</Notice>}
+          {plant.simulated && (
+            <Notice>Simulated sensor data — no hardware connected</Notice>
+          )}
+          {plant.deviceId || devices[plant.id] ? (
             <PlantTelemetry
-              key={devices[plant.id]}
-              deviceId={devices[plant.id]}
+              key={`${plant.deviceId || devices[plant.id]}:${telemetryVersion}`}
+              deviceId={plant.deviceId || devices[plant.id]}
+              linked={!!plant.deviceId}
             />
           ) : (
             <Notice>
               No local device mapping. Image-only scanning remains available.
             </Notice>
           )}
-          <DeletePlantAction key={plant.id} id={plant.id} name={plant.name} />
+          {!editing && (
+            <DeletePlantAction key={plant.id} id={plant.id} name={plant.name} />
+          )}
         </>
       )}
     </Screen>

@@ -1,8 +1,10 @@
 import {
   fetchUserPlants,
+  updatePlant as patchPlant,
   createPlant as postPlant,
   deletePlant as removePlant,
   type CreatePlantInput,
+  type UpdatePlantInput,
 } from "@/services/api";
 import type { Plant } from "@/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,7 +17,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import { useAuth } from "./auth";
+import { session, useAuth } from "./auth";
 
 const Context = createContext<{
   guest: boolean;
@@ -27,12 +29,24 @@ const Context = createContext<{
   error: string | null;
   refresh: () => Promise<void>;
   createPlant: (input: CreatePlantInput) => Promise<Plant>;
+  updatePlant: (id: string, input: UpdatePlantInput) => Promise<Plant>;
   deletePlant: (id: string) => Promise<void>;
   devices: Record<string, string>;
   saveDevice: (id: string, device: string) => Promise<void>;
   storageError: string | null;
 } | null>(null);
 export function AppDataProvider({ children }: PropsWithChildren) {
+  const auth = useAuth();
+  // Remount all account data (and consumers) at every authentication boundary.
+  return (
+    <AccountDataProvider
+      key={`${auth.generation}:${auth.status}:${auth.user?.id ?? "guest"}`}
+    >
+      {children}
+    </AccountDataProvider>
+  );
+}
+function AccountDataProvider({ children }: PropsWithChildren) {
   const auth = useAuth();
   const guest = auth.isGuest;
   const authenticated = auth.status === "authenticated";
@@ -46,6 +60,25 @@ export function AppDataProvider({ children }: PropsWithChildren) {
   const controller = useRef<AbortController | null>(null);
   const deviceRef = useRef<Record<string, string>>({});
   const storageReady = useRef(false);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      controller.current?.abort();
+    };
+  }, []);
+  const assertSession = () => {
+    const current = session.snapshot();
+    if (
+      !active.current ||
+      !authenticated ||
+      current.status !== "authenticated" ||
+      current.generation !== auth.generation ||
+      current.user?.id !== auth.user?.id
+    )
+      throw new Error("Session changed. Sign in to manage plants.");
+  };
   useEffect(() => {
     let active = true;
     AsyncStorage.getItem(storageKey)
@@ -113,7 +146,9 @@ export function AppDataProvider({ children }: PropsWithChildren) {
     setStorageError(null);
   };
   const createPlant = async (input: CreatePlantInput) => {
+    assertSession();
     const plant = await postPlant(input);
+    assertSession();
     // A list request started before this write must not erase the new plant.
     controller.current?.abort();
     setLoading(false);
@@ -122,14 +157,32 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       plant,
       ...current.filter((item) => item.id !== plant.id),
     ]);
+    await refresh();
+    assertSession();
+    return plant;
+  };
+  const updatePlant = async (id: string, input: UpdatePlantInput) => {
+    assertSession();
+    const plant = await patchPlant(id, input);
+    assertSession();
+    controller.current?.abort();
+    setPlants((current) =>
+      current.map((item) => (item.id === id ? plant : item)),
+    );
+    await refresh();
+    assertSession();
     return plant;
   };
   const deletePlant = async (id: string) => {
+    assertSession();
     await removePlant(id);
+    assertSession();
     controller.current?.abort();
     setLoading(false);
     setError(null);
     setPlants((current) => current.filter((plant) => plant.id !== id));
+    await refresh();
+    assertSession();
   };
   return (
     <Context.Provider
@@ -143,6 +196,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
         error,
         refresh,
         createPlant,
+        updatePlant,
         deletePlant,
         devices,
         saveDevice,
