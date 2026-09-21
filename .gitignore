@@ -76,3 +76,6 @@ structure.txt
 
 # MongoDB Atlas credentials (already covered by .env.* above — explicit guard)
 atlas-credentials.envapp-example
+
+#postman test
+LeafCheck_Auth_Postman_Collection.json

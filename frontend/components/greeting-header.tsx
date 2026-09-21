@@ -1,10 +1,15 @@
+import { useAuth } from "@/context/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export function GreetingHeader() {
   const router = useRouter();
-  const profile = { name: 'Guest', photoUri: undefined as string | undefined };
+  const auth = useAuth();
+  const profile = {
+    name: auth.user?.name || (auth.isGuest ? "Guest" : "Plant lover"),
+    photoUri: undefined as string | undefined,
+  };
   const date = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
@@ -15,9 +20,12 @@ export function GreetingHeader() {
   return (
     <View style={styles.container}>
       <View style={styles.greetingContainer}>
-        <Text style={styles.greeting}>Hello, {profile.name.trim().split(/\s+/)[0] || "User"} &</Text>
+        <Text style={styles.greeting}>
+          Hello, {profile.name.trim().split(/\s+/)[0] || "User"} &
+        </Text>
         <Text style={styles.greetingAccent}>
-          {getGreeting().replace("!", "")}<Text style={styles.greetingExclamation}>!</Text>
+          {getGreeting().replace("!", "")}
+          <Text style={styles.greetingExclamation}>!</Text>
         </Text>
         <Text style={styles.date}>{date}</Text>
       </View>
@@ -28,13 +36,18 @@ export function GreetingHeader() {
         accessibilityLabel="Open profile"
       >
         {profile.photoUri ? (
-          <Image source={{ uri: profile.photoUri }} style={styles.profileImage} />
+          <Image
+            source={{ uri: profile.photoUri }}
+            style={styles.profileImage}
+          />
         ) : (
           <Ionicons name="person-outline" size={25} color="#20A64A" />
         )}
       </TouchableOpacity>
       <View style={styles.modePill}>
-        <Text style={styles.modeText}>Guest • API collection</Text>
+        <Text style={styles.modeText}>
+          {auth.isGuest ? "Guest • Local only" : "Private collection"}
+        </Text>
       </View>
     </View>
   );

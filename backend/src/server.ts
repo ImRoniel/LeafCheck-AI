@@ -3,20 +3,37 @@ import "dotenv/config";
 import express from "express";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
+import { authConfig } from "./lib/auth-config.js";
+import { errorHandler } from "./lib/http.js";
 import { ensureTTLIndex } from "./lib/ttl.js";
 import { aiRouter } from "./routes/ai.js";
+import { authRouter } from "./routes/auth.js";
 import { plantsRouter } from "./routes/plants.js";
 import { scanRouter } from "./routes/scan.js";
 import { telemetryRouter } from "./routes/telemetry.js";
+import { usersRouter } from "./routes/users.js";
 
 const app = express();
-const PORT = process.env.PORT ?? 3000;
+const PORT = Number(process.env.PORT ?? 3000);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 // Direct connections only; never trust client-supplied forwarding headers.
 app.set("trust proxy", false);
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: (origin, callback) =>
+      callback(null, !!origin && authConfig.origins.includes(origin)),
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-CSRF-Protection",
+      "X-Auth-Client",
+    ],
+  }),
+);
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -38,7 +55,22 @@ app.use(
     message: { error: "Too many scan requests. Please try again later." },
   }),
 );
-app.use(express.json({ limit: "10mb" })); // allow base64 image payloads
+app.use(
+  "/api/auth",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    identifier: "auth",
+    message: {
+      error: "Too many authentication requests.",
+      code: "RATE_LIMITED",
+    },
+  }),
+);
+app.use(["/api/scan", "/api/ai/analyze"], express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "16kb" }));
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
@@ -54,6 +86,9 @@ app.use("/api/telemetry", telemetryRouter);
 app.use("/api/plants", plantsRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/scan", scanRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/users", usersRouter);
+app.use(errorHandler);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -61,8 +96,8 @@ app.use((_req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, async () => {
-  console.log(`[LeafCheck Backend] Listening on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", async () => {
+  console.log(`[LeafCheck Backend] Listening on http://0.0.0.0:${PORT}`);
 
   // Enforce configurable TTL index on MongoDB SensorReading collection
   try {

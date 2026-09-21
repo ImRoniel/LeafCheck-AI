@@ -6,12 +6,24 @@
 // GET  /api/telemetry/:deviceId/history → Paginated history
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Router, Request, Response } from "express";
-import { prisma } from "../lib/prisma.js";
+import { Request, Response, Router } from "express";
+import { requireAuth } from "../lib/auth.js";
+import { asyncRoute } from "../lib/http.js";
+import { ownedDevice } from "../lib/ownership.js";
 import { prismaPg } from "../lib/prisma-pg.js";
+import { prisma } from "../lib/prisma.js";
 import { TelemetryPayload } from "../types/sensor.js";
 
 export const telemetryRouter = Router();
+// Only reads require user authentication. Firmware POST remains unchanged.
+telemetryRouter.get(
+  ["/:deviceId/latest", "/:deviceId/history"],
+  requireAuth,
+  asyncRoute(async (req, res, next) => {
+    await ownedDevice(req.params.deviceId, res.locals.auth.user.id);
+    next();
+  }),
+);
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -53,7 +65,10 @@ function validateTelemetryPayload(body: unknown): string[] {
   const optionalNumbers = ["soilMoistureRaw", "lightLevel"] as const;
   for (const field of optionalNumbers) {
     if (b[field] !== undefined && b[field] !== null) {
-      if (typeof b[field] !== "number" || !Number.isFinite(b[field] as number)) {
+      if (
+        typeof b[field] !== "number" ||
+        !Number.isFinite(b[field] as number)
+      ) {
         errors.push(`${field} must be a finite number when provided.`);
       }
     }
@@ -128,55 +143,58 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
  * Returns the most recent SensorReading for a device,
  * shaped as a TelemetryPayload for the frontend.
  */
-telemetryRouter.get("/:deviceId/latest", async (req: Request, res: Response) => {
-  const deviceId = req.params.deviceId as string;
+telemetryRouter.get(
+  "/:deviceId/latest",
+  async (req: Request, res: Response) => {
+    const deviceId = req.params.deviceId as string;
 
-  try {
-    const reading = await prisma.sensorReading.findFirst({
-      where: { deviceId },
-      orderBy: { timestamp: "desc" },
-    });
+    try {
+      const reading = await prisma.sensorReading.findFirst({
+        where: { deviceId },
+        orderBy: { timestamp: "desc" },
+      });
 
-    if (!reading) {
-      res.status(404).json({ error: "No telemetry found for this device." });
-      return;
+      if (!reading) {
+        res.status(404).json({ error: "No telemetry found for this device." });
+        return;
+      }
+
+      // Map Prisma SensorReading → TelemetryPayload (frontend contract)
+      const payload: TelemetryPayload = {
+        deviceId: reading.deviceId,
+        timestamp: reading.timestamp.toISOString(),
+        soilMoisture: {
+          percentage: reading.soilMoisture,
+          rawAnalogValue: reading.soilMoistureRaw ?? 0,
+          status:
+            reading.soilMoisture > 70
+              ? "overwatered"
+              : reading.soilMoisture < 30
+                ? "dry"
+                : "optimal",
+        },
+        lightLevel: {
+          lux: reading.lightLevel ?? 0,
+          status:
+            (reading.lightLevel ?? 0) < 500
+              ? "insufficient"
+              : (reading.lightLevel ?? 0) > 50_000
+                ? "excessive"
+                : "optimal",
+        },
+        environment: {
+          temperatureCelsius: reading.temperature,
+          humidityPercentage: reading.humidity,
+        },
+      };
+
+      res.json(payload);
+    } catch (error) {
+      console.error("[Telemetry] GET latest error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
-
-    // Map Prisma SensorReading → TelemetryPayload (frontend contract)
-    const payload: TelemetryPayload = {
-      deviceId: reading.deviceId,
-      timestamp: reading.timestamp.toISOString(),
-      soilMoisture: {
-        percentage: reading.soilMoisture,
-        rawAnalogValue: reading.soilMoistureRaw ?? 0,
-        status:
-          reading.soilMoisture > 70
-            ? "overwatered"
-            : reading.soilMoisture < 30
-              ? "dry"
-              : "optimal",
-      },
-      lightLevel: {
-        lux: reading.lightLevel ?? 0,
-        status:
-          (reading.lightLevel ?? 0) < 500
-            ? "insufficient"
-            : (reading.lightLevel ?? 0) > 50_000
-              ? "excessive"
-              : "optimal",
-      },
-      environment: {
-        temperatureCelsius: reading.temperature,
-        humidityPercentage: reading.humidity,
-      },
-    };
-
-    res.json(payload);
-  } catch (error) {
-    console.error("[Telemetry] GET latest error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+  },
+);
 
 // ─── GET /api/telemetry/:deviceId/history ─────────────────────────────────────
 
@@ -184,33 +202,39 @@ telemetryRouter.get("/:deviceId/latest", async (req: Request, res: Response) => 
  * Returns paginated historical readings for a device.
  * Query params: ?limit=50&offset=0
  */
-telemetryRouter.get("/:deviceId/history", async (req: Request, res: Response) => {
-  const deviceId = req.params.deviceId as string;
-  const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
-  const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+telemetryRouter.get(
+  "/:deviceId/history",
+  async (req: Request, res: Response) => {
+    const deviceId = req.params.deviceId as string;
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit as string) || 50, 1),
+      200,
+    );
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
-  try {
-    const [readings, total] = await Promise.all([
-      prisma.sensorReading.findMany({
-        where: { deviceId },
-        orderBy: { timestamp: "desc" },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.sensorReading.count({ where: { deviceId } }),
-    ]);
+    try {
+      const [readings, total] = await Promise.all([
+        prisma.sensorReading.findMany({
+          where: { deviceId },
+          orderBy: { timestamp: "desc" },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.sensorReading.count({ where: { deviceId } }),
+      ]);
 
-    res.json({
-      data: readings,
-      pagination: {
-        total,
-        limit,
-        offset,
-        hasMore: offset + limit < total,
-      },
-    });
-  } catch (error) {
-    console.error("[Telemetry] GET history error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+      res.json({
+        data: readings,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total,
+        },
+      });
+    } catch (error) {
+      console.error("[Telemetry] GET history error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);

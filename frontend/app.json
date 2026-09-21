@@ -25,7 +25,14 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-camera", { "cameraPermission": "Allow LeafCheck AI to photograph a leaf for analysis.", "recordAudioAndroid": false }],
+      ["expo-secure-store", { "configureAndroidBackup": true }],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow LeafCheck AI to photograph a leaf for analysis.",
+          "recordAudioAndroid": false
+        }
+      ],
       [
         "expo-splash-screen",
         {

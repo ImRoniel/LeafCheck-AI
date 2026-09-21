@@ -2,6 +2,7 @@ import { CollectionState } from "@/components/plant-list";
 import { Action, Notice, Screen, ui } from "@/components/screen";
 import { measurement } from "@/components/telemetry-history";
 import { useAppData } from "@/context/app-data";
+import { useAuth } from "@/context/auth";
 import { useScan } from "@/hooks/use-scan";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, usePathname } from "expo-router";
@@ -19,6 +20,7 @@ import {
 // 4 MB base64 leaves ample JSON overhead under the gateway body limit.
 const MAX_BASE64_LENGTH = 4_000_000;
 export default function Camera() {
+  const auth = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const pathname = usePathname();
@@ -38,7 +40,7 @@ export default function Camera() {
   const data = useAppData();
   const flow = useScan();
   const busy = capturing || flow.scanning || flow.synchronizing;
-  const enabled = focused && active;
+  const enabled = focused && active && auth.status === "authenticated";
   const enabledRef = useRef(enabled);
   useEffect(() => {
     if (plantId && !flow.report && !lock.current) {
