@@ -31,39 +31,12 @@ model User {
   email     String   @unique
   name      String?
   password  String
-  isActive  Boolean  @default(true)
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   devices Device[]
   plants  Plant[]
-  sessions AuthSession[]
-}
-
-model AuthSession {
-  id        String @id @default(uuid())
-  userId    String
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client    String
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  revokedAt DateTime?
-  refreshTokens RefreshToken[]
-
-  @@index([userId, revokedAt])
-  @@index([expiresAt])
-}
-
-model RefreshToken {
-  id        String @id @default(uuid())
-  tokenHash String @unique
-  sessionId String
-  session   AuthSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  consumedAt DateTime?
-
-  @@index([sessionId])
 }
 
 model Device {

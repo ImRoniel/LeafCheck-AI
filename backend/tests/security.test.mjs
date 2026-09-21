@@ -9,8 +9,13 @@ let ttlCalls = 0;
 const originalPort = process.env.PORT;
 
 before(async () => {
+  process.env.AUTH_JWT_SECRET =
+    "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM";
+  process.env.AUTH_JWT_ISSUER = "test";
+  process.env.AUTH_JWT_AUDIENCE = "test";
+  process.env.AUTH_ALLOWED_ORIGINS = "https://example.test";
   process.env.PORT = "0";
-  for (const name of ["telemetry", "plants", "ai", "scan"]) {
+  for (const name of ["telemetry", "plants", "ai", "scan", "auth", "users"]) {
     const router = express.Router();
     if (name === "scan") {
       router.post("/", (_req, res) => {
@@ -43,6 +48,7 @@ before(async () => {
   assert.equal(app.get("trust proxy"), false);
   if (!server.listening)
     await new Promise((resolve) => server.once("listening", resolve));
+  assert.equal(server.address().address, "0.0.0.0");
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
 
@@ -67,6 +73,31 @@ test("headers, preflight, independent quotas, and rejection before body parsing"
   assert.equal((await health.json()).status, "ok");
   assert.equal(ttlCalls, 1);
 
+  // Small auth parser and JSON errors remain structured.
+  const oversized = await fetch(`${baseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: "x".repeat(17000) }),
+  });
+  assert.equal(oversized.status, 413);
+  assert.equal((await oversized.json()).code, "BODY_TOO_LARGE");
+  for (let i = 0; i < 19; i++) {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).code, "INVALID_JSON");
+  }
+  const authBlocked = await fetch(`${baseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{",
+  });
+  assert.equal(authBlocked.status, 429);
+  assert.equal((await authBlocked.json()).code, "RATE_LIMITED");
+
   const preflight = await fetch(`${baseUrl}/api/scan`, {
     method: "OPTIONS",
     headers: {
@@ -75,7 +106,10 @@ test("headers, preflight, independent quotas, and rejection before body parsing"
     },
   });
   assert.equal(preflight.status, 204);
-  assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+  assert.equal(
+    preflight.headers.get("access-control-allow-origin"),
+    "https://example.test",
+  );
 
   for (let i = 0; i < 10; i++) {
     const response = await fetch(`${baseUrl}/api/scan`, {
@@ -99,11 +133,11 @@ test("headers, preflight, independent quotas, and rejection before body parsing"
   );
   assert.ok(Number(scanBlocked.headers.get("retry-after")) > 0);
   assert.equal(scanBlocked.headers.get("x-content-type-options"), "nosniff");
-  assert.equal(scanBlocked.headers.get("access-control-allow-origin"), "*");
+  assert.equal(scanBlocked.headers.get("access-control-allow-origin"), null);
   assert.equal(scanCalls, 10);
 
-  // 12 requests counted globally so far; preflight is handled by CORS.
-  for (let i = 0; i < 288; i++) {
+  // 33 requests counted globally so far; preflight is handled by CORS.
+  for (let i = 0; i < 267; i++) {
     const response = await fetch(`${baseUrl}/missing`);
     assert.equal(response.status, 404);
     await response.json();

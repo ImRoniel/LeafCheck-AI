@@ -17,6 +17,9 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Request, Response, Router } from "express";
+import { requireAuth } from "../lib/auth.js";
+import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
+import { ownedDevice, ownedPlant } from "../lib/ownership.js";
 import { fetchPlantSpecs } from "../lib/perenual.js";
 import { identifyPlant } from "../lib/plantnet.js";
 import { prismaPg } from "../lib/prisma-pg.js";
@@ -24,6 +27,20 @@ import { prisma } from "../lib/prisma.js";
 import type { ScanRequest } from "../types/scan.js";
 
 export const scanRouter = Router();
+scanRouter.use(requireAuth);
+scanRouter.post(
+  "/",
+  asyncRoute(async (req, res, next) => {
+    const data = bodyObject(req.body, ["imageBase64", "plantId", "deviceId"]);
+    const plant = await ownedPlant(data.plantId, res.locals.auth.user.id);
+    if (data.deviceId !== undefined) {
+      const device = await ownedDevice(data.deviceId, res.locals.auth.user.id);
+      if (plant.deviceId !== device.id)
+        throw new HttpError(404, "NOT_FOUND", "Associated device not found.");
+    }
+    next();
+  }),
+);
 
 // ─── Gemini Client ────────────────────────────────────────────────────────────
 

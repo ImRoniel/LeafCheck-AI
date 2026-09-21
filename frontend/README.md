@@ -1,91 +1,120 @@
-# LeafCheck AI frontend integration
+# LeafCheck AI frontend — Phase 2 authentication
 
-Expo SDK 57 UI adapted from the donor prototype. The canonical Express backend,
-dual Prisma schemas, firmware, and root workspace configuration remain authoritative.
-The SDK 54 reference required by repository instructions and SDK 57 compatibility
-reference were reviewed before implementation.
+## Setup
 
-## Local setup
+The frontend remains on Expo SDK 57 / React Native 0.86. The repository-required
+SDK 54 reference and matching SDK 57 SecureStore documentation were consulted;
+no SDK downgrade was performed. `expo-secure-store ~57.0.4` matches Expo's bundled
+module recommendation. Rebuild the native development client after adding its
+config plugin. Android backup exclusions are enabled; iOS uses device-only,
+when-unlocked keychain accessibility without a biometric prompt.
 
-Run from the repository root:
+From the repository root, install the locked workspace dependencies with your
+normal approved setup procedure. Configure `frontend/.env` using `.env.example`,  
+then run `npm run android --workspace=frontend` or
+`npm run web --workspace=frontend`. Do not put database/provider credentials or
+JWT secrets in Expo public variables. No backend generation/migration is required
+by the frontend code changes; server deployment is a separate operator action.
 
-```powershell
-npm ci
-npm run db:generate:all --workspace=backend
-npm run backend
-```
+During implementation npm 11.6.2 failed its workspace installed-tree update with
+an Arborist `location` error. Lockfile-only resolution succeeded, and a frontend
+local install (`npm install --prefix frontend --workspaces=false
+--package-lock=false --ignore-scripts --install-strategy=shallow`) installed
+SecureStore without backend lifecycle scripts or root-manifest edits. Dependency
+audit reported moderate advisories; no forced upgrades were applied.
 
-Configure backend-only credentials locally: DATABASE_URL (MongoDB), POSTGRES_URL
-and DIRECT_URL (PostgreSQL), GEMINI_API_KEY, PLANTNET_API_KEY, and optionally
-PERENUAL_API_KEY. Never expose these through Expo public variables. Client generation
-does not synchronize schemas; do not run database push against an existing database
-without operator approval. Existing user/plant records are required. Device telemetry
-requires an existing registered PostgreSQL device.
+## Verified contract and deployment requirements
 
-In a separate terminal, choose one frontend target:
+Only the permitted server authentication deployment document and auth route were
+read. Their contract overrides the provisional platform-selector assumption:
 
-```powershell
-$env:EXPO_PUBLIC_API_URL = 'http://10.0.2.2:3000'
-npm run android --workspace=frontend
-```
+- Native auth selector: `X-Auth-Client: native`; requests omit browser credentials.
+- Browser auth: `X-CSRF-Protection: 1`, browser-provided allowed Origin, and
+  `credentials: include`. JavaScript never sets Origin or reads the refresh cookie.
+- `X-Client-Platform: native|web` is also included, but is **not** the server's
+  native selector. A cross-origin proxy/server must allow the actual headers.
+- All auth POST bodies are explicit JSON. Browser refresh sends `{}` and does not
+  require a bearer token. Native refresh sends only `refreshToken`.
+- Login/register return an access token; only native responses contain refresh
+  credentials. Access tokens remain in memory. No credential is persisted to
+  localStorage, sessionStorage, or AsyncStorage.
+- Logout uses bearer authentication and `{}`, and accepts an empty 204 response.
+- Profile GET requires bearer authentication. The permitted document does not
+  specify its response envelope: the client validates either `{id,email,name}`
+  or `{user:{id,email,name}}`, discarding unrelated fields. Verify this inference
+  against a live response. Name-only PATCH is documented but optional profile
+  editing is not exposed in this phase.
 
-```powershell
-$env:EXPO_PUBLIC_API_URL = 'http://localhost:3000'
-npm run web --workspace=frontend
-```
+Browser auth requires same-site **HTTPS** frontend/API deployment, an exact
+frontend origin in `AUTH_ALLOWED_ORIGINS`, and credentialed CORS when origins
+differ. The Secure, HttpOnly, SameSite=Strict `__Host-` cookie is incompatible with
+unrelated-site deployment and ordinary HTTP development. Use an HTTPS proxy for
+browser auth testing. Native emulators may use `http://10.0.2.2:3000`; physical
+phones need a reachable LAN endpoint. Use HTTPS for deployed native traffic.
 
-Alternatively copy the frontend environment example to a local environment file.
-An explicit URL overrides platform defaults. Physical phones require a LAN address,
-Windows firewall access and a compatible Expo client/development build. Web camera
-access requires a supported secure context. Native camera verification requires a device.
+## Session behavior
 
-## Behavior and limitations
+- A framework-independent coordinator binds to the existing API singleton without
+  importing React. AuthProvider wraps account-keyed AppDataProvider and navigation.
+- Native restore loads SecureStore, rotates, durably saves the replacement, then
+  fetches `/api/users/me`. SecureStore failures are explicit; access is never
+  published before persistence succeeds. Ambiguous rotation failures require a
+  fresh sign-in instead of replaying a potentially consumed refresh token.
+- Profile network failures retain the rotated credential and offer a profile-only
+  retry; rejected credentials return to sign-in. Guests never fetch private plants,
+  telemetry, analysis, or cloud scans.
+- Private 401s share one rotation and receive at most one retry. Late 401s reuse
+  a newer token. Auth endpoints, 403s and network failures do not trigger automatic
+  retries. Canceling one request never cancels a shared rotation. Timeouts and
+  cancellation retain typed errors; paid mutations are not blindly replayed.
+- Browser tabs serialize cookie-changing auth requests with Web Locks, and use
+  BroadcastChannel plus a nonsecret storage event for logout notification. The
+  fallback for unavailable Web Locks is **fail closed**, not an unsafe storage
+  lease. Browser sign-in is unavailable there; native sign-in and guest mode remain
+  alternatives. Tokens are never broadcast or stored in browser JSON storage.
+- Logout clears local identity immediately and cancels private requests. If the
+  server is unreachable, revocation/cookie clearing cannot be guaranteed; an error
+  explains the limitation. Account-keyed remounting removes private UI state,
+  polling, captured images and scan reports. In-flight generations suppress late
+  writes. Device maps use separate guest/account namespaces; legacy unscoped maps
+  are intentionally not migrated or automatically attached to an account.
+- Login/register are available to guests. Private detail/settings screens are
+  guarded. Terms are public. Registration combines first/last name, checks password
+  confirmation and explicit policy acceptance, and never trims passwords.
+- Password recovery, OTP, account deletion, plant creation, archives and report
+  retrieval remain unavailable. Profile is read-only apart from sign-out.
 
-- Enter through onboarding and Continue as Guest. Guest entry is not authentication.
-  The current backend has no authentication/user filtering: local testing only, not
-  safe for public deployment or sensitive data.
-- Plants are server-backed; spaces are read-only groups derived from plant locations.
-  Account services, plant/space creation, profile changes, archives and notifications
-  are unavailable; their mutation controls are disabled.
-- Configure an optional device ID for each existing plant in Settings. Mappings are
-  stored locally using AsyncStorage and are unverified, not server pairing.
-- All application API requests pass through the frontend gateway. No frontend Prisma,
-  Supabase, MongoDB, Gemini or direct ESP32 transport is used.
-- Latest telemetry uses nested readings; history uses paginated raw readings. Light is
-  lux, not PAR/PPFD. pH is not a live sensor reading. Missing history values remain null.
-  The existing latest endpoint substitutes zero for missing light/raw moisture; the
-  client cannot distinguish those substitutions from real zeros.
-- Capture a JPEG for an existing plant, optionally including its locally configured
-  device. Images over the conservative 4-million-character base64 cap are rejected.
-  The scan saves its report, then the app separately updates health and refetches the
-  plant. Synchronization failure retains the report and retries synchronization only.
-  Scans are never automatically retried: a failed/timed-out pipeline may have saved
-  intermediate records already.
-- Scanning does not update the saved species/image. Reports are session-only because
-  no report retrieval endpoint exists. Identification confidence is not a health score.
-- Provider diagnosis is advisory. Standalone analysis and the primary scan pipeline
-  remain distinct APIs; upstream model availability depends on backend configuration.
+## Verification and remaining live acceptance
 
-## Verification
+Run from the root:
 
 ```powershell
 npm run test --workspace=frontend
 npm run typecheck --workspace=frontend
 npm run lint --workspace=frontend
-npm run build --workspace=backend
-Push-Location frontend
-npx expo install --check
-npx expo-doctor
-npx expo export --platform web
-Pop-Location
 ```
 
-Automated tests cover gateway contracts/errors, no-data handling, request cancellation,
-polling races, scan synchronization failure and targeted retries. Manual acceptance
-still requires live databases/provider credentials and a camera device: permission
-denial, capture/retake, image-only/device-assisted scanning, stale/no telemetry, history
-pagination, offline recovery, persistence after reload, navigation and guest gating.
-No live database writes/provider scans are performed by the unit tests.
+Tests mock transport/storage; they do not contact databases or AI providers.
+Coverage includes original gateway/poller/scan regressions plus session rotation,
+concurrent/stale 401s, canceled waiters, 403 exclusion, mutation network errors,
+SecureStore failures, cookie bootstrap, logout cancellation and guest denial.
 
-The dependency installation reported 14 moderate advisories. Review npm audit
-separately; do not apply forced upgrades to the protected architecture.
+Live acceptance still requires an HTTPS browser deployment and iOS/Android builds:
+cookie acceptance/CORS, multiple real tabs and tab termination during refresh,
+native keychain failures/restart, back/deep links during restore and logout,
+account switching, camera permissions, scan cancellation, offline revocation and
+the inferred profile envelope. Static/unit checks are not a claim that those live
+flows or production database concurrency have been verified.
+
+Local verification: 25 automated tests passed, TypeScript and Expo lint passed,
+and `expo install --check` reported compatible dependencies. A production web
+export was attempted but failed in Metro/Expo's Windows route-context resolution:
+the generated module path contained a doubled drive prefix (`c:\C:\...`). This
+prevents claiming a successful web build in this environment. Resolve and rerun
+the export in the deployment environment before release; no SDK downgrade or
+unreviewed Metro patch was applied.
+
+Sensor values may be absent or stale. Lux is not PAR/PPFD; pH is not live telemetry.
+Device mappings are local, unverified associations, not device authentication.
+Diagnosis is advisory and scans can leave server-side intermediate records after
+timeouts. Backend and hardware implementation/deployment remain outside this work.

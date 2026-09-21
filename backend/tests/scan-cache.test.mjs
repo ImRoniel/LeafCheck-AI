@@ -24,10 +24,24 @@ let prompts;
 const originalKey = process.env.GEMINI_API_KEY;
 
 before(async () => {
+  mock.module(new URL("../src/lib/auth.js", import.meta.url).href, {
+    namedExports: {
+      requireAuth: (_req, res, next) => {
+        res.locals.auth = { user: { id: "owner" } };
+        next();
+      },
+    },
+  });
   process.env.GEMINI_API_KEY = "mock-key";
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
     namedExports: {
       prismaPg: {
+        plant: {
+          findFirst: async () => ({
+            id: "00000000-0000-4000-8000-000000000001",
+            userId: "owner",
+          }),
+        },
         plantIdentification: { create: async () => ({ id: "identification" }) },
         plantSpecCache: {
           findUnique: async (args) => {
@@ -124,7 +138,10 @@ async function scan() {
   const response = await fetch(`${baseUrl}/api/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageBase64: "mock-image", plantId: "plant-1" }),
+    body: JSON.stringify({
+      imageBase64: "mock-image",
+      plantId: "00000000-0000-4000-8000-000000000001",
+    }),
   });
   return { status: response.status, body: await response.json() };
 }

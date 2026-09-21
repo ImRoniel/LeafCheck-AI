@@ -1,8 +1,78 @@
-import { Router, Request, Response } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Request, Response, Router } from "express";
+import { requireAuth } from "../lib/auth.js";
+import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
+import { ownedPlant } from "../lib/ownership.js";
 import { AIDiagnosisRequest, AIDiagnosisResponse } from "../types/ai.js";
 
 export const aiRouter = Router();
+aiRouter.use(requireAuth);
+aiRouter.post(
+  "/analyze",
+  asyncRoute(async (req, res, next) => {
+    const data = bodyObject(req.body, [
+      "imageBase64",
+      "telemetry",
+      "plantId",
+      "notes",
+    ]);
+    if (data.plantId !== undefined)
+      await ownedPlant(data.plantId, res.locals.auth.user.id);
+    if (
+      (data.imageBase64 !== undefined &&
+        typeof data.imageBase64 !== "string") ||
+      (data.notes !== undefined &&
+        (typeof data.notes !== "string" || data.notes.length > 2000))
+    ) {
+      throw new HttpError(400, "INVALID_INPUT", "Invalid analysis input.");
+    }
+    if (data.telemetry !== undefined) {
+      const t = bodyObject(data.telemetry, [
+        "deviceId",
+        "timestamp",
+        "soilMoisture",
+        "lightLevel",
+        "environment",
+      ]);
+      const soil = bodyObject(t.soilMoisture, [
+        "percentage",
+        "rawAnalogValue",
+        "status",
+      ]);
+      if (
+        typeof soil.percentage !== "number" ||
+        !Number.isFinite(soil.percentage) ||
+        !["dry", "optimal", "overwatered"].includes(String(soil.status))
+      )
+        throw new HttpError(400, "INVALID_INPUT", "Invalid telemetry.");
+      if (t.lightLevel !== undefined) {
+        const light = bodyObject(t.lightLevel, ["lux", "status"]);
+        if (
+          typeof light.lux !== "number" ||
+          !Number.isFinite(light.lux) ||
+          !["insufficient", "optimal", "excessive"].includes(
+            String(light.status),
+          )
+        )
+          throw new HttpError(400, "INVALID_INPUT", "Invalid telemetry.");
+      }
+      if (t.environment !== undefined) {
+        const environment = bodyObject(t.environment, [
+          "temperatureCelsius",
+          "humidityPercentage",
+        ]);
+        if (
+          Object.values(environment).length !== 2 ||
+          Object.values(environment).some(
+            (v) => typeof v !== "number" || !Number.isFinite(v),
+          )
+        )
+          throw new HttpError(400, "INVALID_INPUT", "Invalid telemetry.");
+      }
+    }
+    next();
+  }),
+);
 
 // Gemini client — initialized server-side, key never leaves the backend
 const apiKey = process.env.GEMINI_API_KEY ?? "";
@@ -73,11 +143,14 @@ Respond with:
 
     // Determine health status from response text heuristically
     const lowerText = responseText.toLowerCase();
-    const healthStatus: AIDiagnosisResponse["healthStatus"] = lowerText.includes("critical")
-      ? "critical"
-      : lowerText.includes("warning") || lowerText.includes("concern") || lowerText.includes("disease")
-      ? "warning"
-      : "healthy";
+    const healthStatus: AIDiagnosisResponse["healthStatus"] =
+      lowerText.includes("critical")
+        ? "critical"
+        : lowerText.includes("warning") ||
+            lowerText.includes("concern") ||
+            lowerText.includes("disease")
+          ? "warning"
+          : "healthy";
 
     const response: AIDiagnosisResponse = {
       success: true,
@@ -86,7 +159,12 @@ Respond with:
         {
           diseaseName: "Gemini AI Foliar Analysis",
           confidence: 0.9,
-          severity: healthStatus === "critical" ? "high" : healthStatus === "warning" ? "moderate" : "low",
+          severity:
+            healthStatus === "critical"
+              ? "high"
+              : healthStatus === "warning"
+                ? "moderate"
+                : "low",
           symptoms: ["Visual inspection completed by Gemini AI"],
           description: responseText,
         },
@@ -94,7 +172,12 @@ Respond with:
       recommendations: [
         {
           action: "Review AI Diagnosis Report",
-          urgency: healthStatus === "critical" ? "urgent" : healthStatus === "warning" ? "immediate" : "routine",
+          urgency:
+            healthStatus === "critical"
+              ? "urgent"
+              : healthStatus === "warning"
+                ? "immediate"
+                : "routine",
           details: responseText,
         },
       ],

@@ -7,10 +7,8 @@ const globalForPrismaPg = globalThis as unknown as { prismaPg: PrismaClient };
 export const prismaPg =
   globalForPrismaPg.prismaPg ??
   new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "warn", "error"]
-        : ["error"],
+    // Auth queries contain credentials and token hashes; never log query data.
+    log: [],
   });
 
 if (process.env.NODE_ENV !== "production") {
