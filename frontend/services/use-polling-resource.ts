@@ -1,9 +1,9 @@
-import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { useAuth } from "../context/auth";
 import { ApiError, asApiError } from "./errors";
 import { createPoller } from "./poller";
+import { useOptionalIsFocused } from "./use-optional-is-focused";
 export interface PollingOptions {
   enabled?: boolean;
   pollIntervalMs?: number;
@@ -13,7 +13,7 @@ export function usePollingResource<T>(
   load: (signal: AbortSignal) => Promise<T>,
   options: PollingOptions = {},
 ) {
-  const focused = useIsFocused();
+  const focused = useOptionalIsFocused();
   const { status } = useAuth();
   const [appActive, setAppActive] = useState(
     AppState.currentState === "active",
