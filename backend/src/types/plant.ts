@@ -19,9 +19,13 @@ export interface CareRecommendation {
 
 export interface Plant {
   id: string;
+  deviceId?: string;
+  simulated?: boolean;
   name: string;
   species: string;
   location?: string;
+  minMoisture?: number;
+  maxMoisture?: number;
   healthStatus: HealthStatus;
   lastScannedAt?: string;
   imageUrl?: string;

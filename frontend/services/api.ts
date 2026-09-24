@@ -18,6 +18,81 @@ export interface CreatePlantInput {
   species: string;
   location?: string;
   imageUrl?: string;
+  minMoisture?: number;
+  maxMoisture?: number;
+}
+export type UpdatePlantInput = Partial<CreatePlantInput>;
+
+function validatePlantInput(body: UpdatePlantInput, partial = false) {
+  v.object({})(body, "plant");
+  const keys = [
+    "name",
+    "species",
+    "location",
+    "imageUrl",
+    "minMoisture",
+    "maxMoisture",
+  ];
+  if (
+    Object.keys(body).some((key) => !keys.includes(key)) ||
+    (partial && !Object.values(body).some((value) => value !== undefined))
+  )
+    throw new ApiError("validation", "Provide valid plant fields");
+  for (const [key, max] of [
+    ["name", 100],
+    ["species", 200],
+    ["location", 100],
+    ["imageUrl", 2048],
+  ] as const) {
+    const value = body[key];
+    if (
+      value === undefined &&
+      (partial || (key !== "name" && key !== "species"))
+    )
+      continue;
+    (key === "name" || key === "species" ? v.nonempty : v.text)(value, key);
+    if (value!.trim().length > max)
+      throw new ApiError(
+        "validation",
+        `${key} must be at most ${max} characters`,
+      );
+  }
+  if (body.imageUrl?.trim()) {
+    let url: URL;
+    try {
+      url = new URL(body.imageUrl.trim());
+    } catch {
+      throw new ApiError("validation", "Image URL must use HTTP or HTTPS");
+    }
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password
+    )
+      throw new ApiError(
+        "validation",
+        "Image URL must use HTTP or HTTPS without credentials",
+      );
+  }
+  for (const key of ["minMoisture", "maxMoisture"] as const) {
+    const value = body[key];
+    if (
+      value !== undefined &&
+      (typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value > 100)
+    )
+      throw new ApiError("validation", `${key} must be between 0 and 100`);
+  }
+  return Object.fromEntries(
+    Object.entries(body)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [
+        key,
+        typeof value === "string" ? value.trim() : value,
+      ]),
+  );
 }
 export function resolveApiBaseUrl(
   env: string | undefined,
@@ -201,46 +276,35 @@ export function createApiClient(
       request("/api/plants", v.parsePlants, options),
     fetchPlant: (plantId: string, options?: RequestOptions) =>
       request(`/api/plants/${id(plantId)}`, v.parsePlant, options),
+    seedTelemetry: (plantId: string, options?: RequestOptions) =>
+      request(
+        `/api/plants/${id(plantId)}/seed-telemetry`,
+        v.parsePlant,
+        options,
+        "POST",
+        {},
+      ),
     createPlant: (body: CreatePlantInput, options?: RequestOptions) => {
-      v.object({ name: v.nonempty, species: v.nonempty })(body, "plant");
-      for (const [key, max] of [
-        ["name", 100],
-        ["species", 200],
-        ["location", 100],
-        ["imageUrl", 2048],
-      ] as const) {
-        if (body[key] !== undefined) {
-          v.text(body[key], key);
-          if (body[key]!.trim().length > max)
-            throw new ApiError(
-              "validation",
-              `${key} must be at most ${max} characters`,
-            );
-        }
-      }
-      if (body.imageUrl?.trim()) {
-        let url: URL;
-        try {
-          url = new URL(body.imageUrl.trim());
-        } catch {
-          throw new ApiError("validation", "Image URL must use HTTP or HTTPS");
-        }
-        if (
-          !["http:", "https:"].includes(url.protocol) ||
-          url.username ||
-          url.password
-        )
-          throw new ApiError(
-            "validation",
-            "Image URL must use HTTP or HTTPS without credentials",
-          );
-      }
+      const fields = validatePlantInput(body);
       return request("/api/plants", v.parsePlant, options, "POST", {
-        name: body.name.trim(),
-        species: body.species.trim(),
+        ...fields,
         location: body.location?.trim() || undefined,
         imageUrl: body.imageUrl?.trim() || undefined,
       });
+    },
+    updatePlant: (
+      plantId: string,
+      body: UpdatePlantInput,
+      options?: RequestOptions,
+    ) => {
+      const fields = validatePlantInput(body, true);
+      return request(
+        `/api/plants/${id(plantId)}`,
+        v.parsePlant,
+        options,
+        "PATCH",
+        fields,
+      );
     },
     deletePlant: (plantId: string, options?: RequestOptions) =>
       request<void>(
@@ -312,7 +376,9 @@ export const api = createApiClient();
 export const {
   fetchUserPlants,
   fetchPlant,
+  seedTelemetry,
   createPlant,
+  updatePlant,
   deletePlant,
   updatePlantHealth,
   fetchLatestTelemetry,

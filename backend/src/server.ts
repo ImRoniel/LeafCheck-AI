@@ -25,12 +25,13 @@ app.use(
     origin: (origin, callback) =>
       callback(null, !!origin && authConfig.origins.includes(origin)),
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
       "Authorization",
       "X-CSRF-Protection",
       "X-Auth-Client",
+      "X-Client-Platform",
     ],
   }),
 );

@@ -110,6 +110,35 @@ test("headers, preflight, independent quotas, and rejection before body parsing"
     preflight.headers.get("access-control-allow-origin"),
     "https://example.test",
   );
+  for (const method of ["PATCH", "DELETE"]) {
+    const response = await fetch(`${baseUrl}/api/plants/example`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://example.test",
+        "Access-Control-Request-Method": method,
+        "Access-Control-Request-Headers":
+          "authorization,content-type,x-client-platform,x-csrf-protection",
+      },
+    });
+    assert.equal(response.status, 204);
+    assert.ok(
+      response.headers
+        .get("access-control-allow-methods")
+        .split(",")
+        .includes(method),
+    );
+    const headers = response.headers
+      .get("access-control-allow-headers")
+      .toLowerCase()
+      .split(",");
+    for (const header of [
+      "authorization",
+      "content-type",
+      "x-client-platform",
+      "x-csrf-protection",
+    ])
+      assert.ok(headers.includes(header));
+  }
 
   for (let i = 0; i < 10; i++) {
     const response = await fetch(`${baseUrl}/api/scan`, {

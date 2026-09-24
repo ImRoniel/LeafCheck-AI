@@ -28,6 +28,8 @@ before(async () => {
             if (failWrite) throw new Error("private database details");
             writes++;
             const row = {
+              minMoisture: 30,
+              maxMoisture: 80,
               ...data,
               id: randomUUID(),
               createdAt: new Date(),
@@ -52,6 +54,22 @@ before(async () => {
             writes++;
             rows.delete(row.id);
             return { count: 1 };
+          },
+          async update({ where, data }) {
+            if (failWrite) throw new Error("private database details");
+            assert.equal(typeof where.userId, "string");
+            const row = rows.get(where.id);
+            if (disappear || row?.userId !== where.userId)
+              throw Object.assign(new Error("missing"), { code: "P2025" });
+            writes++;
+            Object.assign(
+              row,
+              Object.fromEntries(
+                Object.entries(data).filter(([, value]) => value !== undefined),
+              ),
+            );
+            row.updatedAt = new Date();
+            return row;
           },
         },
       },
@@ -150,6 +168,112 @@ test("creation rejects invalid input and caller-controlled ownership without wri
     );
   }
   assert.equal(writes, count);
+});
+
+test("owner can patch details and boundary moisture values; other accounts see identical 404s", async () => {
+  const plant = await (
+    await request("POST", "", { name: "Fern", species: "Fern" })
+  ).json();
+  const response = await request("PATCH", `/${plant.id}`, {
+    name: "  Office fern  ",
+    species: "  Boston fern ",
+    location: "",
+    imageUrl: "",
+    minMoisture: 0,
+    maxMoisture: 100,
+  });
+  assert.equal(response.status, 200);
+  const updated = await response.json();
+  assert.equal(updated.name, "Office fern");
+  assert.equal(updated.species, "Boston fern");
+  assert.equal(updated.location, "");
+  assert.equal(updated.minMoisture, 0);
+  assert.equal(updated.maxMoisture, 100);
+  assert.equal(rows.get(plant.id).userId, "new-account");
+  assert.deepEqual(
+    await (await request("GET", `/${plant.id}`)).json(),
+    updated,
+  );
+  const count = writes;
+  for (const method of ["GET", "PATCH", "DELETE"]) {
+    const body = method === "PATCH" ? { name: "stolen" } : undefined;
+    const foreign = await request(method, `/${plant.id}`, body, "other");
+    const missing = await request(method, `/${randomUUID()}`, body, "other");
+    assert.equal(foreign.status, 404);
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await foreign.json(), await missing.json());
+    assert.equal(
+      (await request(method, `/${plant.id}`, body, null)).status,
+      401,
+    );
+  }
+  assert.equal((await request("GET", "", undefined, null)).status, 401);
+  assert.deepEqual(
+    await (await request("GET", "", undefined, "other")).json(),
+    [],
+  );
+  assert.equal(writes, count);
+});
+
+test("patch validation rejects invalid fields without writes and handles concurrent disappearance", async () => {
+  const plant = await (
+    await request("POST", "", { name: "Fern", species: "Fern" })
+  ).json();
+  const count = writes;
+  for (const body of [
+    {},
+    [],
+    { name: " " },
+    { species: " " },
+    { name: 3 },
+    { species: null },
+    { name: "x".repeat(101) },
+    { species: "x".repeat(201) },
+    { userId: "other" },
+    { healthStatus: "healthy" },
+    { deviceId: randomUUID() },
+    { imageUrl: "javascript:alert(1)" },
+    { imageUrl: "https://u:p@example.test" },
+    { location: null },
+    { minMoisture: -1 },
+    { maxMoisture: 101 },
+    { minMoisture: "30" },
+    { maxMoisture: null },
+  ])
+    assert.equal(
+      (await request("PATCH", `/${plant.id}`, body)).status,
+      400,
+      JSON.stringify(body),
+    );
+  for (const extra of [
+    { minMoisture: -1 },
+    { maxMoisture: 101 },
+    { minMoisture: "30" },
+  ])
+    assert.equal(
+      (await request("POST", "", { name: "x", species: "x", ...extra })).status,
+      400,
+    );
+  assert.equal(writes, count);
+  disappear = true;
+  assert.equal(
+    (await request("PATCH", `/${plant.id}`, { name: "new" })).status,
+    404,
+  );
+  assert.equal(
+    (await request("PATCH", `/${plant.id}/health`, { healthStatus: "healthy" }))
+      .status,
+    404,
+  );
+  disappear = false;
+  failWrite = true;
+  const response = await request("PATCH", `/${plant.id}`, { name: "new" });
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    error: "Internal server error.",
+    code: "INTERNAL_ERROR",
+  });
+  failWrite = false;
 });
 test("anonymous writes, invalid IDs, optional blanks, and write failures", async () => {
   assert.equal(
