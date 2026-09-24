@@ -18,6 +18,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { session, useAuth } from "./auth";
+import { useLocalState } from "./local-state";
 
 const Context = createContext<{
   guest: boolean;
@@ -48,6 +49,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
 }
 function AccountDataProvider({ children }: PropsWithChildren) {
   const auth = useAuth();
+  const local = useLocalState();
   const guest = auth.isGuest;
   const authenticated = auth.status === "authenticated";
   const storageKey = `leafcheck.device-mappings.v2:${auth.user ? `account:${encodeURIComponent(auth.user.id)}` : "guest"}`;
@@ -146,6 +148,23 @@ function AccountDataProvider({ children }: PropsWithChildren) {
     setStorageError(null);
   };
   const createPlant = async (input: CreatePlantInput) => {
+    if (guest) {
+      const now = new Date().toISOString();
+      const plant: Plant = {
+        id: `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: input.name.trim(),
+        species: input.species.trim(),
+        location: input.location?.trim(),
+        healthStatus: "unknown",
+        createdAt: now,
+        updatedAt: now,
+      };
+      await local.update((state) => ({
+        ...state,
+        guestPlants: [...state.guestPlants, plant],
+      }));
+      return plant;
+    }
     assertSession();
     const plant = await postPlant(input);
     assertSession();
@@ -190,9 +209,9 @@ function AccountDataProvider({ children }: PropsWithChildren) {
         guest,
         enterGuest: auth.enterGuest,
         leaveGuest: auth.leaveGuest,
-        plants,
+        plants: guest ? local.data.guestPlants : plants,
         loading,
-        loaded,
+        loaded: guest ? local.ready : loaded,
         error,
         refresh,
         createPlant,

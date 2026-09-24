@@ -71,7 +71,6 @@ export default function Login() {
           disabled={busy}
           onPress={() => {
             auth.enterGuest();
-            router.replace("/(tabs)");
           }}
         />
       </View>

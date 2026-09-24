@@ -4,16 +4,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Image, Pressable, Text, View } from "react-native";
 import { Action, Notice, ui } from "./screen";
+import { SetupSummary } from "./setup-summary";
 export function CollectionState() {
   const data = useAppData();
   const router = useRouter();
   return (
     <>
+      <SetupSummary />
       {data.guest && (
         <>
           <Notice>
-            Guest mode is local only. Sign in to view your plants, telemetry, or
-            submit cloud scans.
+            Guest plants and care preferences stay on this device. Sign in for a
+            separate cloud collection, telemetry, and AI scans.
           </Notice>
           <Action label="Sign in" onPress={() => router.push("/login")} />
         </>
@@ -41,13 +43,19 @@ export function CollectionState() {
 }
 export function PlantList({ plants }: { plants: Plant[] }) {
   const router = useRouter();
+  const { guest } = useAppData();
   return (
     <>
       {plants.map((plant) => (
         <Pressable
           key={plant.id}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${plant.name}`}
+          accessibilityRole={guest ? "text" : "button"}
+          accessibilityLabel={
+            guest
+              ? `${plant.name}, ${plant.species}, local guest plant`
+              : `View ${plant.name}`
+          }
+          disabled={guest}
           style={[ui.card, { flexDirection: "row", alignItems: "center" }]}
           onPress={() =>
             router.push({
