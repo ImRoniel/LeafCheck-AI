@@ -21,6 +21,8 @@ let inserts;
 let fetches;
 let analyses;
 let prompts;
+let generationError;
+let plantCreates;
 const originalKey = process.env.GEMINI_API_KEY;
 
 before(async () => {
@@ -32,11 +34,20 @@ before(async () => {
       },
     },
   });
-  process.env.GEMINI_API_KEY = "mock-key";
+  process.env.GEMINI_API_KEY = `AIza${"a".repeat(35)}`;
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
     namedExports: {
       prismaPg: {
         plant: {
+          create: async () => {
+            plantCreates++;
+            return {
+              id: "new-plant",
+              name: "Basil",
+              species: speciesName,
+              deviceId: null,
+            };
+          },
           findFirst: async () => ({
             id: "00000000-0000-4000-8000-000000000001",
             userId: "owner",
@@ -91,6 +102,7 @@ before(async () => {
         getGenerativeModel() {
           return {
             generateContent: async (contents) => {
+              if (generationError) throw generationError;
               prompts.push(contents[0]);
               return { response: { text: () => "healthy" } };
             },
@@ -114,6 +126,8 @@ beforeEach(() => {
   analyses = [];
   prompts = [];
   fetches = 0;
+  generationError = null;
+  plantCreates = 0;
   perenualData = {
     speciesName,
     commonName: "Basil",
@@ -134,13 +148,13 @@ after(async () => {
   mock.restoreAll();
 });
 
-async function scan() {
+async function scan(newPlant = false) {
   const response = await fetch(`${baseUrl}/api/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       imageBase64: "mock-image",
-      plantId: "00000000-0000-4000-8000-000000000001",
+      ...(newPlant ? {} : { plantId: "00000000-0000-4000-8000-000000000001" }),
     }),
   });
   return { status: response.status, body: await response.json() };
@@ -228,7 +242,7 @@ for (const code of ["P2002", "P2034"]) {
     };
     const result = await scan();
     assert.equal(result.status, 500);
-    assert.equal(result.body.error, error.message);
+    assert.equal(result.body.code, "SCAN_FAILED");
     assert.equal(reads.length, 2);
     assert.equal(analyses.length, 0);
   });
@@ -241,7 +255,7 @@ test("unrelated insertion failure does not trigger a recovery read", async () =>
   };
   const result = await scan();
   assert.equal(result.status, 500);
-  assert.equal(result.body.error, error.message);
+  assert.equal(result.body.code, "SCAN_FAILED");
   assert.equal(reads.length, 1);
 });
 
@@ -255,7 +269,7 @@ test("recovery read failure reaches the existing error handler", async () => {
   };
   const result = await scan();
   assert.equal(result.status, 500);
-  assert.equal(result.body.error, "Recovery database unavailable");
+  assert.equal(result.body.code, "SCAN_FAILED");
   assert.equal(analyses.length, 0);
 });
 
@@ -265,4 +279,43 @@ test("missing Perenual specifications retain general-advice behavior", async () 
   assert.equal(inserts.length, 0);
   assert.equal(analyses[0].idealSpecs, undefined);
   assert.ok(prompts[0].includes("No ideal species specs available"));
+});
+
+test("Gemini authentication failure is sanitized and subsequent scans still work", async () => {
+  generationError = Object.assign(
+    new Error("ACCESS_TOKEN_TYPE_UNSUPPORTED private-key"),
+    { status: 401 },
+  );
+  const failed = await scan();
+  assert.equal(failed.status, 503);
+  assert.equal(failed.body.code, "SCAN_AI_CONFIGURATION");
+  assert.doesNotMatch(JSON.stringify(failed.body), /private-key|ACCESS_TOKEN/);
+  assert.equal(analyses.length, 0);
+  generationError = null;
+  assert.equal((await scan()).status, 201);
+});
+
+test("provider failure does not create a new plant; a successful scan creates it once", async () => {
+  generationError = Object.assign(new Error("unauthorized"), { status: 401 });
+  assert.equal((await scan(true)).status, 503);
+  assert.equal(plantCreates, 0);
+  generationError = null;
+  assert.equal((await scan(true)).status, 201);
+  assert.equal(plantCreates, 1);
+});
+
+test("invalid runtime credential fails before cache work and recovers after replacement", async () => {
+  const key = process.env.GEMINI_API_KEY;
+  try {
+    process.env.GEMINI_API_KEY = "invalid-provider-credential";
+    const failed = await scan(true);
+    assert.equal(failed.status, 503);
+    assert.equal(failed.body.code, "SCAN_AI_CONFIGURATION");
+    assert.equal(reads.length, 0);
+    assert.equal(plantCreates, 0);
+    process.env.GEMINI_API_KEY = key;
+    assert.equal((await scan(true)).status, 201);
+  } finally {
+    process.env.GEMINI_API_KEY = key;
+  }
 });

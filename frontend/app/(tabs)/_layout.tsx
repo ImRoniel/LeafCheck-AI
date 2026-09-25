@@ -3,7 +3,11 @@ import { Tabs } from "expo-router";
 export default function Layout() {
   return (
     <Tabs
-      tabBar={(props) => <BottomNav {...props} />}
+      tabBar={(props) =>
+        props.state.routes[props.state.index]?.name === "camera" ? null : (
+          <BottomNav {...props} />
+        )
+      }
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" />

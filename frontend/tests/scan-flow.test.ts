@@ -2,7 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createScanFlow } from "../services/scan-flow";
 import type { Plant, ScanResponse } from "../types";
-const report:ScanResponse={success:true,identification:{speciesName:"Fern",commonName:null,confidence:1},diagnostic:{id:"a",healthStatus:"healthy",rawAnalysisText:"report",telemetryFreshness:"fresh"},telemetry:null};
+const report: ScanResponse = {
+  success: true,
+  plant: { id: "p", name: "Fern", species: "Fern" },
+  identification: { speciesName: "Fern", commonName: null, confidence: 1 },
+  diagnostic: {
+    id: "a",
+    healthStatus: "healthy",
+    rawAnalysisText: "report",
+    telemetryFreshness: "fresh",
+  },
+  telemetry: null,
+  careTasks: [],
+  notification: null,
+};
 const plant:Plant={id:"p",name:"Fern",species:"Fern",healthStatus:"healthy",createdAt:"2026-09-19T10:00:00Z",updatedAt:"2026-09-19T10:00:00Z"};
 test("patch failure retains report and retry only synchronizes",async()=>{
   let scans=0,patches=0;

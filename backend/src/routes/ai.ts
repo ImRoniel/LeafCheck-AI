@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
+import { geminiError, geminiModel } from "../lib/gemini.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { ownedPlant } from "../lib/ownership.js";
 import { AIDiagnosisRequest, AIDiagnosisResponse } from "../types/ai.js";
@@ -75,8 +75,6 @@ aiRouter.post(
 );
 
 // Gemini client — initialized server-side, key never leaves the backend
-const apiKey = process.env.GEMINI_API_KEY ?? "";
-const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 /**
  * POST /api/ai/analyze
@@ -88,22 +86,8 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 aiRouter.post("/analyze", async (req: Request, res: Response) => {
   const request = req.body as AIDiagnosisRequest;
 
-  if (!genAI) {
-    const errorResponse: AIDiagnosisResponse = {
-      success: false,
-      healthStatus: "unknown",
-      diagnoses: [],
-      recommendations: [],
-      timestamp: new Date().toISOString(),
-      error:
-        "Gemini API key is not configured. Set GEMINI_API_KEY in /backend/.env",
-    };
-    res.status(503).json(errorResponse);
-    return;
-  }
-
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = geminiModel(false);
 
     const telemetrySummary = request.telemetry
       ? `Associated Sensor Telemetry:
@@ -127,7 +111,7 @@ Respond with:
 - Immediate care recommendations with urgency (routine/immediate/urgent)
 - Be concise and actionable.`;
 
-    const contents: any[] = [prompt];
+    const contents: Parameters<typeof model.generateContent>[0] = [prompt];
 
     if (request.imageBase64) {
       contents.push({
@@ -138,7 +122,11 @@ Respond with:
       });
     }
 
-    const result = await model.generateContent(contents);
+    const result = await model
+      .generateContent(contents)
+      .catch((error: unknown) => {
+        throw geminiError(error);
+      });
     const responseText = result.response.text();
 
     // Determine health status from response text heuristically
@@ -186,16 +174,17 @@ Respond with:
     };
 
     res.json(response);
-  } catch (error: any) {
-    console.error("[AI] /analyze error:", error);
+  } catch (error: unknown) {
+    const failure = error instanceof HttpError ? error : geminiError(error);
+    console.error("[AI] /analyze error:", failure.code);
     const errorResponse: AIDiagnosisResponse = {
       success: false,
       healthStatus: "unknown",
       diagnoses: [],
       recommendations: [],
       timestamp: new Date().toISOString(),
-      error: error?.message ?? "Gemini AI analysis failed.",
+      error: failure.message,
     };
-    res.status(500).json(errorResponse);
+    res.status(failure.status).json({ ...errorResponse, code: failure.code });
   }
 });

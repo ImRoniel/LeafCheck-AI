@@ -10,5 +10,12 @@ export type {
 } from "./plant";
 
 export type { AIDiagnosisRequest, AIDiagnosisResponse } from "./ai";
-export type { PlantHealthUpdate, ScanRequest, ScanResponse } from "./scan";
-
+export type {
+  ArchiveEntry,
+  CareTask,
+  CareTaskOutput,
+  NotificationOutput,
+  PlantHealthUpdate,
+  ScanRequest,
+  ScanResponse,
+} from "./scan";

@@ -6,9 +6,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { PlantIdentificationResult } from "../types/scan.js";
+import { HttpError } from "./http.js";
 
-const PLANTNET_BASE_URL =
-  "https://my-api.plantnet.org/v2/identify/all";
+const PLANTNET_BASE_URL = "https://my-api.plantnet.org/v2/identify/all";
 
 /**
  * Sends a plant image to the Pl@ntNet API and returns the top identification.
@@ -20,10 +20,12 @@ const PLANTNET_BASE_URL =
 export async function identifyPlant(
   imageBase64: string,
 ): Promise<PlantIdentificationResult> {
-  const apiKey = process.env.PLANTNET_API_KEY;
+  const apiKey = process.env.PLANTNET_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error(
-      "PLANTNET_API_KEY is not configured. Set it in your .env file.",
+    throw new HttpError(
+      503,
+      "PLANT_IDENTIFICATION_FAILED",
+      "Plant identification is temporarily unavailable.",
     );
   }
 
@@ -35,17 +37,43 @@ export async function identifyPlant(
   formData.append("images", blob, "plant.jpg");
   formData.append("organs", "leaf");
 
-  const url = `${PLANTNET_BASE_URL}?include-related-images=false&no-reject=false&lang=en&api-key=${apiKey}`;
+  const url = `${PLANTNET_BASE_URL}?include-related-images=false&no-reject=false&lang=en&api-key=${encodeURIComponent(apiKey)}`;
 
   const response = await fetch(url, {
     method: "POST",
     body: formData,
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => {
+    throw new HttpError(
+      502,
+      "PLANT_IDENTIFICATION_FAILED",
+      "Plant identification is temporarily unavailable.",
+    );
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(
-      `Pl@ntNet API error (${response.status}): ${errorBody}`,
+    let errorDetail = "";
+    try {
+      const errJson = JSON.parse(await response.text());
+      const detail = errJson?.message || errJson?.error;
+      errorDetail = typeof detail === "string" ? detail : "";
+    } catch {
+      // ignore
+    }
+    if (
+      response.status === 404 ||
+      errorDetail.toLowerCase().includes("not found")
+    ) {
+      throw new HttpError(
+        422,
+        "NO_PLANT_DETECTED",
+        "We couldn't detect a plant in this photo. Please center the leaves or flowers in bright light and try again.",
+      );
+    }
+    throw new HttpError(
+      502,
+      "PLANT_IDENTIFICATION_FAILED",
+      "Unable to reach the plant identification service. Please check your internet connection and try again.",
     );
   }
 
@@ -59,10 +87,12 @@ export async function identifyPlant(
     }[];
   };
 
-  const topResult = data.results?.[0];
-  if (!topResult) {
-    throw new Error(
-      "Pl@ntNet could not identify the plant. Try a clearer image of the leaves.",
+  const topResult = data?.results?.[0];
+  if (!topResult || !topResult.species?.scientificNameWithoutAuthor?.trim()) {
+    throw new HttpError(
+      422,
+      "NO_PLANT_DETECTED",
+      "We couldn't detect a plant in this photo. Please center the leaves or flowers in bright light and try again.",
     );
   }
 

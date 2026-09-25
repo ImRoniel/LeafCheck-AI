@@ -1,5 +1,8 @@
 # Phase 1 authentication deployment
 
+For portable Argon2id hashing, fresh-clone setup, compatibility and worker capacity,
+see [PASSWORD_HASHING.md](PASSWORD_HASHING.md).
+
 ## Verification boundary
 
 This implementation was checked with mocked database/API tests and local TypeScript/lint checks. No production database was inspected, reset, baselined or migrated. Schema-to-schema migration generation does not connect to a database. Prisma's CLI may load its usual environment configuration; secret files were not read or printed by the implementation work.

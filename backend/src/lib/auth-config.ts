@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./env.js";
 
 export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env) {
   const secret = env.AUTH_JWT_SECRET;

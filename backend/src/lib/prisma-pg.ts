@@ -1,5 +1,5 @@
-import "dotenv/config";
 import { PrismaClient } from "../generated/postgres-client/index.js";
+import "./env.js";
 
 // Prevent multiple PostgreSQL Prisma Client instances in development (hot reload)
 const globalForPrismaPg = globalThis as unknown as { prismaPg: PrismaClient };

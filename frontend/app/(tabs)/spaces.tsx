@@ -25,24 +25,31 @@ export default function Spaces() {
         find it under Unassigned.
       </Notice>
       <CollectionState />
-      {!data.guest &&
-        (creating ? (
-          <CreatePlantForm
-            onClose={() => setCreating(false)}
-            onCreated={() => {
-              setCreating(false);
-              setCreated(true);
-            }}
-          />
-        ) : (
+      {!data.guest && (
+        <>
           <Action
-            label="Create plant"
-            onPress={() => {
-              setCreated(false);
-              setCreating(true);
-            }}
+            label="📷 Scan Plant to Add"
+            onPress={() => router.push("/(tabs)/camera")}
           />
-        ))}
+          {creating ? (
+            <CreatePlantForm
+              onClose={() => setCreating(false)}
+              onCreated={() => {
+                setCreating(false);
+                setCreated(true);
+              }}
+            />
+          ) : (
+            <Action
+              label="Add plant manually"
+              onPress={() => {
+                setCreated(false);
+                setCreating(true);
+              }}
+            />
+          )}
+        </>
+      )}
       {created && (
         <Notice>Plant created. Open its space below to view it.</Notice>
       )}

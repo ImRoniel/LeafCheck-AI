@@ -34,9 +34,15 @@ export function CollectionState() {
         </>
       )}
       {data.loaded && !data.loading && !data.plants.length && (
-        <Notice>
-          Your collection is empty. Create your first plant from My Spaces.
-        </Notice>
+        <>
+          <Notice>
+            Your collection is empty. Scan a plant with your camera to identify its species and create it automatically.
+          </Notice>
+          <Action
+            label="Scan Plant to Add"
+            onPress={() => router.push("/(tabs)/camera")}
+          />
+        </>
       )}
     </>
   );

@@ -19,6 +19,7 @@ const telemetry = {
 };
 const report = {
   success: true,
+  plant: { id: "p", name: "Fern", species: "Fern" },
   identification: { speciesName: "Fern", commonName: null, confidence: 0.8 },
   diagnostic: {
     id: "a",
@@ -27,6 +28,8 @@ const report = {
     telemetryFreshness: "Fresh",
   },
   telemetry: null,
+  careTasks: [],
+  notification: null,
 };
 const client = (body: unknown, status = 200) =>
   createApiClient({

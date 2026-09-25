@@ -1,4 +1,3 @@
-import argon2 from "argon2";
 import { jwtVerify, SignJWT } from "jose";
 import { createHash, randomBytes } from "node:crypto";
 import type { User } from "../generated/postgres-client/index.js";
@@ -7,26 +6,7 @@ import { asyncRoute, HttpError } from "./http.js";
 import { prismaPg } from "./prisma-pg.js";
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
-export const hashPassword = (password: string) =>
-  argon2.hash(password, {
-    type: argon2.argon2id,
-    memoryCost: 65536,
-    timeCost: 3,
-    parallelism: 1,
-  });
-const dummyHash = hashPassword(randomBytes(32).toString("base64url"));
-export async function verifyPassword(password: string, stored?: string) {
-  const supported = stored?.startsWith("$argon2id$") === true;
-  try {
-    const valid = await argon2.verify(
-      supported ? stored! : await dummyHash,
-      password,
-    );
-    return supported && valid;
-  } catch {
-    return false;
-  }
-}
+export { hashPassword, verifyPassword } from "./password.js";
 export const tokenHash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 const opaqueToken = () => randomBytes(32).toString("base64url");

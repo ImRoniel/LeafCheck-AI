@@ -1,10 +1,10 @@
 import cors from "cors";
-import "dotenv/config";
 import express from "express";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { authConfig } from "./lib/auth-config.js";
 import { errorHandler } from "./lib/http.js";
+import "./lib/provider-startup.js";
 import { ensureTTLIndex } from "./lib/ttl.js";
 import { aiRouter } from "./routes/ai.js";
 import { authRouter } from "./routes/auth.js";

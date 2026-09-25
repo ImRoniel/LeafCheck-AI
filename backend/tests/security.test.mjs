@@ -7,8 +7,14 @@ let baseUrl;
 let scanCalls = 0;
 let ttlCalls = 0;
 const originalPort = process.env.PORT;
+const originalProviders = {
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  PLANTNET_API_KEY: process.env.PLANTNET_API_KEY,
+};
 
 before(async () => {
+  process.env.GEMINI_API_KEY = `AIza${"a".repeat(35)}`;
+  process.env.PLANTNET_API_KEY = "test-plantnet-key";
   process.env.AUTH_JWT_SECRET =
     "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM";
   process.env.AUTH_JWT_ISSUER = "test";
@@ -59,6 +65,10 @@ after(async () => {
     );
   if (originalPort === undefined) delete process.env.PORT;
   else process.env.PORT = originalPort;
+  for (const [name, value] of Object.entries(originalProviders)) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
   mock.restoreAll();
 });
 

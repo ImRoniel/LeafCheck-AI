@@ -357,7 +357,8 @@ export function createApiClient(
       );
     },
     scanPlant: (body: ScanRequest, options?: RequestOptions) => {
-      v.object({ plantId: v.nonempty, imageBase64: v.nonempty })(body, "scan");
+      v.object({ imageBase64: v.nonempty })(body, "scan");
+      if (body.plantId !== undefined) v.nonempty(body.plantId, "plantId");
       if (body.deviceId !== undefined) v.nonempty(body.deviceId, "deviceId");
       return request("/api/scan", v.parseScan, options, "POST", body);
     },
@@ -368,6 +369,35 @@ export function createApiClient(
       if (body.telemetry !== undefined)
         v.telemetryCheck(body.telemetry, "telemetry");
       return request("/api/ai/analyze", v.parseAnalysis, options, "POST", body);
+    },
+    fetchArchives: (options?: RequestOptions) =>
+      request<import("../types").ArchiveEntry[]>(
+        "/api/scan/archives",
+        v.parseArchives,
+        options,
+        "GET",
+      ),
+    fetchTasks: (options?: RequestOptions) =>
+      request<import("../types").CareTask[]>(
+        "/api/scan/tasks",
+        v.parseTasks,
+        options,
+        "GET",
+      ),
+    updateTaskStatus: (
+      taskId: string,
+      status: "PENDING" | "COMPLETED" | "SKIPPED",
+      options?: RequestOptions,
+    ) => {
+      v.nonempty(taskId, "taskId");
+      v.nonempty(status, "status");
+      return request<import("../types").CareTask>(
+        `/api/scan/tasks/${id(taskId)}`,
+        v.parseTask,
+        options,
+        "PATCH",
+        { status },
+      );
     },
   };
 }
@@ -385,4 +415,8 @@ export const {
   fetchTelemetryHistory,
   scanPlant,
   analyzePlant,
+  fetchArchives,
+  fetchTasks,
+  updateTaskStatus,
 } = api;
+

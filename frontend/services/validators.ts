@@ -1,5 +1,7 @@
 import type {
   AIDiagnosisResponse,
+  ArchiveEntry,
+  CareTask,
   Plant,
   PlantHealthUpdate,
   ScanResponse,
@@ -187,6 +189,11 @@ export const parseAnalysis = parse<AIDiagnosisResponse>(
 export const parseScan = parse<ScanResponse>(
   object({
     success: enumeration(true),
+    plant: object({
+      id: nonempty,
+      name: text,
+      species: text,
+    }),
     identification: object({
       speciesName: nonempty,
       commonName: nullable(text),
@@ -199,5 +206,60 @@ export const parseScan = parse<ScanResponse>(
       telemetryFreshness: text,
     }),
     telemetry: nullable(object(snapshot)),
+    careTasks: array(
+      object({
+        title: text,
+        taskType: text,
+        description: text,
+        urgency: enumeration("routine", "immediate", "urgent"),
+        dueDate: text,
+      }),
+    ),
+    notification: nullable(
+      object({
+        notifyAt: text,
+        reason: text,
+      }),
+    ),
   }),
 );
+
+const plantSummary = object({
+  id: nonempty,
+  name: text,
+  species: text,
+});
+
+export const parseArchives = parse<ArchiveEntry[]>(
+  array(
+    object({
+      id: nonempty,
+      plantId: nonempty,
+      userId: nullable(text),
+      healthStatus: text,
+      rawAnalysisText: nullable(text),
+      speciesName: nullable(text),
+      notificationTime: nullable(text),
+      notificationReason: nullable(text),
+      createdAt: text,
+      plant: nullable(plantSummary),
+    }),
+  ),
+);
+
+const careTaskSchema = object({
+  id: nonempty,
+  plantId: nonempty,
+  title: text,
+  taskType: text,
+  description: nullable(text),
+  status: text,
+  urgency: text,
+  dueDate: text,
+  completedAt: nullable(text),
+  createdAt: text,
+  plant: nullable(plantSummary),
+});
+
+export const parseTasks = parse<CareTask[]>(array(careTaskSchema));
+export const parseTask = parse<CareTask>(careTaskSchema);
