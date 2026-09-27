@@ -4,15 +4,18 @@ import {
 } from "@/components/device-connection-screen";
 import { Action, ui } from "@/components/screen";
 import { useLocalState } from "@/context/local-state";
-import { findMockDevice } from "@/services/device-connection";
+import type { DeviceConnectionRouteParams } from "@/types/device-connection";
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, Text } from "react-native";
 
 export default function DeviceConnectionSuccess() {
   const { data } = useLocalState();
   const router = useRouter();
-  const connection = data.mockDeviceConnection;
+  const { deviceId } = useLocalSearchParams<DeviceConnectionRouteParams>();
+  const connection = data.connectedDevices.find(
+    (device) => device.id === deviceId,
+  );
   if (!connection) return <Redirect href="/device-connection/scanner" />;
   return (
     <DeviceConnectionScreen title="Device setup complete" step={4}>
@@ -27,15 +30,19 @@ export default function DeviceConnectionSuccess() {
           Mock connection successful
         </Text>
         <Text style={s.text}>
-          {findMockDevice(connection.deviceId)?.name} is assigned to{" "}
-          {connection.target.kind === "space" ? "Space" : "Plant"}:{" "}
-          {connection.target.name}.
+          {connection.name} is assigned to{" "}
+          {connection.assignedType === "space" ? "Space" : "Plant"}:{" "}
+          {connection.targetName}.
         </Text>
         <Text style={s.status}>
           Your dashboard now shows Mode: Auto (With IoT). This is a mock setup,
           not live monitoring or automatic watering. Existing telemetry and
           manual care are unchanged.
         </Text>
+        <Action
+          label="+ Add Sensor"
+          onPress={() => router.replace("/device-connection/scanner")}
+        />
         <Action
           label="Return to Dashboard"
           onPress={() => router.dismissTo("/(tabs)")}

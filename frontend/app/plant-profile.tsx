@@ -117,6 +117,15 @@ export default function PlantProfile() {
             }
           />
           <Action
+            label="Pair Sensor to this Plant"
+            onPress={() =>
+              router.push({
+                pathname: "/device-connection/scanner",
+                params: { targetType: "plant", targetId: plant.id },
+              })
+            }
+          />
+          <Action
             label="Local device mapping"
             onPress={() =>
               router.push({

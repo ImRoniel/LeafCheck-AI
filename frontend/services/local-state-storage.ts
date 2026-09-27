@@ -3,7 +3,11 @@ import {
   setupSteps,
   type LocalState,
 } from "../types/local-state";
-import { isMockDeviceConnection } from "./device-connection";
+import {
+  connectedDeviceFromMock,
+  isConnectedDevice,
+  isMockDeviceConnection,
+} from "./device-connection";
 
 export interface LocalStorageAdapter {
   getItem(key: string): Promise<string | null>;
@@ -49,6 +53,14 @@ export function parseLocalState(value: unknown): LocalState {
   if (
     value.mockDeviceConnection !== undefined &&
     !isMockDeviceConnection(value.mockDeviceConnection)
+  )
+    return fail();
+  if (
+    value.connectedDevices !== undefined &&
+    (!Array.isArray(value.connectedDevices) ||
+      !value.connectedDevices.every(isConnectedDevice) ||
+      new Set(value.connectedDevices.map((device) => device.id)).size !==
+        value.connectedDevices.length)
   )
     return fail();
   if (
@@ -134,7 +146,17 @@ export function parseLocalState(value: unknown): LocalState {
     !onboarding.plantId
   )
     return fail();
-  return value as unknown as LocalState;
+  // A present collection is authoritative, including an explicitly empty one.
+  // Remove the legacy field so deleting the last device cannot resurrect it.
+  const { mockDeviceConnection, ...current } = value;
+  return {
+    ...current,
+    connectedDevices:
+      value.connectedDevices ??
+      (isMockDeviceConnection(mockDeviceConnection)
+        ? [connectedDeviceFromMock(mockDeviceConnection)]
+        : []),
+  } as unknown as LocalState;
 }
 
 export interface LocalSnapshot {

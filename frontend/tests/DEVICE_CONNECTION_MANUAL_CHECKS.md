@@ -21,7 +21,7 @@ Also repeat the existing [scan checks](SCAN_MANUAL_CHECKS.md) and [setup checks]
    Restore storage and retry. Corrupt a stored assignment: local-state recovery must fail closed,
    not erase data or report a successful connection.
 7. Success shows the selected node and destination, a green checkmark, and Return to Dashboard.
-   Return removes the connection screens from the app navigation stack. Alerts is absent; badge
+   Return removes the connection screens from the app navigation stack. Alerts becomes Connected Hardware; badge
    reads exactly Mode: Auto (With IoT), alongside Mock setup · No live connection.
 8. Restart and verify the assignment remains in the same account. Switch accounts and guest mode:
    no assignment or Auto badge leaks. Guest setup remains local and does not enable AI/network telemetry.
@@ -32,6 +32,19 @@ Also repeat the existing [scan checks](SCAN_MANUAL_CHECKS.md) and [setup checks]
 11. Test TalkBack/VoiceOver, Tab navigation and Enter/Space activation, selection-button announcements, 200% text size,
     narrow web windows, phones with safe-area insets, tablets, and long destination names. Lists scroll
     without nested vertical scroll containers; Cancel and confirmation actions remain reachable.
+
+## Multi-entry and multi-sensor checks
+
+- The overlapping quick-action container has separate Scan Plant and Pair Sensor controls. Scan Plant retains camera permissions and guest sign-in guidance. Pair Sensor opens unrestricted demo assignment even after previous pairing.
+- Pair two different nodes to different plants/spaces. Both remain after restart. Connected Hardware shows the demo count, Add Sensor, and Manage Devices. Never label simulated pairing as active live telemetry.
+- Selecting an already-paired node clearly offers reassignment. Confirm it changes only that node, does not duplicate its count, and preserves other assignments and manual care.
+- Manage Devices lists all demo assignments, permits reassignment/removal, and shows an explicit empty state after the last removal. Dashboard reverts to Alerts and its previous non-Auto badge. Live plant links and local device mappings are untouched.
+- Pair from Plant Detail and Space Detail (including empty local spaces). Assignment automatically selects and disables the intended destination. Retry discovery, choose another device, and use Back: the target must stay locked. Start again from Dashboard: no previous contextual target remains.
+- Test contextual links with missing, repeated, malformed, deleted, and other-account destinations. Confirmation remains disabled with recovery guidance; it never falls back to another target. Test Unicode and punctuation in space names.
+- Upgrade a profile containing only the legacy single demo assignment. It appears once in Manage Devices. Remove it, restart, and verify it does not reappear. Corrupt collection entries must fail closed without overwriting storage.
+- Repeat storage failures, account switches, and background/cancel checks while adding a second sensor, reassigning, or removing one. Existing assignments must survive failed writes.
+
+Space identifiers follow the existing space-detail navigation convention (space names). A future rename/stable-ID migration requires coordinated collection changes.
 
 ## Version/documentation evidence
 

@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  connectedDeviceFromMock,
   createMockConnection,
   deviceTargets,
   findMockDevice,
+  isConnectedDevice,
   isMockDeviceConnection,
   mockDeviceDelay,
   mockHardwareNodes,
+  parsePreselectedTarget,
+  resolveDeviceTarget,
+  upsertConnectedDevice,
 } from "../services/device-connection";
 import {
   createLocalStateStore,
@@ -30,6 +35,7 @@ const connection = createMockConnection(
   targets[0],
   targets,
 );
+const connectedDevice = connectedDeviceFromMock(connection);
 
 test("discovery contains only uniquely identified mock nodes and rejects invalid route parameters", () => {
   assert.equal(
@@ -97,16 +103,18 @@ test("completed assignments survive reload and remain isolated from other accoun
   await account.load();
   await account.update((state) => ({
     ...state,
-    mockDeviceConnection: connection,
+    connectedDevices: [connectedDevice],
   }));
   const restored = createLocalStateStore(storage, localStateKey("A"));
   await restored.load();
-  assert.deepEqual(restored.snapshot().data.mockDeviceConnection, connection);
+  assert.deepEqual(restored.snapshot().data.connectedDevices, [
+    connectedDevice,
+  ]);
   assert.equal(restored.snapshot().data.onboarding.mode, null);
   for (const id of ["B", null]) {
     const other = createLocalStateStore(storage, localStateKey(id));
     await other.load();
-    assert.equal(other.snapshot().data.mockDeviceConnection, undefined);
+    assert.deepEqual(other.snapshot().data.connectedDevices, []);
   }
 });
 
@@ -123,12 +131,15 @@ test("failed persistence does not publish a successful connection and retry succ
   );
   await store.load();
   const save = () =>
-    store.update((state) => ({ ...state, mockDeviceConnection: connection }));
+    store.update((state) => ({
+      ...state,
+      connectedDevices: [connectedDevice],
+    }));
   await assert.rejects(save());
-  assert.equal(store.snapshot().data.mockDeviceConnection, undefined);
+  assert.deepEqual(store.snapshot().data.connectedDevices, []);
   fail = false;
   await save();
-  assert.deepEqual(store.snapshot().data.mockDeviceConnection, connection);
+  assert.deepEqual(store.snapshot().data.connectedDevices, [connectedDevice]);
 });
 
 test("mock delays finish only after their timeout", async (t) => {
@@ -191,7 +202,7 @@ test("a cancelled queued assignment never writes and the queue remains usable", 
   const cancelled = store.update((state) => {
     // Same cancellation boundary used by the assignment screen's updater.
     if (abort.signal.aborted) throw new Error("Cancelled");
-    return { ...state, mockDeviceConnection: connection };
+    return { ...state, connectedDevices: [connectedDevice] };
   });
   const rejected = assert.rejects(cancelled, /Cancelled/);
   abort.abort();
@@ -199,14 +210,14 @@ test("a cancelled queued assignment never writes and the queue remains usable", 
   await first;
   await rejected;
   assert.equal(writes, 1);
-  assert.equal(store.snapshot().data.mockDeviceConnection, undefined);
+  assert.deepEqual(store.snapshot().data.connectedDevices, []);
   await store.update((state) => ({
     ...state,
-    mockDeviceConnection: connection,
+    connectedDevices: [connectedDevice],
   }));
   assert.equal(writes, 2);
   assert.equal(store.snapshot().data.experience, "beginner");
-  assert.deepEqual(store.snapshot().data.mockDeviceConnection, connection);
+  assert.deepEqual(store.snapshot().data.connectedDevices, [connectedDevice]);
 });
 
 test("invalid persisted mock assignment blocks loading and preserves stored data", async () => {
@@ -227,10 +238,164 @@ test("invalid persisted mock assignment blocks loading and preserves stored data
   await store.load();
   assert.equal(store.snapshot().ready, false);
   assert.ok(store.snapshot().error);
-  assert.equal(store.snapshot().data.mockDeviceConnection, undefined);
+  assert.deepEqual(store.snapshot().data.connectedDevices, []);
   await assert.rejects(
     store.update((state) => state),
     /not ready/,
   );
   assert.equal(writes, 0);
+});
+
+test("legacy single connection migrates once without resurrecting removed devices", () => {
+  const { connectedDevices: _devices, ...legacy } = initialLocalState();
+  assert.deepEqual(parseLocalState(legacy).connectedDevices, []);
+  const migrated = parseLocalState({
+    ...legacy,
+    mockDeviceConnection: connection,
+  });
+  assert.deepEqual(migrated.connectedDevices, [connectedDevice]);
+  assert.equal(migrated.mockDeviceConnection, undefined);
+  assert.deepEqual(
+    parseLocalState({ ...migrated, connectedDevices: [] }).connectedDevices,
+    [],
+  );
+  assert.deepEqual(
+    parseLocalState({
+      ...legacy,
+      mockDeviceConnection: connection,
+      connectedDevices: [],
+    }).connectedDevices,
+    [],
+  );
+});
+
+test("multiple sensors append, reassignment replaces only the matching identity", () => {
+  const second = connectedDeviceFromMock(
+    createMockConnection(mockHardwareNodes[1].id, targets[1], targets),
+  );
+  const both = upsertConnectedDevice([connectedDevice], second);
+  assert.equal(both.length, 2);
+  assert.deepEqual(upsertConnectedDevice(both, second), both);
+  const reassigned = {
+    ...connectedDevice,
+    assignedType: "plant" as const,
+    assignedId: plant.id,
+    targetName: plant.name,
+  };
+  assert.deepEqual(upsertConnectedDevice(both, reassigned), [
+    reassigned,
+    second,
+  ]);
+  assert.deepEqual(both[0], connectedDevice);
+  assert.deepEqual(
+    parseLocalState({ ...initialLocalState(), connectedDevices: both })
+      .connectedDevices,
+    both,
+  );
+  assert.deepEqual(second.telemetry, {});
+});
+
+test("device collections fail closed on corrupt, duplicate, or spoofed live entries", () => {
+  for (const invalid of [
+    null,
+    {},
+    { ...connectedDevice, source: "live" },
+    { ...connectedDevice, assignedId: " " },
+    { ...connectedDevice, name: "spoofed" },
+    { ...connectedDevice, telemetry: { humidity: NaN } },
+    { ...connectedDevice, telemetry: { soilMoisture: Infinity } },
+    { ...connectedDevice, telemetry: { ph: 7 } },
+  ]) {
+    assert.equal(isConnectedDevice(invalid), false);
+    assert.throws(() =>
+      parseLocalState({ ...initialLocalState(), connectedDevices: [invalid] }),
+    );
+  }
+  assert.throws(() =>
+    parseLocalState({
+      ...initialLocalState(),
+      connectedDevices: [connectedDevice, connectedDevice],
+    }),
+  );
+  assert.throws(() =>
+    parseLocalState({ ...initialLocalState(), connectedDevices: {} }),
+  );
+});
+
+test("contextual targets lock selection and invalid or deleted destinations never fall back", () => {
+  assert.equal(parsePreselectedTarget(undefined, undefined), undefined);
+  for (const [type, id] of [
+    ["plant", undefined],
+    [undefined, "p1"],
+    ["account", "p1"],
+    [["plant"], "p1"],
+    ["plant", ["p1"]],
+    ["space", " "],
+    ["space", "x".repeat(201)],
+  ]) {
+    const parsed = parsePreselectedTarget(type, id);
+    assert.equal(parsed, null);
+    assert.equal(resolveDeviceTarget(parsed, targets[0], targets), null);
+  }
+  const parsed = parsePreselectedTarget("plant", plant.id);
+  assert.deepEqual(parsed, { type: "plant", id: plant.id });
+  assert.deepEqual(
+    resolveDeviceTarget(parsed, targets[0], targets),
+    targets[1],
+  );
+  assert.equal(resolveDeviceTarget(parsed, targets[0], [targets[0]]), null);
+  assert.deepEqual(
+    resolveDeviceTarget(undefined, targets[0], targets),
+    targets[0],
+  );
+  const unicode = {
+    kind: "space" as const,
+    id: "Patio / 蘭 & herbs",
+    name: "Patio / 蘭 & herbs",
+  };
+  assert.deepEqual(
+    resolveDeviceTarget(parsePreselectedTarget("space", unicode.id), null, [
+      unicode,
+    ]),
+    unicode,
+  );
+});
+
+test("concurrent pairing preserves multiple sensors across reload and removal", async () => {
+  let raw: string | null = null;
+  const storage = {
+    getItem: async () => raw,
+    setItem: async (_key: string, value: string) => {
+      raw = value;
+    },
+  };
+  const store = createLocalStateStore(storage, "multi-sensor");
+  await store.load();
+  const second = connectedDeviceFromMock(
+    createMockConnection(mockHardwareNodes[1].id, targets[1], targets),
+  );
+  await Promise.all(
+    [connectedDevice, second].map((device) =>
+      store.update((state) => ({
+        ...state,
+        connectedDevices: upsertConnectedDevice(state.connectedDevices, device),
+      })),
+    ),
+  );
+  const restored = createLocalStateStore(storage, "multi-sensor");
+  await restored.load();
+  assert.deepEqual(restored.snapshot().data.connectedDevices, [
+    connectedDevice,
+    second,
+  ]);
+  await restored.update((state) => ({
+    ...state,
+    connectedDevices: state.connectedDevices.filter(
+      (device) => device.id !== connectedDevice.id,
+    ),
+  }));
+  assert.deepEqual(restored.snapshot().data.connectedDevices, [second]);
+  await restored.update((state) => ({ ...state, connectedDevices: [] }));
+  await store.load();
+  assert.deepEqual(store.snapshot().data.connectedDevices, []);
 });

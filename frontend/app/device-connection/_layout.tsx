@@ -13,6 +13,7 @@ export default function DeviceConnectionStack() {
       <Stack.Screen name="selection" />
       <Stack.Screen name="assignment" />
       <Stack.Screen name="success" />
+      <Stack.Screen name="manage" />
     </Stack>
   );
 }

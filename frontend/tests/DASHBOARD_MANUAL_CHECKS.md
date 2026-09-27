@@ -7,20 +7,19 @@ Also run the existing [scan checks](SCAN_MANUAL_CHECKS.md) and [setup checks](SE
 ## Layout and accessibility
 
 - Compare with the supplied current screenshot: greeting, date, badge, green header background,
-  and overlapping Scan to Add Plant card must retain their original positioning.
+  and overlapping quick-action container must retain their original positioning. It now has separate Scan Plant and Pair Sensor segments.
 - Confirm the order below the scan card: inline Alerts, one white AI Summary placeholder,
   then the unchanged Plant Overview. No Garden summary, Your garden at a glance,
   Saved care preferences, View My Spaces button, Review care schedule button, My plants
   header, or individual plant-list cards should appear on Home.
 - AI Summary must explicitly say Coming soon and that no AI-generated garden summary is
   available yet. It must not invent analysis or offer a nonfunctional summary action.
-- Dismiss Alerts. The summary should move up in normal document flow without a blank overlay.
+- Pair a sensor. Alerts transforms in place into Connected Hardware without leaving a blank overlay; the hardware widget is not dismissible.
 - Test narrow phones, notched phones, tablets, web resizing, and large accessibility text.
   Alert buttons must wrap and all new card content must expand without clipping.
 - Scroll to the bottom of Plant Overview and verify the floating bottom navigation does not cover the final
   content at the end of scrolling. The existing bottom safe-area clearance must remain intact.
-- Verify VoiceOver/TalkBack headings, mock pairing hint, Dismiss label, and web
-  keyboard activation of Dismiss, retry when shown, and the retained overview controls.
+- Verify VoiceOver/TalkBack headings, mock pairing hints, and web keyboard activation of both quick actions, Add Sensor, Manage Devices, retry when shown, and the retained overview controls.
 
 ## Data and actions
 
@@ -32,14 +31,13 @@ Also run the existing [scan checks](SCAN_MANUAL_CHECKS.md) and [setup checks](SE
 - Check no-device, linked-device, demo-only, and mixed collections. Alerts must describe recorded
   links, not claim sensor discovery or current live readings. Demo readings must be labelled simulated.
 - Connect Device opens the mock connection stack. Follow the [device connection checks](DEVICE_CONNECTION_MANUAL_CHECKS.md).
-  After saving an assignment, Alerts disappears and the badge reads Mode: Auto (With IoT),
+  After saving an assignment, Alerts becomes Connected Hardware and the badge reads Mode: Auto (With IoT),
   with a visible mock-only/no-live-connection qualifier. Scanning without hardware must continue
   to work for signed-in users. Guests see sign-in guidance for AI scans and telemetry.
 - Plant Overview still opens existing spaces destinations. On another collection screen, check
   the unchanged standalone setup summary: Review care schedule restores saved preferences and
   Resume setup restores the saved step. No saved care data is deleted by removing Home controls.
-- Dismiss an alert in account A, then sign out and enter account B or guest mode. The dismissal,
-  collection, and care preferences must not leak across the session boundary.
+- Pair multiple sensors in account A, then sign out and enter account B or guest mode. Device assignments, counts, collection, and care preferences must not leak across the session boundary.
 
 ## Documentation compatibility
 

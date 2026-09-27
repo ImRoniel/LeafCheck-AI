@@ -1,42 +1,53 @@
-import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export function DashboardAlerts({
   message,
+  connectedCount,
   onConnect,
+  onManage,
 }: {
   message: string | null;
+  connectedCount: number;
   onConnect: () => void;
+  onManage: () => void;
 }) {
-  // Account-provider remounts reset this dismissal at session boundaries.
-  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null);
-  if (!message || message === dismissedMessage) return null;
+  const connected = connectedCount > 0;
 
   return (
     <View style={styles.container}>
       <Text accessibilityRole="header" style={styles.title}>
-        Alerts
+        {connected ? "Connected Hardware" : "Alerts"}
       </Text>
       <Text accessibilityLiveRegion="polite" style={styles.message}>
-        {message}
+        {connected
+          ? `${connectedCount} Demo Sensor${connectedCount === 1 ? "" : "s"} Paired • Mode: Auto (With IoT)`
+          : "No sensors detected by pairing setup"}
+      </Text>
+      <Text style={styles.message}>
+        {connected
+          ? "Mock setup · No live connection or automatic watering."
+          : (message ??
+            "Sensor status is not verified while your collection loads. Pair Sensor previews a demo setup; no physical discovery is performed.")}
       </Text>
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Connect Device"
+          accessibilityLabel={connected ? "Add Sensor" : "Connect Device"}
           accessibilityHint="Opens a mock device setup; no physical hardware will be connected"
           onPress={onConnect}
           style={[styles.button, styles.connect]}
         >
-          <Text style={styles.buttonText}>Connect Device</Text>
+          <Text style={styles.buttonText}>
+            {connected ? "+ Add Sensor" : "Connect Device"}
+          </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Dismiss sensor alert"
-          onPress={() => setDismissedMessage(message)}
+          accessibilityLabel="Manage Devices"
+          onPress={onManage}
           style={[styles.button, styles.dismiss]}
         >
-          <Text style={styles.buttonText}>Dismiss</Text>
+          <Text style={styles.buttonText}>Manage Devices</Text>
         </Pressable>
       </View>
     </View>

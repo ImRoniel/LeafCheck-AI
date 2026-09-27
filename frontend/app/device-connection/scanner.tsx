@@ -4,8 +4,9 @@ import {
 } from "@/components/device-connection-screen";
 import { useDeviceActivity } from "@/hooks/use-device-activity";
 import { mockDeviceDelay } from "@/services/device-connection";
+import type { DeviceConnectionRouteParams } from "@/types/device-connection";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -18,6 +19,8 @@ import {
 
 export default function DeviceScanner() {
   const router = useRouter();
+  const { targetType, targetId } =
+    useLocalSearchParams<DeviceConnectionRouteParams>();
   const active = useDeviceActivity();
   const controller = useRef<AbortController | null>(null);
   const [reduceMotion, setReduceMotion] = useState(true);
@@ -69,11 +72,14 @@ export default function DeviceScanner() {
     void mockDeviceDelay(2400, abort.signal)
       .then(() => {
         if (!abort.signal.aborted)
-          router.replace("/device-connection/selection");
+          router.replace({
+            pathname: "/device-connection/selection",
+            params: { targetType, targetId },
+          });
       })
       .catch(() => {});
     return () => abort.abort();
-  }, [active, router]);
+  }, [active, router, targetType, targetId]);
   return (
     <DeviceConnectionScreen
       title="Finding your devices"

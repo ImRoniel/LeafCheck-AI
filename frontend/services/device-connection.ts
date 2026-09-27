@@ -1,6 +1,8 @@
 import type {
-    DeviceTarget,
-    MockDeviceConnection,
+  ConnectedDevice,
+  DeviceTarget,
+  MockDeviceConnection,
+  PreselectedTarget,
 } from "../types/device-connection";
 import type { Plant } from "../types/plant";
 
@@ -24,6 +26,88 @@ export const mockHardwareNodes = [
 
 export function findMockDevice(id: unknown) {
   return mockHardwareNodes.find((node) => node.id === id);
+}
+
+/** undefined = open mode; null = malformed contextual link (must not unlock). */
+export function parsePreselectedTarget(
+  type: unknown,
+  id: unknown,
+): PreselectedTarget | null | undefined {
+  if (type === undefined && id === undefined) return undefined;
+  if (
+    (type !== "plant" && type !== "space") ||
+    typeof id !== "string" ||
+    !id.trim() ||
+    id.length > 200
+  )
+    return null;
+  return { type, id };
+}
+
+export function resolveDeviceTarget(
+  preselected: PreselectedTarget | null | undefined,
+  selected: DeviceTarget | null,
+  targets: readonly DeviceTarget[],
+): DeviceTarget | null {
+  if (preselected === null) return null;
+  const kind = preselected?.type ?? selected?.kind;
+  const id = preselected?.id ?? selected?.id;
+  return (
+    targets.find((target) => target.kind === kind && target.id === id) ?? null
+  );
+}
+
+export function connectedDeviceFromMock(
+  connection: MockDeviceConnection,
+): ConnectedDevice {
+  return {
+    id: connection.deviceId,
+    name: findMockDevice(connection.deviceId)!.name,
+    assignedType: connection.target.kind,
+    assignedId: connection.target.id,
+    targetName: connection.target.name,
+    source: "mock",
+    connectedAt: connection.connectedAt,
+    telemetry: {},
+  };
+}
+
+export function upsertConnectedDevice(
+  devices: readonly ConnectedDevice[],
+  device: ConnectedDevice,
+): ConnectedDevice[] {
+  const existing = devices.some((item) => item.id === device.id);
+  return existing
+    ? devices.map((item) => (item.id === device.id ? device : item))
+    : [...devices, device];
+}
+
+export function isConnectedDevice(value: unknown): value is ConnectedDevice {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const item = value as Partial<ConnectedDevice>;
+  const telemetry = item.telemetry;
+  return (
+    isMockDeviceConnection({
+      source: item.source,
+      deviceId: item.id,
+      connectedAt: item.connectedAt,
+      target: {
+        kind: item.assignedType,
+        id: item.assignedId,
+        name: item.targetName,
+      },
+    }) &&
+    item.name === findMockDevice(item.id)?.name &&
+    !!telemetry &&
+    typeof telemetry === "object" &&
+    !Array.isArray(telemetry) &&
+    Object.entries(telemetry).every(
+      ([key, reading]) =>
+        ["soilMoisture", "temperature", "humidity"].includes(key) &&
+        typeof reading === "number" &&
+        Number.isFinite(reading),
+    )
+  );
 }
 
 export function deviceTargets(

@@ -1,4 +1,7 @@
-import type { MockDeviceConnection } from "./device-connection";
+import type {
+  ConnectedDevice,
+  MockDeviceConnection,
+} from "./device-connection";
 import type { Plant } from "./plant";
 
 export type ExperienceLevel = "beginner" | "intermediate" | "experienced";
@@ -36,6 +39,8 @@ export interface LocalState {
   spaces: LocalSpace[];
   guestPlants: Plant[];
   schedules: Record<string, CareSchedule>;
+  connectedDevices: ConnectedDevice[];
+  /** Read-only legacy input; migrated by the persistence validator. */
   mockDeviceConnection?: MockDeviceConnection;
   onboarding: {
     status: "pending" | "completed" | "skipped";
@@ -61,6 +66,7 @@ export function initialLocalState(): LocalState {
     spaces: [],
     guestPlants: [],
     schedules: {},
+    connectedDevices: [],
     onboarding: {
       status: "pending",
       step: "experience",

@@ -8,25 +8,35 @@ import { useLocalState } from "@/context/local-state";
 import { useSpaces } from "@/context/spaces";
 import { useDeviceActivity } from "@/hooks/use-device-activity";
 import {
+  connectedDeviceFromMock,
   createMockConnection,
   deviceTargets,
   findMockDevice,
   mockDeviceDelay,
+  parsePreselectedTarget,
+  resolveDeviceTarget,
+  upsertConnectedDevice,
 } from "@/services/device-connection";
-import type { DeviceTarget } from "@/types/device-connection";
+import type {
+  DeviceConnectionRouteParams,
+  DeviceTarget,
+} from "@/types/device-connection";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 
 export default function DeviceAssignment() {
-  const { deviceId } = useLocalSearchParams<{ deviceId?: string }>();
+  const { deviceId, targetType, targetId } =
+    useLocalSearchParams<DeviceConnectionRouteParams>();
+  const preselected = parsePreselectedTarget(targetType, targetId);
+  const locked = preselected !== undefined;
   const device = findMockDevice(deviceId);
   const data = useAppData();
   const local = useLocalState();
   const { spaces } = useSpaces();
   const active = useDeviceActivity();
   const router = useRouter();
-  const [selected, setSelected] = useState<DeviceTarget | null>(null);
+  const [manualSelection, setSelected] = useState<DeviceTarget | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const work = useRef<AbortController | null>(null);
@@ -42,9 +52,10 @@ export default function DeviceAssignment() {
     ),
     data.loaded && !data.error ? data.plants : [],
   );
-  const latest = useRef({ targets, local, loading: data.loading });
+  const selected = resolveDeviceTarget(preselected, manualSelection, targets);
+  const latest = useRef({ targets, local, loading: data.loading, preselected });
   useLayoutEffect(() => {
-    latest.current = { targets, local, loading: data.loading };
+    latest.current = { targets, local, loading: data.loading, preselected };
   });
   const cancel = () => {
     work.current?.abort();
@@ -81,10 +92,36 @@ export default function DeviceAssignment() {
       await latest.current.local.update((state) => {
         if (abort.signal.aborted) throw new Error("Cancelled");
         // Revalidate after waiting for the persistence queue.
-        createMockConnection(device.id, selected, latest.current.targets);
-        return { ...state, mockDeviceConnection: connection };
+        const current = resolveDeviceTarget(
+          latest.current.preselected,
+          selected,
+          latest.current.targets,
+        );
+        if (
+          latest.current.loading ||
+          !current ||
+          current.kind !== selected.kind ||
+          current.id !== selected.id
+        )
+          throw new Error("Assignment changed");
+        const validated = createMockConnection(
+          device.id,
+          current,
+          latest.current.targets,
+        );
+        return {
+          ...state,
+          connectedDevices: upsertConnectedDevice(
+            state.connectedDevices,
+            connectedDeviceFromMock(validated),
+          ),
+        };
       });
-      if (!abort.signal.aborted) router.replace("/device-connection/success");
+      if (!abort.signal.aborted)
+        router.replace({
+          pathname: "/device-connection/success",
+          params: { deviceId: device.id, targetName: connection.target.name },
+        });
     } catch {
       if (!abort.signal.aborted)
         setError(
@@ -98,7 +135,15 @@ export default function DeviceAssignment() {
     }
   };
 
-  if (!device) return <Redirect href="/device-connection/scanner" />;
+  if (!device)
+    return (
+      <Redirect
+        href={{
+          pathname: "/device-connection/scanner",
+          params: { targetType, targetId },
+        }}
+      />
+    );
   return (
     <DeviceConnectionScreen
       title="Assign your sensor"
@@ -106,7 +151,7 @@ export default function DeviceAssignment() {
       onCancel={cancel}
     >
       <FlatList
-        data={targets}
+        data={locked ? (selected ? [selected] : []) : targets}
         keyExtractor={(item) => `${item.kind}:${item.id}`}
         extraData={[selected, busy]}
         contentContainerStyle={s.content}
@@ -114,9 +159,19 @@ export default function DeviceAssignment() {
           <View style={{ gap: 12 }}>
             <Text style={ui.heading}>{device.name}</Text>
             <Text style={s.text}>
-              Choose an existing Space or Plant. This assignment is saved only
-              on this device for the current account or guest profile.
+              {locked
+                ? "Your destination is preselected and locked. "
+                : "Choose an existing Space or Plant. "}
+              This assignment is saved only on this device for the current
+              account or guest profile.
             </Text>
+            {locked && !selected && !data.loading && (
+              <Text accessibilityRole="alert" style={s.status}>
+                This pairing destination is invalid or no longer available.
+                Return to its detail screen and try again; another destination
+                will not be selected automatically.
+              </Text>
+            )}
             {data.loading && (
               <Text accessibilityLiveRegion="polite" style={s.status}>
                 Loading your plants…
@@ -151,10 +206,17 @@ export default function DeviceAssignment() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`${item.kind === "space" ? "Space" : "Plant"}: ${item.name}`}
-              accessibilityState={{ selected: checked, disabled: busy }}
+              accessibilityState={{
+                selected: checked,
+                disabled: busy || locked,
+              }}
               aria-pressed={checked}
-              accessibilityHint="Select this destination for the mock sensor"
-              disabled={busy}
+              accessibilityHint={
+                locked
+                  ? "Preselected destination; cannot be changed in this flow"
+                  : "Select this destination for the mock sensor"
+              }
+              disabled={busy || locked}
               onPress={() => setSelected(item)}
               style={[s.node, checked && s.selected]}
             >
@@ -196,7 +258,12 @@ export default function DeviceAssignment() {
             <Action
               label="Choose another device"
               disabled={busy}
-              onPress={() => router.replace("/device-connection/selection")}
+              onPress={() =>
+                router.replace({
+                  pathname: "/device-connection/selection",
+                  params: { targetType, targetId },
+                })
+              }
             />
           </View>
         }
