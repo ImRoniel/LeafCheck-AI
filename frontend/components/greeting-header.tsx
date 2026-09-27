@@ -3,7 +3,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-export function GreetingHeader() {
+export function GreetingHeader({
+  mockConnected = false,
+}: {
+  mockConnected?: boolean;
+}) {
   const router = useRouter();
   const auth = useAuth();
   const profile = {
@@ -29,25 +33,37 @@ export function GreetingHeader() {
         </Text>
         <Text style={styles.date}>{date}</Text>
       </View>
-      <TouchableOpacity
-        style={styles.profileIcon}
-        onPress={() => router.replace("/profile")}
-        accessibilityRole="button"
-        accessibilityLabel="Open profile"
-      >
-        {profile.photoUri ? (
-          <Image
-            source={{ uri: profile.photoUri }}
-            style={styles.profileImage}
-          />
-        ) : (
-          <Ionicons name="person-outline" size={25} color="#20A64A" />
+      <View style={styles.rightColumn}>
+        <TouchableOpacity
+          style={styles.profileIcon}
+          onPress={() => router.replace("/profile")}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
+        >
+          {profile.photoUri ? (
+            <Image
+              source={{ uri: profile.photoUri }}
+              style={styles.profileImage}
+            />
+          ) : (
+            <Ionicons name="person-outline" size={25} color="#20A64A" />
+          )}
+        </TouchableOpacity>
+        <View style={[styles.modePill, mockConnected && styles.autoPill]}>
+          <Text style={styles.modeText}>
+            {mockConnected
+              ? "Mode: Auto (With IoT)"
+              : auth.isGuest
+                ? "Guest • Local only"
+                : "Private collection"}
+          </Text>
+        </View>
+        {mockConnected && (
+          <Text style={styles.mockLabel}>
+            Mock setup · No live connection
+            {auth.isGuest ? "\nGuest · Local only" : ""}
+          </Text>
         )}
-      </TouchableOpacity>
-      <View style={styles.modePill}>
-        <Text style={styles.modeText}>
-          {auth.isGuest ? "Guest • Local only" : "Private collection"}
-        </Text>
       </View>
     </View>
   );
@@ -65,11 +81,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 12,
     marginBottom: 18,
     minHeight: 72,
   },
   greetingContainer: {
     flex: 1,
+    minWidth: 160,
   },
   greeting: {
     fontSize: 25,
@@ -104,9 +123,6 @@ const styles = StyleSheet.create({
     borderRadius: 19,
   },
   modePill: {
-    position: "absolute",
-    right: 0,
-    bottom: -10,
     backgroundColor: "#F5B800",
     borderRadius: 12,
     paddingHorizontal: 8,
@@ -116,5 +132,18 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "600",
     color: "#111111",
+  },
+  rightColumn: {
+    alignItems: "flex-end",
+    gap: 8,
+    maxWidth: "100%",
+    marginLeft: "auto",
+  },
+  autoPill: { backgroundColor: "#FFFFFF" },
+  mockLabel: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    textAlign: "right",
+    maxWidth: 170,
   },
 });

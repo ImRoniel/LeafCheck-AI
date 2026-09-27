@@ -62,6 +62,7 @@ function Routes() {
       <Stack.Protected guard={active && !setupRequired}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="profile" />
+        <Stack.Screen name="device-connection" />
       </Stack.Protected>
       <Stack.Protected guard={!authenticated}>
         <Stack.Screen name="login" />

@@ -1,8 +1,9 @@
 import {
-    initialLocalState,
-    setupSteps,
-    type LocalState,
+  initialLocalState,
+  setupSteps,
+  type LocalState,
 } from "../types/local-state";
+import { isMockDeviceConnection } from "./device-connection";
 
 export interface LocalStorageAdapter {
   getItem(key: string): Promise<string | null>;
@@ -44,6 +45,12 @@ export function parseLocalState(value: unknown): LocalState {
     );
   };
   if (!record(value) || value.version !== 1) return fail();
+  // Optional additive field: existing v1 installations remain readable.
+  if (
+    value.mockDeviceConnection !== undefined &&
+    !isMockDeviceConnection(value.mockDeviceConnection)
+  )
+    return fail();
   if (
     value.experience !== null &&
     !oneOf(value.experience, ["beginner", "intermediate", "experienced"])

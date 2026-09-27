@@ -34,7 +34,7 @@ export function getDashboardCollectionStatus(
 
 export function getDashboardAlert(data: DashboardCollection) {
   if (data.guest) {
-    return "Sensors are optional. Guest mode supports local plants and care preferences. Sign in for AI camera scans and telemetry. New device pairing is not available in this app version.";
+    return "Sensors are optional. Guest mode supports local plants and care preferences. Sign in for AI camera scans and telemetry. Connect Device previews a mock setup only; physical pairing is not available.";
   }
   // A failed/refreshing collection cannot establish whether a sensor is linked.
   if (!data.loaded || data.loading || data.error) return null;
@@ -50,10 +50,10 @@ export function getDashboardAlert(data: DashboardCollection) {
       hasLinked
         ? "Sensor links are saved for this collection; a link does not confirm live readings. Open a plant to check sample times and telemetry status."
         : "No physical sensor links are recorded for this collection.",
-      "AI camera scans and manual care work without hardware. New device pairing is not available in this app version.",
+      "AI camera scans and manual care work without hardware. Connect Device previews a mock setup only; physical pairing is not available.",
     ]
       .filter(Boolean)
       .join(" ");
   }
-  return "No sensor links are recorded for this collection. Local device mappings do not verify a physical connection. Continue using AI camera scans and manual care without hardware. New device pairing is not available in this app version.";
+  return "No sensor links are recorded for this collection. Local device mappings do not verify a physical connection. Continue using AI camera scans and manual care without hardware. Connect Device previews a mock setup only; physical pairing is not available.";
 }

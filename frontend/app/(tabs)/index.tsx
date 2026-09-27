@@ -4,6 +4,7 @@ import { GreetingHeader } from "@/components/greeting-header";
 import { PlantOverviewCard } from "@/components/plant-overview-card";
 import { Screen } from "@/components/screen";
 import { useAppData } from "@/context/app-data";
+import { useLocalState } from "@/context/local-state";
 import {
   getDashboardAlert,
   getDashboardCollectionStatus,
@@ -14,13 +15,15 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function Home() {
   const data = useAppData();
+  const local = useLocalState();
+  const mockConnected = !!local.data.mockDeviceConnection;
   const router = useRouter();
 
   return (
     <View style={{ flex: 1 }}>
       <Screen refresh={() => void data.refresh()} loading={data.loading}>
         <View style={s.topBackground} />
-        <GreetingHeader />
+        <GreetingHeader mockConnected={mockConnected} />
 
         {/* Scan-First Hero Action */}
         <Pressable
@@ -42,7 +45,12 @@ export default function Home() {
           <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
         </Pressable>
 
-        <DashboardAlerts message={getDashboardAlert(data)} />
+        {!mockConnected && (
+          <DashboardAlerts
+            message={getDashboardAlert(data)}
+            onConnect={() => router.push("/device-connection/scanner")}
+          />
+        )}
         <DashboardAiSummary
           collectionStatus={getDashboardCollectionStatus(data)}
           onRetry={() => void data.refresh()}

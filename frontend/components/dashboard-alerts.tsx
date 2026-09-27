@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-export function DashboardAlerts({ message }: { message: string | null }) {
+export function DashboardAlerts({
+  message,
+  onConnect,
+}: {
+  message: string | null;
+  onConnect: () => void;
+}) {
   // Account-provider remounts reset this dismissal at session boundaries.
   const [dismissedMessage, setDismissedMessage] = useState<string | null>(null);
   if (!message || message === dismissedMessage) return null;
@@ -17,12 +23,12 @@ export function DashboardAlerts({ message }: { message: string | null }) {
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Connect device, pairing unavailable in this app version"
-          accessibilityState={{ disabled: true }}
-          disabled
+          accessibilityLabel="Connect Device"
+          accessibilityHint="Opens a mock device setup; no physical hardware will be connected"
+          onPress={onConnect}
           style={[styles.button, styles.connect]}
         >
-          <Text style={styles.buttonText}>Connect Device (unavailable)</Text>
+          <Text style={styles.buttonText}>Connect Device</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -44,7 +50,7 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
   },
-  title: { color: "#F5B800", fontSize: 18, fontWeight: "700" },
+  title: { color: "#FFFFFF", fontSize: 18, fontWeight: "700" },
   message: { color: "#FFFFFF", fontSize: 15, lineHeight: 23 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   button: {
@@ -56,7 +62,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  connect: { backgroundColor: "#F5B800" },
+  connect: { backgroundColor: "#FFFFFF" },
   dismiss: { backgroundColor: "#DBE7DA" },
   buttonText: { color: "#193E27", fontWeight: "700", textAlign: "center" },
 });

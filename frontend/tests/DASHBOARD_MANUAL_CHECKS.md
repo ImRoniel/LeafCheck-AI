@@ -19,7 +19,7 @@ Also run the existing [scan checks](SCAN_MANUAL_CHECKS.md) and [setup checks](SE
   Alert buttons must wrap and all new card content must expand without clipping.
 - Scroll to the bottom of Plant Overview and verify the floating bottom navigation does not cover the final
   content at the end of scrolling. The existing bottom safe-area clearance must remain intact.
-- Verify VoiceOver/TalkBack headings, disabled pairing announcement, Dismiss label, and web
+- Verify VoiceOver/TalkBack headings, mock pairing hint, Dismiss label, and web
   keyboard activation of Dismiss, retry when shown, and the retained overview controls.
 
 ## Data and actions
@@ -31,8 +31,10 @@ Also run the existing [scan checks](SCAN_MANUAL_CHECKS.md) and [setup checks](SE
   its carousel. Pull-to-refresh still works. No per-plant list is rendered below the overview.
 - Check no-device, linked-device, demo-only, and mixed collections. Alerts must describe recorded
   links, not claim sensor discovery or current live readings. Demo readings must be labelled simulated.
-- Connect Device remains explicitly unavailable because pairing is not implemented. Scanning
-  without hardware must continue to work for signed-in users. Guests see sign-in guidance.
+- Connect Device opens the mock connection stack. Follow the [device connection checks](DEVICE_CONNECTION_MANUAL_CHECKS.md).
+  After saving an assignment, Alerts disappears and the badge reads Mode: Auto (With IoT),
+  with a visible mock-only/no-live-connection qualifier. Scanning without hardware must continue
+  to work for signed-in users. Guests see sign-in guidance for AI scans and telemetry.
 - Plant Overview still opens existing spaces destinations. On another collection screen, check
   the unchanged standalone setup summary: Review care schedule restores saved preferences and
   Resume setup restores the saved step. No saved care data is deleted by removing Home controls.

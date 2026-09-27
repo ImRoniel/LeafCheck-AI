@@ -1,3 +1,4 @@
+import type { MockDeviceConnection } from "./device-connection";
 import type { Plant } from "./plant";
 
 export type ExperienceLevel = "beginner" | "intermediate" | "experienced";
@@ -35,6 +36,7 @@ export interface LocalState {
   spaces: LocalSpace[];
   guestPlants: Plant[];
   schedules: Record<string, CareSchedule>;
+  mockDeviceConnection?: MockDeviceConnection;
   onboarding: {
     status: "pending" | "completed" | "skipped";
     step: SetupStep;
