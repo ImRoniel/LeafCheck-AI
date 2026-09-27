@@ -1,16 +1,19 @@
+import { DashboardAiSummary } from "@/components/dashboard-ai-summary";
+import { DashboardAlerts } from "@/components/dashboard-alerts";
 import { GreetingHeader } from "@/components/greeting-header";
-import { CollectionState, PlantList } from "@/components/plant-list";
 import { PlantOverviewCard } from "@/components/plant-overview-card";
-import { Screen, ui } from "@/components/screen";
+import { Screen } from "@/components/screen";
 import { useAppData } from "@/context/app-data";
-import { useSpaces } from "@/context/spaces";
+import {
+  getDashboardAlert,
+  getDashboardCollectionStatus,
+} from "@/services/dashboard-summary";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function Home() {
   const data = useAppData();
-  const { spaces } = useSpaces();
   const router = useRouter();
 
   return (
@@ -32,26 +35,19 @@ export default function Home() {
           <View style={{ flex: 1, marginLeft: 14 }}>
             <Text style={s.scanBannerTitle}>Scan to Add Plant</Text>
             <Text style={s.scanBannerSubtitle}>
-              Point camera at any plant for instant AI identification & care specs
+              Point camera at any plant for instant AI identification & care
+              specs
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
         </Pressable>
 
-        <View style={ui.card}>
-          <Text style={ui.heading}>Your growing world</Text>
-          <Text style={ui.text}>
-            {data.loaded
-              ? `${data.plants.length} plants across ${spaces.length} locations.`
-              : "Your API collection will appear here."}{" "}
-            Health labels reflect backend records, not a calculated health score.
-          </Text>
-        </View>
-
-        <CollectionState />
+        <DashboardAlerts message={getDashboardAlert(data)} />
+        <DashboardAiSummary
+          collectionStatus={getDashboardCollectionStatus(data)}
+          onRetry={() => void data.refresh()}
+        />
         {data.loaded && <PlantOverviewCard />}
-        <Text style={ui.heading}>My plants</Text>
-        <PlantList plants={data.plants} />
       </Screen>
     </View>
   );

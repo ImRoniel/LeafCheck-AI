@@ -12,7 +12,7 @@ export function SetupSummary() {
     : undefined;
   return (
     <View style={ui.card}>
-      <Text style={ui.heading}>
+      <Text accessibilityRole="header" style={ui.heading}>
         {schedule ? "Your saved care plan" : "Grow at your own pace"}
       </Text>
       {schedule ? (
