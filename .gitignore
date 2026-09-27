@@ -82,3 +82,15 @@ LeafCheck_Auth_Postman_Collection.json
 
 #docs 
 docs
+
+#certs
+certs
+
+#.roo
+.roo/mcp.json
+
+#plans
+plans/
+
+#roommodes
+.roommodes
