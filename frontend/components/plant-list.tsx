@@ -4,13 +4,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Image, Pressable, Text, View } from "react-native";
 import { Action, Notice, ui } from "./screen";
-import { SetupSummary } from "./setup-summary";
 export function CollectionState() {
   const data = useAppData();
   const router = useRouter();
   return (
     <>
-      <SetupSummary />
       {data.guest && (
         <>
           <Notice>
@@ -41,7 +39,7 @@ export function CollectionState() {
           </Notice>
           <Action
             label="Scan Plant to Add"
-            onPress={() => router.push("/(tabs)/camera")}
+            onPress={() => router.push("/(tabs)/scanner")}
           />
         </>
       )}
@@ -82,8 +80,31 @@ export function PlantList({ plants }: { plants: Plant[] }) {
           <View style={{ flex: 1 }}>
             <Text style={ui.heading}>{plant.name}</Text>
             <Text style={ui.text}>{plant.species}</Text>
-            <Text style={ui.text}>
-              {plant.location || "Unassigned"} · {plant.healthStatus}
+            <Text style={ui.text}>{plant.location || "Unassigned"}</Text>
+            <Text
+              style={{
+                alignSelf: "flex-start",
+                borderRadius: 12,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                fontWeight: "700",
+                color: "#193E27",
+                backgroundColor: {
+                  healthy: "#DDF4E3",
+                  warning: "#FFF0C2",
+                  critical: "#FFDCDC",
+                  unknown: "#E8ECE9",
+                }[plant.healthStatus],
+              }}
+            >
+              {
+                {
+                  healthy: "Healthy",
+                  warning: "Warning",
+                  critical: "Critical",
+                  unknown: "Unknown",
+                }[plant.healthStatus]
+              }
             </Text>
           </View>
         </Pressable>

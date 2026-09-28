@@ -49,6 +49,27 @@ export function parseLocalState(value: unknown): LocalState {
     );
   };
   if (!record(value) || value.version !== 1) return fail();
+  if (
+    value.careCompletions !== undefined &&
+    (!Array.isArray(value.careCompletions) ||
+      value.careCompletions.length > 500 ||
+      !value.careCompletions.every(
+        (item: unknown) =>
+          record(item) &&
+          text(item.id, 20000) &&
+          text(item.key, 16000) &&
+          text(item.plantId) &&
+          text(item.title, 10000) &&
+          typeof item.details === "string" &&
+          item.details.length <= 20000 &&
+          (item.dueAt === null || date(item.dueAt)) &&
+          oneOf(item.priority, ["immediate", "routine"]) &&
+          date(item.completedAt),
+      ) ||
+      new Set(value.careCompletions.map((item) => item.id)).size !==
+        value.careCompletions.length)
+  )
+    return fail();
   // Optional additive field: existing v1 installations remain readable.
   if (
     value.mockDeviceConnection !== undefined &&
@@ -151,6 +172,7 @@ export function parseLocalState(value: unknown): LocalState {
   const { mockDeviceConnection, ...current } = value;
   return {
     ...current,
+    careCompletions: value.careCompletions ?? [],
     connectedDevices:
       value.connectedDevices ??
       (isMockDeviceConnection(mockDeviceConnection)

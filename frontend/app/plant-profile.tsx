@@ -111,7 +111,7 @@ export default function PlantProfile() {
             label="Scan this plant"
             onPress={() =>
               router.push({
-                pathname: "/(tabs)/camera",
+                pathname: "/(tabs)/scanner",
                 params: { plantId: plant.id },
               })
             }

@@ -40,7 +40,6 @@ export default function SpaceDetail() {
       {data.loaded && !plants.length && (
         <Notice>No plants at this location.</Notice>
       )}
-      <Action label="Edit / archive location — unavailable" disabled />
     </Screen>
   );
 }

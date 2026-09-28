@@ -1,3 +1,4 @@
+import type { CareCompletion } from "./care-task";
 import type {
   ConnectedDevice,
   MockDeviceConnection,
@@ -39,6 +40,7 @@ export interface LocalState {
   spaces: LocalSpace[];
   guestPlants: Plant[];
   schedules: Record<string, CareSchedule>;
+  careCompletions: CareCompletion[];
   connectedDevices: ConnectedDevice[];
   /** Read-only legacy input; migrated by the persistence validator. */
   mockDeviceConnection?: MockDeviceConnection;
@@ -66,6 +68,7 @@ export function initialLocalState(): LocalState {
     spaces: [],
     guestPlants: [],
     schedules: {},
+    careCompletions: [],
     connectedDevices: [],
     onboarding: {
       status: "pending",

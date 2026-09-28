@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import {
-    createContext,
-    createElement,
-    useCallback,
-    useContext,
-    type ReactNode,
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  type ReactNode,
 } from "react";
 import ts from "typescript";
 
@@ -15,7 +15,7 @@ const { renderToString } = require("react-dom/server") as {
   renderToString(node: ReactNode): string;
 };
 
-// Isolate React Navigation's native entry point, but render with real React hooks.
+// Isolate Router's navigation entry point, but render with real React hooks.
 function setup() {
   type Navigation = {
     isFocused(): boolean;
@@ -36,7 +36,7 @@ function setup() {
     {
       exports,
       require(name: string) {
-        if (name === "@react-navigation/native") {
+        if (name === "expo-router/react-navigation") {
           return { NavigationContext, NavigationContainerRefContext };
         }
         if (name === "react") {

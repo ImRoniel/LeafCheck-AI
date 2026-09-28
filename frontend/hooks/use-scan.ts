@@ -14,7 +14,8 @@ export function useScan() {
     flow.getState,
   );
   const pathname = usePathname();
-  const focused = pathname === "/camera" || pathname.endsWith("/camera");
+  const focused =
+    pathname === "/scanner" || pathname.endsWith("/(tabs)/scanner");
   useEffect(() => {
     if (!focused) flow.cancel();
   }, [focused, flow]);

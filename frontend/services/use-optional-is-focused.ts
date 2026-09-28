@@ -1,7 +1,7 @@
 import {
     NavigationContainerRefContext,
     NavigationContext,
-} from "@react-navigation/native";
+} from "expo-router/react-navigation";
 import { useCallback, useContext, useSyncExternalStore } from "react";
 
 type FocusNavigation = {

@@ -131,6 +131,6 @@ for (const count of [0, 2]) {
     assert.equal(badge, count > 0);
     assert.ok(press(node, "Scan Plant"));
     assert.ok(press(node, "Pair Sensor"));
-    assert.deepEqual(paths, ["/(tabs)/camera", "/device-connection/scanner"]);
+    assert.deepEqual(paths, ["/(tabs)/scanner", "/device-connection/scanner"]);
   });
 }

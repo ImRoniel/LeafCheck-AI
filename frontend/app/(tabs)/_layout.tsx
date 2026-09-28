@@ -4,17 +4,27 @@ export default function Layout() {
   return (
     <Tabs
       tabBar={(props) =>
-        props.state.routes[props.state.index]?.name === "camera" ? null : (
+        ["scanner", "camera"].includes(
+          props.state.routes[props.state.index]?.name ?? "",
+        ) ? null : (
           <BottomNav {...props} />
         )
       }
+      backBehavior="history"
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="search" />
-      <Tabs.Screen name="spaces" />
-      <Tabs.Screen name="notifications" />
-      <Tabs.Screen name="camera" />
+      <Tabs.Screen name="index" options={{ title: "Home" }} />
+      <Tabs.Screen name="garden" options={{ title: "My Garden" }} />
+      <Tabs.Screen name="tasks" options={{ title: "Care Tasks" }} />
+      <Tabs.Screen
+        name="scanner"
+        options={{ title: "Scan Plant", href: null }}
+      />
+      <Tabs.Screen name="search" options={{ href: null }} />
+      <Tabs.Screen name="spaces" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="camera" options={{ href: null }} />
+      <Tabs.Screen name="explore" options={{ href: null }} />
       <Tabs.Screen name="space-detail" options={{ href: null }} />
     </Tabs>
   );

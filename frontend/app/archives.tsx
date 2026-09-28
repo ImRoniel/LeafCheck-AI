@@ -1,9 +1,8 @@
 import { Action, Notice, Screen, ui } from "@/components/screen";
-import { useAuth } from "@/context/auth";
 import { api } from "@/services/api";
-import type { ArchiveEntry } from "@/types";
+import { usePollingResource } from "@/services/use-polling-resource";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -23,34 +22,15 @@ if (
 }
 
 export default function Archives() {
-  const auth = useAuth();
-  const [archives, setArchives] = useState<ArchiveEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const resource = usePollingResource(
+    "scan-archives",
+    (signal) => api.fetchArchives({ signal }),
+    { pollIntervalMs: 60_000 },
+  );
+  const archives = resource.data ?? [];
+  const { loading, error } = resource;
+  const loadArchives = () => resource.refresh().catch(() => undefined);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const loadArchives = async () => {
-    if (auth.status !== "authenticated") {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.fetchArchives();
-      setArchives(data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load archives.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadArchives();
-  }, [auth.status]);
 
   const toggleExpand = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -78,20 +58,26 @@ export default function Archives() {
       loading={loading}
     >
       <Notice>
-        Diagnostic history and AI plant assessments generated from your camera scans.
+        Diagnostic history and AI plant assessments generated from your camera
+        scans.
       </Notice>
 
       {error && (
         <>
-          <Notice>{error}</Notice>
-          <Action label="Retry loading archives" onPress={() => void loadArchives()} />
+          <Notice>{error.message}</Notice>
+          <Action
+            label="Retry loading archives"
+            onPress={() => void loadArchives()}
+          />
         </>
       )}
 
       {loading && archives.length === 0 && (
         <View style={s.centerBox}>
           <ActivityIndicator size="large" color="#2F8135" />
-          <Text style={[ui.text, { marginTop: 12 }]}>Loading scan archives…</Text>
+          <Text style={[ui.text, { marginTop: 12 }]}>
+            Loading scan archives…
+          </Text>
         </View>
       )}
 
@@ -100,8 +86,8 @@ export default function Archives() {
           <Ionicons name="archive-outline" size={48} color="#888" />
           <Text style={[ui.heading, { marginTop: 12 }]}>No Archives Yet</Text>
           <Text style={[ui.text, { textAlign: "center", marginTop: 6 }]}>
-            When you scan plants using the AI camera, their detailed diagnostic reports
-            and care recommendations are permanently archived here.
+            When you scan plants using the AI camera, their detailed diagnostic
+            reports and care recommendations are permanently archived here.
           </Text>
         </View>
       )}
@@ -109,13 +95,16 @@ export default function Archives() {
       {archives.map((entry) => {
         const badge = getHealthBadgeStyle(entry.healthStatus);
         const isExpanded = expandedId === entry.id;
-        const scanDate = new Date(entry.createdAt).toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        const scanDate = new Date(entry.createdAt).toLocaleDateString(
+          undefined,
+          {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          },
+        );
 
         return (
           <View key={entry.id} style={[ui.card, s.archiveCard]}>
@@ -125,7 +114,9 @@ export default function Archives() {
                   {entry.plant?.name ?? entry.speciesName ?? "Unknown Plant"}
                 </Text>
                 <Text style={s.speciesText}>
-                  {entry.plant?.species ?? entry.speciesName ?? "Unidentified species"}
+                  {entry.plant?.species ??
+                    entry.speciesName ??
+                    "Unidentified species"}
                 </Text>
               </View>
               <View style={[s.badge, { backgroundColor: badge.bg }]}>
@@ -142,16 +133,23 @@ export default function Archives() {
 
             {entry.notificationTime && (
               <View style={s.notificationBox}>
-                <Ionicons name="notifications-outline" size={16} color="#1565C0" />
+                <Ionicons
+                  name="notifications-outline"
+                  size={16}
+                  color="#1565C0"
+                />
                 <View style={{ flex: 1, marginLeft: 8 }}>
                   <Text style={s.notificationTime}>
                     Follow-up:{" "}
-                    {new Date(entry.notificationTime).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {new Date(entry.notificationTime).toLocaleDateString(
+                      undefined,
+                      {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )}
                   </Text>
                   {entry.notificationReason ? (
                     <Text style={s.notificationReason}>
@@ -170,7 +168,9 @@ export default function Archives() {
                   onPress={() => toggleExpand(entry.id)}
                 >
                   <Text style={s.toggleButtonText}>
-                    {isExpanded ? "Hide Diagnostic Report" : "View Diagnostic Report"}
+                    {isExpanded
+                      ? "Hide Diagnostic Report"
+                      : "View Diagnostic Report"}
                   </Text>
                   <Ionicons
                     name={isExpanded ? "chevron-up" : "chevron-down"}

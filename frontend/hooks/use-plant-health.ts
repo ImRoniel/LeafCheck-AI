@@ -1,4 +1,4 @@
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { analyzePlant } from "../services/api";

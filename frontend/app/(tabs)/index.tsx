@@ -30,7 +30,7 @@ export default function Home() {
             accessibilityRole="button"
             accessibilityLabel="Scan Plant"
             style={s.scanBanner}
-            onPress={() => router.push("/(tabs)/camera")}
+            onPress={() => router.push("/(tabs)/scanner")}
           >
             <View style={s.scanBannerIcon}>
               <Ionicons name="scan-outline" size={28} color="#FFFFFF" />
@@ -70,11 +70,11 @@ export default function Home() {
           onConnect={() => router.push("/device-connection/scanner")}
           onManage={() => router.push("/device-connection/manage")}
         />
+        {data.loaded && <PlantOverviewCard />}
         <DashboardAiSummary
           collectionStatus={getDashboardCollectionStatus(data)}
           onRetry={() => void data.refresh()}
         />
-        {data.loaded && <PlantOverviewCard />}
       </Screen>
     </View>
   );
