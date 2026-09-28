@@ -93,6 +93,31 @@ test("tab layout exposes only three primary tabs and retains hidden compatibilit
     assert.ok(existsSync(`app/(tabs)/${node.props.name}.tsx`));
 });
 
+test("custom tab bar stays visible on content routes and hides on scan routes", () => {
+  const BottomNav = () => null;
+  const { default: Layout } = load("app/(tabs)/_layout.tsx", {
+    "@/components/bottom-nav": { BottomNav },
+    "expo-router": { Tabs: Object.assign(() => null, { Screen: () => null }) },
+  });
+  const layout = Layout({} as never) as React.ReactElement<{
+    backBehavior: string;
+    tabBar: (props: {
+      state: { index: number; routes: { name: string }[] };
+    }) => React.ReactElement | null;
+  }>;
+  assert.equal(layout.props.backBehavior, "history");
+  for (const name of ["index", "garden", "tasks", "space-detail"])
+    assert.equal(
+      layout.props.tabBar({ state: { index: 0, routes: [{ name }] } })?.type,
+      BottomNav,
+    );
+  for (const name of ["scanner", "camera"])
+    assert.equal(
+      layout.props.tabBar({ state: { index: 0, routes: [{ name }] } }),
+      null,
+    );
+});
+
 test("bottom navigation emits tab events, respects prevention and keeps Scan an action", () => {
   const navigated: string[] = [];
   let prevent = false;

@@ -1,8 +1,11 @@
 import { BottomNav } from "@/components/bottom-nav";
 import { Tabs } from "expo-router";
+
 export default function Layout() {
   return (
     <Tabs
+      // BottomNav owns the three-tab pill and separate right-hand camera FAB.
+      // Keep both hidden while the scanner or legacy camera route is active.
       tabBar={(props) =>
         ["scanner", "camera"].includes(
           props.state.routes[props.state.index]?.name ?? "",

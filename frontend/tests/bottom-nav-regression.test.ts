@@ -12,7 +12,10 @@ const web = loadModule("react-native-web");
 type Props = {
   children?: React.ReactNode;
   style?: unknown;
+  pointerEvents?: string;
   accessibilityLabel?: string;
+  accessibilityRole?: string;
+  accessibilityHint?: string;
   onPress?: () => void;
   onLongPress?: () => void;
 };
@@ -72,35 +75,67 @@ function loadNav() {
   return { tree, navigated, events };
 }
 
-test("Scan occupies the center between equal side groups with safe-area and tap-target space", () => {
+test("flat pill and right-hand camera share a centerline, height and consistent spacing", () => {
   const { tree, events } = loadNav();
   const outer = web.StyleSheet.flatten(tree.props.style);
   assert.equal(outer.bottom, 36);
   assert.equal(outer.left, 44);
   assert.equal(outer.right, 44);
-  const [bar] = children(tree);
-  const [left, scan, right] = children(bar);
+  assert.equal(tree.props.pointerEvents, "box-none");
+  const [dock] = children(tree);
+  assert.equal(dock.props.pointerEvents, "box-none");
+  const dockStyle = web.StyleSheet.flatten(dock.props.style);
+  assert.equal(dockStyle.flexDirection, "row");
+  assert.equal(dockStyle.alignItems, "center");
+  assert.equal(dockStyle.width, "100%");
+  assert.equal(dockStyle.maxWidth, 560);
+  assert.equal(dockStyle.gap, 12);
+  const [bar, scan] = children(dock);
+  assert.equal(children(dock).length, 2);
   assert.equal(children(bar).length, 3);
   assert.equal(scan.props.accessibilityLabel, "Scan Plant");
-  const leftStyle = web.StyleSheet.flatten(left.props.style);
-  const rightStyle = web.StyleSheet.flatten(right.props.style);
-  assert.equal(leftStyle.flex, 1);
-  assert.equal(leftStyle.flexBasis, 0);
-  assert.deepEqual(leftStyle, rightStyle);
-  const scanStyle = web.StyleSheet.flatten(scan.props.style);
+  assert.equal(scan.props.accessibilityRole, "button");
+  assert.match(scan.props.accessibilityHint!, /camera/);
+  const barStyle = web.StyleSheet.flatten(bar.props.style);
+  assert.equal(barStyle.flex, 1);
+  assert.equal(barStyle.backgroundColor, "#FFFFFF");
+  const scanStyles = scan.props.style as (state: {
+    pressed: boolean;
+  }) => unknown;
+  const scanStyle = web.StyleSheet.flatten(scanStyles({ pressed: false }));
   assert.equal(scanStyle.width, 60);
+  assert.equal(scanStyle.height, scanStyle.width);
+  assert.equal(scanStyle.borderRadius, scanStyle.width / 2);
   assert.equal(scanStyle.flexShrink, 0);
-  assert.ok(scanStyle.minHeight >= 48);
-  assert.ok(scanStyle.marginTop < 0);
-  const tabs = [...children(left), ...children(right)];
+  assert.equal(barStyle.minHeight, scanStyle.height);
+  assert.equal(barStyle.borderRadius, scanStyle.borderRadius);
+  assert.equal(barStyle.borderWidth, 1);
+  assert.equal(scanStyle.marginBottom, undefined);
+  assert.equal(scanStyle.marginTop, undefined);
+  for (const style of [barStyle, scanStyle]) {
+    assert.equal(style.elevation, undefined);
+    assert.equal(style.shadowColor, undefined);
+    assert.equal(style.boxShadow, undefined);
+    assert.equal(style.transform, undefined);
+  }
+  assert.notEqual(
+    web.StyleSheet.flatten(scanStyles({ pressed: true })).backgroundColor,
+    scanStyle.backgroundColor,
+  );
+  const tabs = children(bar);
   assert.deepEqual(
     tabs.map((tab) => tab.props.accessibilityLabel),
     ["Home", "My Garden", "Care Tasks"],
   );
   for (const tab of tabs) {
+    assert.equal(tab.props.accessibilityRole, "tab");
     const style = web.StyleSheet.flatten(tab.props.style);
     assert.ok(style.minWidth >= 48);
     assert.ok(style.minHeight >= 48);
+    assert.equal(
+      style.minHeight + 2 * barStyle.paddingVertical + 2 * barStyle.borderWidth,
+      scanStyle.height,
+    );
     tab.props.onLongPress!();
   }
   assert.deepEqual(

@@ -2,7 +2,7 @@
 
 Automated coverage does not replace these Android, iOS, and browser checks.
 
-- Verify Home, My Garden, and Care Tasks selection and back history. Scan is a raised camera action, not a fourth content tab. Check narrow screens, safe areas, large text, keyboard focus, VoiceOver, and TalkBack.
+- Verify Home, My Garden, and Care Tasks appear in that order inside one pill, with the circular camera action separately on its far right, not in the center or as a fourth content tab. Both surfaces should be flat (no shadows), 60 points tall at default text size, vertically centered with a 12-point gap and matching rounded corners. Check selection and back history, narrow screens, portrait/landscape safe areas, large text, keyboard focus, VoiceOver, and TalkBack. At large text sizes the pill may grow, but the camera must remain centered and circular. Confirm it announces “Scan Plant,” shows press feedback, and does not overlap the tab targets; the empty gap must not intercept screen interactions.
 - Open Scan from every tab and from a plant profile. Confirm the tab bar disappears, target plant parameters survive, and closing returns appropriately. Repeat permission denial, background/cancel, duplicate capture, and synchronization retry checks from [scan checks](SCAN_MANUAL_CHECKS.md).
 - Open old Search, Spaces, Notifications, Camera, and Explore bookmarks. Confirm redirects, with no template or unsupported-notifications page.
 - On Home, verify both header actions remain, hardware management works, Plant Overview immediately follows hardware, and AI Summary is last.

@@ -57,6 +57,7 @@ export function BottomNav({ state, navigation }: BottomTabBarProps) {
   const horizontalInset = Math.max(12, insets.left || 0, insets.right || 0);
   return (
     <View
+      pointerEvents="box-none"
       style={[
         s.outer,
         {
@@ -66,19 +67,17 @@ export function BottomNav({ state, navigation }: BottomTabBarProps) {
         },
       ]}
     >
-      <View style={s.bar}>
-        <View style={s.side}>{items.slice(0, 2).map(renderItem)}</View>
+      <View pointerEvents="box-none" style={s.dock}>
+        <View style={s.bar}>{items.map(renderItem)}</View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Scan Plant"
           accessibilityHint="Open the camera to identify or scan a plant"
-          style={s.scan}
+          style={({ pressed }) => [s.scan, pressed && s.scanPressed]}
           onPress={() => router.navigate("/(tabs)/scanner")}
         >
           <Ionicons name="camera-outline" size={26} color="#FFFFFF" />
-          <Text style={s.scanLabel}>Scan</Text>
         </Pressable>
-        <View style={s.side}>{items.slice(2).map(renderItem)}</View>
       </View>
     </View>
   );
@@ -86,21 +85,25 @@ export function BottomNav({ state, navigation }: BottomTabBarProps) {
 
 const s = StyleSheet.create({
   outer: { position: "absolute", left: 12, right: 12, alignItems: "center" },
-  bar: {
+  dock: {
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
     maxWidth: 560,
-    borderRadius: 28,
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 5,
+    gap: 12,
   },
-  side: { flex: 1, flexBasis: 0, flexDirection: "row", alignItems: "center" },
+  bar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 60,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "#E2EBE4",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+  },
   item: {
     flex: 1,
     minWidth: 48,
@@ -118,15 +121,12 @@ const s = StyleSheet.create({
   selected: { color: "#1B6B36", fontWeight: "800" },
   scan: {
     width: 60,
+    height: 60,
     flexShrink: 0,
-    marginHorizontal: 8,
-    minHeight: 60,
-    marginTop: -24,
     borderRadius: 30,
     backgroundColor: "#1B6B36",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
   },
-  scanLabel: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  scanPressed: { backgroundColor: "#145329" },
 });
