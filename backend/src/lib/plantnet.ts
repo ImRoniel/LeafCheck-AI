@@ -77,18 +77,15 @@ export async function identifyPlant(
     );
   }
 
-  const data = (await response.json()) as {
-    results?: {
-      score?: number;
-      species?: {
-        scientificNameWithoutAuthor?: string;
-        commonNames?: string[];
-      };
-    }[];
-  };
-
-  const topResult = data?.results?.[0];
-  if (!topResult || !topResult.species?.scientificNameWithoutAuthor?.trim()) {
+  const unavailable = () => new HttpError(502, "PLANT_IDENTIFICATION_FAILED", "Plant identification is temporarily unavailable.");
+  const data: unknown = await response.json().catch(() => { throw unavailable(); });
+  const record = (value: unknown): value is Record<string, unknown> =>
+    value !== null && typeof value === "object" && !Array.isArray(value);
+  if (!record(data) || !Array.isArray(data.results)) throw unavailable();
+  const topResult: unknown = data.results[0];
+  const species = record(topResult) && record(topResult.species) ? topResult.species : null;
+  const speciesName = species?.scientificNameWithoutAuthor;
+  if (topResult === undefined || speciesName === undefined || speciesName === "") {
     throw new HttpError(
       422,
       "NO_PLANT_DETECTED",
@@ -96,11 +93,18 @@ export async function identifyPlant(
     );
   }
 
+  if (
+    !record(topResult) || typeof speciesName !== "string" ||
+    !speciesName.trim() || speciesName.length > 200 ||
+    (topResult.score !== undefined && (typeof topResult.score !== "number" || !Number.isFinite(topResult.score) || topResult.score < 0 || topResult.score > 1)) ||
+    (species?.commonNames !== undefined && (!Array.isArray(species.commonNames) || species.commonNames.some((name: unknown) => typeof name !== "string" || name.length > 200)))
+  ) throw unavailable();
+  const commonNames = species?.commonNames;
+
   return {
-    speciesName:
-      topResult.species?.scientificNameWithoutAuthor ?? "Unknown species",
-    commonName: topResult.species?.commonNames?.[0] ?? null,
-    confidence: topResult.score ?? 0,
+    speciesName: speciesName.trim(),
+    commonName: Array.isArray(commonNames) && typeof commonNames[0] === "string" ? commonNames[0].trim() || null : null,
+    confidence: typeof topResult.score === "number" ? topResult.score : 0,
     rawResponse: data,
   };
 }

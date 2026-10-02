@@ -23,6 +23,13 @@ let analyses;
 let prompts;
 let generationError;
 let plantCreates;
+let identifications;
+let linkedDevice;
+let deviceOwned;
+let plantOwned;
+let latestReading;
+let telemetryReads;
+let responseText;
 const originalKey = process.env.GEMINI_API_KEY;
 
 before(async () => {
@@ -48,11 +55,13 @@ before(async () => {
               deviceId: null,
             };
           },
-          findFirst: async () => ({
+          findFirst: async () => plantOwned ? ({
             id: "00000000-0000-4000-8000-000000000001",
             userId: "owner",
-          }),
+            deviceId: linkedDevice,
+          }) : null,
         },
+        device: { findFirst: async ({ where }) => deviceOwned ? { id: where.id, userId: "owner" } : null },
         plantIdentification: { create: async () => ({ id: "identification" }) },
         plantSpecCache: {
           findUnique: async (args) => {
@@ -75,17 +84,17 @@ before(async () => {
   });
   mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, {
     namedExports: {
-      prisma: { sensorReading: { findFirst: async () => null } },
+      prisma: { sensorReading: { findFirst: async () => { telemetryReads++; return latestReading; } } },
     },
   });
   mock.module(new URL("../src/lib/plantnet.js", import.meta.url).href, {
     namedExports: {
-      identifyPlant: async () => ({
+      identifyPlant: async () => { identifications++; return ({
         speciesName,
         commonName: "Basil",
         confidence: 0.99,
         rawResponse: {},
-      }),
+      }); },
     },
   });
   mock.module(new URL("../src/lib/perenual.js", import.meta.url).href, {
@@ -104,7 +113,7 @@ before(async () => {
             generateContent: async (contents) => {
               if (generationError) throw generationError;
               prompts.push(contents[0]);
-              return { response: { text: () => "healthy" } };
+              return { response: { text: () => responseText } };
             },
           };
         }
@@ -113,8 +122,9 @@ before(async () => {
   });
   const { scanRouter } = await import("../src/routes/scan.ts");
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "10mb" }));
   app.use("/api/scan", scanRouter);
+  app.use((await import("../src/lib/http.ts")).errorHandler);
   server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -128,6 +138,13 @@ beforeEach(() => {
   fetches = 0;
   generationError = null;
   plantCreates = 0;
+  identifications = 0;
+  linkedDevice = null;
+  deviceOwned = true;
+  plantOwned = true;
+  latestReading = null;
+  telemetryReads = 0;
+  responseText = "healthy";
   perenualData = {
     speciesName,
     commonName: "Basil",
@@ -148,13 +165,14 @@ after(async () => {
   mock.restoreAll();
 });
 
-async function scan(newPlant = false) {
+async function scan(newPlant = false, extra = {}) {
   const response = await fetch(`${baseUrl}/api/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      imageBase64: "mock-image",
+      imageBase64: "/9j/2Q==",
       ...(newPlant ? {} : { plantId: "00000000-0000-4000-8000-000000000001" }),
+      ...extra,
     }),
   });
   return { status: response.status, body: await response.json() };
@@ -166,6 +184,85 @@ test("cache hit skips Perenual and insertion", async () => {
   assert.equal(fetches, 0);
   assert.equal(inserts.length, 0);
   assert.deepEqual(analyses[0].idealSpecs, winner);
+});
+
+test("missing, malformed and oversized images are rejected before provider calls or writes", async () => {
+  for (const imageBase64 of [undefined, null, 42, "", "mock-image", "YWJj", "data:image/jpeg;base64,/9j/2Q==", "/9j/2Q==\n"]) {
+    const result = await scan(true, { imageBase64 });
+    assert.equal(result.status, 400);
+    assert.equal(result.body.code, "INVALID_IMAGE");
+  }
+  const oversized = "A".repeat(Math.ceil(7 * 1024 * 1024 / 3) * 4 + 4);
+  const result = await scan(true, { imageBase64: oversized });
+  assert.equal(result.status, 413);
+  assert.equal(result.body.code, "IMAGE_TOO_LARGE");
+  for (const location of [42, {}, "x".repeat(101)]) assert.equal((await scan(true, { location })).status, 400);
+  assert.equal(identifications, 0);
+  assert.equal(fetches, 0);
+  assert.equal(plantCreates, 0);
+  assert.equal(analyses.length, 0);
+});
+
+test("foreign plants and linked devices are blocked before providers and telemetry reads", async () => {
+  const deviceId = "00000000-0000-4000-8000-000000000002";
+  plantOwned = false;
+  assert.equal((await scan()).status, 404);
+  plantOwned = true;
+  linkedDevice = deviceId;
+  deviceOwned = false;
+  assert.equal((await scan()).status, 404);
+  assert.equal((await scan(false, { deviceId })).status, 404);
+  assert.equal((await scan(true, { deviceId })).status, 404);
+  deviceOwned = true;
+  assert.equal((await scan(false, { deviceId: "00000000-0000-4000-8000-000000000003" })).status, 404);
+  assert.equal(identifications, 0);
+  assert.equal(telemetryReads, 0);
+  assert.equal(analyses.length, 0);
+});
+
+test("owned device telemetry and stale context are preserved with diagnostic text", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  latestReading = {
+    deviceId: linkedDevice, timestamp: new Date(Date.now() - 60 * 60_000),
+    temperature: 25, humidity: 60, soilMoisture: 50, lightLevel: 1000,
+  };
+  const result = await scan();
+  assert.equal(result.status, 201);
+  assert.equal(result.body.identification.speciesName, speciesName);
+  assert.equal(result.body.diagnostic.rawAnalysisText, "healthy");
+  assert.match(result.body.diagnostic.telemetryFreshness, /STALE/);
+  assert.equal(result.body.telemetry.timestamp, latestReading.timestamp.toISOString());
+  assert.equal(analyses[0].telemetrySnapshot.deviceId, linkedDevice);
+  assert.equal(analyses[0].userId, "owner");
+});
+
+test("malformed AI structures fail safely before creating plants or analyses", async () => {
+  const valid = {
+    healthStatus: "warning", diagnosticReport: "Inspect the leaves.", careTasks: [],
+    notification: { notifyAt: new Date().toISOString(), reason: "Follow up" },
+  };
+  for (const output of [null, [], {}, { ...valid, healthStatus: ["healthy"] },
+    { ...valid, diagnosticReport: {} }, { ...valid, careTasks: "water" },
+    { ...valid, careTasks: [null] }, { ...valid, notification: { notifyAt: "invalid", reason: "x" } },
+  ]) {
+    responseText = JSON.stringify(output);
+    const result = await scan(true);
+    assert.equal(result.status, 502);
+    assert.equal(result.body.code, "SCAN_AI_UNAVAILABLE");
+    assert.equal(plantCreates, 0);
+    assert.equal(analyses.length, 0);
+  }
+  responseText = JSON.stringify({
+    ...valid,
+    careTasks: [{ title: "Inspect leaves", taskType: "OTHER", description: "Check for spots", urgency: "routine", dueDate: new Date().toISOString(), providerDebug: "internal" }],
+    notification: { ...valid.notification, providerDebug: "internal" },
+  });
+  const success = await scan();
+  assert.equal(success.status, 201);
+  assert.equal(success.body.diagnostic.healthStatus, "warning");
+  assert.equal(success.body.diagnostic.rawAnalysisText, valid.diagnosticReport);
+  assert.equal(success.body.careTasks[0].providerDebug, undefined);
+  assert.equal(success.body.notification.providerDebug, undefined);
 });
 
 test("cache miss inserts specifications normally", async () => {

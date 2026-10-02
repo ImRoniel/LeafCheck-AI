@@ -3,6 +3,7 @@ import { requireAuth } from "../lib/auth.js";
 import { geminiError, geminiModel } from "../lib/gemini.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { ownedPlant } from "../lib/ownership.js";
+import { validateScanImage } from "../lib/scan-input.js";
 import { AIDiagnosisRequest, AIDiagnosisResponse } from "../types/ai.js";
 
 export const aiRouter = Router();
@@ -18,6 +19,7 @@ aiRouter.post(
     ]);
     if (data.plantId !== undefined)
       await ownedPlant(data.plantId, res.locals.auth.user.id);
+    if (data.imageBase64 !== undefined) validateScanImage(data.imageBase64);
     if (
       (data.imageBase64 !== undefined &&
         typeof data.imageBase64 !== "string") ||

@@ -59,6 +59,20 @@ test("Pl@ntNet unexpected provider error objects and network failures remain con
   });
 });
 
+test("malformed identification metadata is rejected without returning provider details", async () => {
+  process.env.PLANTNET_API_KEY = "test";
+  for (const result of [
+    { species: { scientificNameWithoutAuthor: 42 }, score: 0.9 },
+    { species: { scientificNameWithoutAuthor: "Basil" }, score: "high" },
+    { species: { scientificNameWithoutAuthor: "Basil" }, score: 1.1 },
+    { species: { scientificNameWithoutAuthor: "Basil", commonNames: [42] }, score: 0.9 },
+  ]) {
+    mock.method(globalThis, "fetch", async () => Response.json({ results: [result] }));
+    await assert.rejects(identifyPlant("abc"), { status: 502, code: "PLANT_IDENTIFICATION_FAILED" });
+    mock.restoreAll();
+  }
+});
+
 test("Perenual common-name fallback verifies scientific identity", async () => {
   process.env.PERENUAL_API_KEY = "test";
   const queries = [];

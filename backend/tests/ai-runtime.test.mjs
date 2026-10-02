@@ -62,7 +62,7 @@ test("legacy analysis route recovers from missing config, rotates keys, and sani
     fetch(`${baseUrl}/api/ai/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageBase64: "YWJj" }),
+      body: JSON.stringify({ imageBase64: "/9j/2Q==" }),
     });
   let response = await analyze();
   assert.equal(response.status, 503);

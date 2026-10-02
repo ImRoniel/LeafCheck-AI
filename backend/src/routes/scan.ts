@@ -27,7 +27,9 @@ import { fetchPlantSpecs } from "../lib/perenual.js";
 import { identifyPlant } from "../lib/plantnet.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
-import type { GeminiStructuredOutput, ScanRequest } from "../types/scan.js";
+import { validateScanImage } from "../lib/scan-input.js";
+import { validateScanOutput } from "../lib/scan-output.js";
+import type { ScanRequest } from "../types/scan.js";
 
 export const scanRouter = Router();
 scanRouter.use(requireAuth);
@@ -53,8 +55,14 @@ scanRouter.post(
           "Device not associated with this plant.",
         );
       }
+      // Check the actual device owner even when the caller uses the stored link.
+      if (plant.deviceId) await ownedDevice(plant.deviceId, res.locals.auth.user.id);
     } else if (data.deviceId !== undefined) {
       await ownedDevice(data.deviceId, res.locals.auth.user.id);
+    }
+    validateScanImage(data.imageBase64);
+    if (data.location !== undefined && (typeof data.location !== "string" || data.location.trim().length > 100)) {
+      throw new HttpError(400, "INVALID_INPUT", "Location must be a string of at most 100 characters.");
     }
     next();
   }),
@@ -101,6 +109,10 @@ scanRouter.post("/", async (req: Request, res: Response) => {
         select: { id: true, name: true, species: true, deviceId: true },
       });
       if (!existing) throw new HttpError(404, "NOT_FOUND", "Plant not found.");
+      if (deviceId !== undefined && deviceId !== existing.deviceId) {
+        throw new HttpError(404, "NOT_FOUND", "Device not associated with this plant.");
+      }
+      if (existing.deviceId) await ownedDevice(existing.deviceId, userId);
       plant = existing;
     } else {
       // Defer persistence until providers have produced a diagnosis.
@@ -285,7 +297,7 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
     const rawText = result.response.text();
 
     // Parse the structured JSON from Gemini
-    let geminiOutput: GeminiStructuredOutput;
+    let geminiOutput: unknown;
     try {
       // Strip markdown code fences if Gemini wraps them
       const cleaned = rawText
@@ -326,6 +338,7 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
       };
     }
 
+    validateScanOutput(geminiOutput);
     // Validate health status
     const healthStatus = ["healthy", "warning", "critical"].includes(
       geminiOutput.healthStatus,
@@ -341,7 +354,7 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
             identification.commonName ??
             identification.speciesName.split(" ")[0],
           species: identification.speciesName,
-          location: location || undefined,
+          location: location?.trim() || undefined,
           userId,
           healthStatus: "unknown",
           imageUrl: undefined,
@@ -395,7 +408,13 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
 
     // ── Step 8: Create CareTask records ───────────────────────────────────
     const tasks = geminiOutput.careTasks ?? [];
-    const validTasks = tasks.slice(0, 5).filter((t) => t.title && t.dueDate);
+    const validTasks = tasks.map((task) => ({
+      title: task.title,
+      taskType: task.taskType,
+      description: task.description,
+      urgency: task.urgency,
+      dueDate: task.dueDate,
+    }));
 
     if (prismaPg.careTask && validTasks.length > 0) {
       await prismaPg.careTask.createMany({
@@ -417,7 +436,7 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
     // ── Step 9: Update plant health + lastScannedAt ───────────────────────
     if (prismaPg.plant?.update) {
       await prismaPg.plant.update({
-        where: { id: plant.id },
+        where: { id: plant.id, userId },
         data: {
           healthStatus,
           lastScannedAt: new Date(),
@@ -455,7 +474,10 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
           }
         : null,
       careTasks: validTasks,
-      notification: geminiOutput.notification ?? null,
+      notification: {
+        notifyAt: geminiOutput.notification.notifyAt,
+        reason: geminiOutput.notification.reason,
+      },
     });
   } catch (error: unknown) {
     // Provider errors can contain credential-bearing URLs. Log codes only.
