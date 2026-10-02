@@ -56,7 +56,7 @@ export async function seedDemoTelemetry(plantId: string, userId: string) {
           "HARDWARE_LINKED",
           "Demo readings cannot replace a linked hardware device.",
         );
-      await tx.device.upsert({
+      const device = await tx.device.upsert({
         where: { id: deviceId },
         create: {
           id: deviceId,
@@ -67,6 +67,13 @@ export async function seedDemoTelemetry(plantId: string, userId: string) {
         },
         update: {},
       });
+      if (device.userId !== userId || device.macAddress !== `DEMO:${plantId}`) {
+        throw new HttpError(
+          409,
+          "DEVICE_CONFLICT",
+          "Demo device association is unavailable.",
+        );
+      }
       const readings = generateDemoReadings(deviceId, new Date());
       // Atomic replacement leaves either the previous complete batch or the new one.
       // Stable _ids provide an additional database-level duplicate guard.

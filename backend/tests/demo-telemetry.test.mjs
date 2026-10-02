@@ -77,6 +77,12 @@ before(async () => {
           for (const operation of operations) operation();
         },
         sensorReading: {
+          create: async ({ data }) => {
+            if (failMongo) throw new Error("private storage failure");
+            writes++;
+            rows.push(data);
+            return data;
+          },
           deleteMany:
             ({ where }) =>
             () => {
@@ -254,4 +260,80 @@ test("hardware ingestion cannot contaminate demo data; hardware links are preser
   assert.equal(rows.length, 193);
   failMongo = false;
   assert.equal((await seed()).status, 200);
+});
+
+test("demo seeding cannot reuse a device belonging to another owner or plant", async () => {
+  const originalDevice = devices.get(plant.deviceId);
+  const originalRows = structuredClone(rows);
+  const association = plant.deviceId;
+  try {
+    for (const replacement of [
+      { ...originalDevice, userId: "other" },
+      { ...originalDevice, macAddress: `DEMO:${randomUUID()}` },
+    ]) {
+      devices.set(association, replacement);
+      const response = await seed();
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).code, "DEVICE_CONFLICT");
+      assert.equal(plant.deviceId, association);
+      assert.deepEqual(rows, originalRows);
+      assert.deepEqual(devices.get(association), replacement);
+    }
+  } finally {
+    devices.set(association, originalDevice);
+  }
+});
+
+test("hardware ingestion accepts sensor boundaries and rejects invalid input before writes", async () => {
+  const hardwareId = randomUUID();
+  devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "physical" });
+  const valid = { deviceId: hardwareId, temperature: 25, humidity: 60, soilMoisture: 50 };
+  for (const extra of [
+    { temperature: -40, humidity: 0, soilMoisture: 0, soilMoistureRaw: 0, lightLevel: 0 },
+    { temperature: 125, humidity: 100, soilMoisture: 100, soilMoistureRaw: 4095 },
+    { soilMoistureRaw: null, lightLevel: null },
+  ]) {
+    const response = await request("/api/telemetry", null, "POST", { ...valid, ...extra });
+    assert.equal(response.status, 201);
+    const reading = await response.json();
+    assert.equal(reading.deviceId, hardwareId);
+    assert.ok(Number.isFinite(Date.parse(reading.timestamp)));
+  }
+  const count = writes;
+  const samples = rows.length;
+  for (const body of [
+    [], {},
+    ...[
+      { deviceId: "not-a-uuid" }, { deviceId: "" }, { deviceId: null },
+      { temperature: "25" }, { temperature: null }, { temperature: -41 }, { temperature: 126 },
+      { humidity: -1 }, { humidity: 101 }, { soilMoisture: -1 }, { soilMoisture: 101 },
+      { soilMoistureRaw: -1 }, { soilMoistureRaw: 4096 }, { soilMoistureRaw: 1.5 },
+      { lightLevel: -1 }, { lightLevel: "10" }, { userId: "other" },
+      { timestamp: new Date().toISOString() },
+    ].map((extra) => ({ ...valid, ...extra })),
+  ]) {
+    assert.equal((await request("/api/telemetry", null, "POST", body)).status, 400);
+  }
+  // JSON numeric overflow reaches the validator as Infinity; literal NaN is invalid JSON.
+  for (const field of ["temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLevel"]) {
+    const body = JSON.stringify({ ...valid, [field]: "overflow" }).replace('"overflow"', "1e400");
+    const response = await fetch(base + "/api/telemetry", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body,
+    });
+    assert.equal(response.status, 400);
+  }
+  const unknown = await request("/api/telemetry", null, "POST", { ...valid, deviceId: randomUUID() });
+  assert.equal(unknown.status, 404);
+  assert.deepEqual(await unknown.json(), { error: "Device not found." });
+  assert.equal(writes, count);
+  assert.equal(rows.length, samples);
+  failMongo = true;
+  try {
+    const failure = await request("/api/telemetry", null, "POST", valid);
+    assert.equal(failure.status, 500);
+    assert.deepEqual(await failure.json(), { error: "Failed to store telemetry reading." });
+    assert.equal(writes, count);
+  } finally {
+    failMongo = false;
+  }
 });

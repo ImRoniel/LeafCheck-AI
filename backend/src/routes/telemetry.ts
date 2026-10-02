@@ -44,13 +44,18 @@ function validateTelemetryPayload(body: unknown): string[] {
   const errors: string[] = [];
   const b = body as Record<string, unknown>;
 
-  if (!b || typeof b !== "object") {
+  if (!b || typeof b !== "object" || Array.isArray(b)) {
     return ["Request body must be a JSON object."];
   }
 
+  const fields = ["deviceId", "temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLevel"];
+  if (Object.keys(b).some((key) => !fields.includes(key))) {
+    errors.push("Unexpected telemetry fields.");
+  }
+
   // deviceId — required non-empty string
-  if (typeof b.deviceId !== "string" || b.deviceId.trim() === "") {
-    errors.push("deviceId must be a non-empty string.");
+  if (typeof b.deviceId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.deviceId)) {
+    errors.push("deviceId must be a valid resource ID.");
   }
 
   // Required numeric fields
@@ -74,6 +79,25 @@ function validateTelemetryPayload(body: unknown): string[] {
     }
   }
 
+  // Match the firmware's supported sensor ranges and 12-bit soil ADC.
+  for (const [field, min, max] of [
+    ["temperature", -40, 125],
+    ["humidity", 0, 100],
+    ["soilMoisture", 0, 100],
+    ["soilMoistureRaw", 0, 4095],
+  ] as const) {
+    const value = b[field];
+    if (typeof value === "number" && (value < min || value > max)) {
+      errors.push(`${field} must be between ${min} and ${max}.`);
+    }
+  }
+  if (typeof b.soilMoistureRaw === "number" && !Number.isInteger(b.soilMoistureRaw)) {
+    errors.push("soilMoistureRaw must be an integer.");
+  }
+  if (typeof b.lightLevel === "number" && b.lightLevel < 0) {
+    errors.push("lightLevel must be non-negative.");
+  }
+
   return errors;
 }
 
@@ -90,6 +114,7 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
   // Step 1: Validate payload
   const errors = validateTelemetryPayload(req.body);
   if (errors.length > 0) {
+    console.warn("[Telemetry] Rejected invalid telemetry payload.");
     res.status(400).json({ error: "Validation failed.", details: errors });
     return;
   }
@@ -110,9 +135,9 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     });
 
     if (!device) {
+      console.warn("[Telemetry] Rejected telemetry for an unknown device.");
       res.status(404).json({
         error: "Device not found.",
-        details: `No device with id "${deviceId}" exists in the system.`,
       });
       return;
     }
