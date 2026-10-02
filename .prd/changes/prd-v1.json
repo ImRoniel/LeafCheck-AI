@@ -5,16 +5,74 @@
   "prd": ".prd/prd-v1.md",
   "base": "7da3ca85a95a509bc84b9d85dac4da1efb26477f",
   "registered": "2026-10-02T12:25:54Z",
-  "sequence": 1,
+  "sequence": 4,
   "lifecycle": {
-    "state": "planned",
-    "since": "2026-10-02T12:25:54Z",
+    "state": "active",
+    "since": "2026-10-02T12:26:41Z",
     "reason": null,
     "note": null,
     "superseded_by": null
   },
-  "agreements": [],
-  "authorizations": [],
+  "agreements": [
+    {
+      "id": "G-01",
+      "digest": "ac30f1891abf0bf3620bd609f21e9867e87a6f6d816c846e8dae802add9c04cb",
+      "prd_revision": "4ef063fb3a6f2b31f1a2f0de4648a455bc7a034a1ff48c0d49094afcc709184d",
+      "breakdown": "2a963179c04f3c12fe8bfc5cd5dcbe553905e14e64481e431bfe93748b7d2823",
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03",
+        "T-04"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v1/agreements/G-01.json",
+      "recorded": "2026-10-02T12:26:40Z"
+    },
+    {
+      "id": "G-02",
+      "digest": "4bab7dcce64bd97097d72cbc105c7c1b49644bf90a0d7d271ecc93ab8853ccae",
+      "prd_revision": "4ef063fb3a6f2b31f1a2f0de4648a455bc7a034a1ff48c0d49094afcc709184d",
+      "breakdown": "1ffab356076914b1e674b0f0cef346314a0053ad6a666ec700548d7464050610",
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03",
+        "T-04"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v1/agreements/G-02.json",
+      "recorded": "2026-10-02T12:28:37Z"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "A-01",
+      "agreement": "G-01",
+      "digest": "ac30f1891abf0bf3620bd609f21e9867e87a6f6d816c846e8dae802add9c04cb",
+      "disposition": "user",
+      "reference": "Current session: pincer-code invocation and 2026-10-02 T-01 clarification",
+      "excerpt": "Yes, clarify T-01 to preserve native SecureStore tokens and web HttpOnly cookies. Update the ticket to reflect this, then continue.",
+      "constraints": null,
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-02T12:26:40Z"
+    },
+    {
+      "id": "A-02",
+      "agreement": "G-02",
+      "digest": "4bab7dcce64bd97097d72cbc105c7c1b49644bf90a0d7d271ecc93ab8853ccae",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-01",
+      "explanation": "Add existing frontend session regression checks to verify the approved native SecureStore and web cookie behavior in T-01; no product scope change.",
+      "decisions": [],
+      "recorded": "2026-10-02T12:28:37Z"
+    }
+  ],
   "decisions": [],
   "events": [
     {
@@ -26,6 +84,45 @@
       "reason": null,
       "agreement": null,
       "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 2,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-02T12:26:40Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 3,
+      "kind": "activate",
+      "from": "planned",
+      "to": "active",
+      "at": "2026-10-02T12:26:41Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 4,
+      "kind": "authorize",
+      "from": "active",
+      "to": "active",
+      "at": "2026-10-02T12:28:37Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
       "decision": null,
       "replacement": null,
       "note": null
