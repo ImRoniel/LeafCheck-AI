@@ -1,0 +1,41 @@
+{
+  "schema": 2,
+  "runtime": 2,
+  "change": "prd-v1",
+  "prd": ".prd/prd-v1.md",
+  "base": "7da3ca85a95a509bc84b9d85dac4da1efb26477f",
+  "registered": "2026-10-02T12:25:54Z",
+  "sequence": 1,
+  "lifecycle": {
+    "state": "planned",
+    "since": "2026-10-02T12:25:54Z",
+    "reason": null,
+    "note": null,
+    "superseded_by": null
+  },
+  "agreements": [],
+  "authorizations": [],
+  "decisions": [],
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "register",
+      "from": null,
+      "to": "planned",
+      "at": "2026-10-02T12:25:54Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    }
+  ],
+  "evaluations": [],
+  "legacy": {
+    "receipts": {},
+    "authorization_text": null,
+    "migrated_from": null,
+    "migrated": null
+  }
+}
