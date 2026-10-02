@@ -503,11 +503,19 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
 
 // ─── GET /api/scan/archives ───────────────────────────────────────────────────
 
+scanRouter.get(["/archives", "/tasks"], asyncRoute(async (req, res, next) => {
+  if (req.query.plantId !== undefined) {
+    const plant = await ownedPlant(req.query.plantId, res.locals.auth.user.id);
+    res.locals.guidancePlantId = plant.id;
+  }
+  next();
+}));
+
 scanRouter.get("/archives", async (req: Request, res: Response) => {
   const userId = res.locals.auth.user.id;
   try {
     const archives = await prismaPg.aIAnalysis.findMany({
-      where: { userId, isArchived: true },
+      where: { userId, isArchived: true, ...(res.locals.guidancePlantId ? { plantId: res.locals.guidancePlantId as string } : {}) },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
@@ -527,7 +535,7 @@ scanRouter.get("/tasks", async (req: Request, res: Response) => {
   const userId = res.locals.auth.user.id;
   try {
     const tasks = await prismaPg.careTask.findMany({
-      where: { userId },
+      where: { userId, ...(res.locals.guidancePlantId ? { plantId: res.locals.guidancePlantId as string } : {}) },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
       take: 50,
       include: {

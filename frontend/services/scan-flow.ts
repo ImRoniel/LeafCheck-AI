@@ -50,6 +50,7 @@ export function createScanFlow(
         patched = true;
       }
       const plant = await client.fetchPlant(plantId!, { signal });
+      if (plant.id !== plantId) throw new ApiError("validation", "The refreshed plant does not match this scan");
       if (token === generation) publish({ phase: "complete", plant });
     } catch (error) {
       if (token === generation)
@@ -95,6 +96,8 @@ export function createScanFlow(
         const report = await client.scanPlant(request, { signal });
         if (token !== generation)
           throw new ApiError("cancelled", "Scan cancelled");
+        if (!report.plant?.id || (plantId && report.plant.id !== plantId))
+          throw new ApiError("validation", "The scan response does not match the requested plant");
         // Extract the plant ID from the scan response (for auto-created plants)
         plantId = report.plant?.id ?? plantId;
         publish({ report });

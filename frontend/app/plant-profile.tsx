@@ -1,6 +1,7 @@
 import { DeletePlantAction } from "@/components/delete-plant-action";
 import { EditPlantForm } from "@/components/edit-plant-form";
 import { PlantTelemetry } from "@/components/plant-telemetry";
+import { PlantCareSummary } from "@/components/plant-care-summary";
 import { Action, Notice, Screen, ui } from "@/components/screen";
 import { useAppData } from "@/context/app-data";
 import { fetchPlant, seedTelemetry } from "@/services/api";
@@ -65,7 +66,7 @@ export default function PlantProfile() {
         </>
       )}
       {loading && <Notice>Loading plant...</Notice>}
-      {plant && (
+      {plant && plant.id === id && (
         <>
           <View style={[ui.card, { alignItems: "center" }]}>
             {plant.imageUrl ? (
@@ -168,14 +169,18 @@ export default function PlantProfile() {
           )}
           {plant.deviceId || devices[plant.id] ? (
             <PlantTelemetry
-              key={`${plant.deviceId || devices[plant.id]}:${telemetryVersion}`}
+              key={`${plant.id}:${plant.deviceId || devices[plant.id]}:${telemetryVersion}`}
               deviceId={plant.deviceId || devices[plant.id]}
               linked={!!plant.deviceId}
+              plant={plant}
             />
           ) : (
+            <>
+            <PlantCareSummary key={plant.id} plant={plant} telemetry={null} />
             <Notice>
               No local device mapping. Image-only scanning remains available.
             </Notice>
+            </>
           )}
           {!editing && (
             <DeletePlantAction key={plant.id} id={plant.id} name={plant.name} />

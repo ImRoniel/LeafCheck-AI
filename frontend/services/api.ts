@@ -370,16 +370,16 @@ export function createApiClient(
         v.telemetryCheck(body.telemetry, "telemetry");
       return request("/api/ai/analyze", v.parseAnalysis, options, "POST", body);
     },
-    fetchArchives: (options?: RequestOptions) =>
+    fetchArchives: (options?: RequestOptions & { plantId?: string }) =>
       request<import("../types").ArchiveEntry[]>(
-        "/api/scan/archives",
+        `/api/scan/archives${options?.plantId ? `?plantId=${id(options.plantId)}` : ""}`,
         v.parseArchives,
         options,
         "GET",
       ),
-    fetchTasks: (options?: RequestOptions) =>
+    fetchTasks: (options?: RequestOptions & { plantId?: string }) =>
       request<import("../types").CareTask[]>(
-        "/api/scan/tasks",
+        `/api/scan/tasks${options?.plantId ? `?plantId=${id(options.plantId)}` : ""}`,
         v.parseTasks,
         options,
         "GET",

@@ -1,4 +1,7 @@
 import { useSensorData } from "@/hooks/use-sensor-data";
+import type { Plant } from "@/types";
+import { telemetryGuidance } from "@/services/plant-guidance";
+import { PlantCareSummary } from "./plant-care-summary";
 import { Text, View } from "react-native";
 import { MetricCard } from "./metric-card";
 import { Action, Notice, ui } from "./screen";
@@ -7,14 +10,18 @@ import { TelemetryHistory } from "./telemetry-history";
 export function PlantTelemetry({
   deviceId,
   linked = false,
+  plant,
 }: {
   deviceId: string;
   linked?: boolean;
+  plant?: Plant;
 }) {
   const { telemetry, loading, error, refreshData } = useSensorData(deviceId);
   return (
     <View style={{ gap: 16 }}>
+      {plant && <PlantCareSummary key={plant.id} plant={plant} telemetry={telemetry} telemetryError={Boolean(error)} />}
       <Text style={ui.heading}>Growing conditions</Text>
+      {!plant && <Notice>{telemetryGuidance(telemetry?.timestamp, { linked, failed: Boolean(error) }).message}</Notice>}
       {!linked && (
         <Notice>
           Device {deviceId} is an unverified local mapping. Readings do not

@@ -30,6 +30,7 @@ let plantOwned;
 let latestReading;
 let telemetryReads;
 let responseText;
+let guidanceQueries;
 const originalKey = process.env.GEMINI_API_KEY;
 
 before(async () => {
@@ -74,10 +75,15 @@ before(async () => {
           },
         },
         aIAnalysis: {
+          findMany: async (query) => { guidanceQueries.push(query); return []; },
           create: async ({ data }) => {
             analyses.push(data);
             return { id: `analysis-${analyses.length}` };
           },
+        },
+        careTask: {
+          findMany: async (query) => { guidanceQueries.push(query); return []; },
+          createMany: async () => ({ count: 1 }),
         },
       },
     },
@@ -145,6 +151,7 @@ beforeEach(() => {
   latestReading = null;
   telemetryReads = 0;
   responseText = "healthy";
+  guidanceQueries = [];
   perenualData = {
     speciesName,
     commonName: "Basil",
@@ -184,6 +191,21 @@ test("cache hit skips Perenual and insertion", async () => {
   assert.equal(fetches, 0);
   assert.equal(inserts.length, 0);
   assert.deepEqual(analyses[0].idealSpecs, winner);
+});
+
+test("plant guidance is filtered by the owned plant before limiting history", async () => {
+  const plantId = "00000000-0000-4000-8000-000000000001";
+  for (const endpoint of ["archives", "tasks"]) {
+    const response = await fetch(`${baseUrl}/api/scan/${endpoint}?plantId=${plantId}`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(guidanceQueries.at(-1).where, { userId: "owner", ...(endpoint === "archives" ? { isArchived: true } : {}), plantId });
+    plantOwned = false;
+    const count = guidanceQueries.length;
+    assert.equal((await fetch(`${baseUrl}/api/scan/${endpoint}?plantId=${plantId}`)).status, 404);
+    assert.equal((await fetch(`${baseUrl}/api/scan/${endpoint}?plantId=invalid`)).status, 400);
+    assert.equal(guidanceQueries.length, count);
+    plantOwned = true;
+  }
 });
 
 test("missing, malformed and oversized images are rejected before provider calls or writes", async () => {

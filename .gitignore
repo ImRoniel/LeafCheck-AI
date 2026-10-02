@@ -94,3 +94,9 @@ plans/
 
 #roommodes
 .roommodes
+
+#agents
+AGENTS.md
+
+# pincer runtime state (added by pincer init)
+.pincer/
