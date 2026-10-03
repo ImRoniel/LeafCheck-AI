@@ -1,0 +1,4 @@
+$ node scripts/pincer-runtime.cjs evidence export --candidate 278462bd791e2b094cdac7932cea9bd0650f9f20 --base 3102e9c84c27f078d77cf38ce1bbd2bc1d5a1df7 --prd .prd/prd-v2.md --draft /tmp/leafcheck-prdv2-evaluation-draft.json
+Exit 1: REVIEW_MISSING C-04: required physical mobile and camera-capable browser review is unverified.
+REVIEW_MISSING C-05: required before/after screenshots and visual review are unverified.
+No manifest or evaluation locator was produced. Full draft is retained at review/evaluation-draft.json for resumption; no required obligation was marked passed or deferred.
