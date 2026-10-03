@@ -1,0 +1,116 @@
+---
+version: 2
+status: built
+date: 2026-10-03
+---
+
+# Scanner close and reopen lifecycle
+
+Planning profile: standard. The scope is confined to the existing scanner, but retained tab state, native camera callbacks, and overlapping capture/network operations require explicit lifecycle and race verification.
+
+## 1. Problem
+
+A user scans a flower, closes the scanner, and cannot start another scan because state from the previous visit survives. Closing must terminate that local scan session so reopening works without restarting the application or requiring Retake/New Scan first.
+
+Original user brief: "Fix the camera scan lifecycle bug. When a user scans a flower and clicks the X to close the scan screen, the camera state is not being reset. This prevents them from scanning again. The fix must ensure all camera and scan state is completely reset when the screen is closed."
+
+This is a new change; `.prd/prd-v1.md` and its completed tickets remain historical. The user's request authorizes planning this lifecycle correction. It does not authorize a redesign, deletion of saved plants, unrelated release repairs, or a Git commit. The repository's no-commit-unless-explicitly-requested rule takes precedence over the planning template's commit step.
+
+## 2. Solution
+
+End the scanner session on X, results Back, or navigation away, release its preview, cancel pending client work, and clear transient capture and scan state. Reopening creates a clean session that waits for its own camera-ready event before permitting capture. All callbacks and finalizers from a closed session must be harmless, even when an underlying operation ignores cancellation. Preserve authentication, permissions, route context supplied by the new entry, saved server records, and synchronization retry while the scanner remains open.
+
+Assumptions: the user means transient camera/scan state, not OS permission grants or persisted plant history. X is currently present on the viewfinder; completed results use Back, which must obey the same exit contract. Temporary backgrounding without leaving the route retains existing cancellation/report-retention behavior and is not treated as an explicit close.
+
+## 3. Scope
+
+| This PRD covers | This PRD does NOT cover |
+| --- | --- |
+| Scanner exit, retained-tab reentry, and camera release/readiness | New navigation design, visual redesign, or camera SDK upgrades |
+| Clearing photos, busy flags, locks, reports, errors, and synchronization bookkeeping | Deleting saved plants, diagnoses, tasks, or OS permission grants |
+| Cancellation and session guards for late callbacks and finalizers | Server-side transaction cancellation or rollback |
+| Component/hook and service regressions plus device/browser verification | Fixing PRD v1 release evidence, backend setup, or unrelated workflow tooling |
+
+## 4. Requirements
+
+### R-01 — Fully end a scanner session on exit
+
+- **S-01:** Given an open scanner in preview, capture, analysis, error, synchronization, or completed-results state, when X or the available Back action closes it, then the preview is released and transient state is cleared: photo URI/base64, capture flag and lock, camera readiness, local errors, scan phase/report/plant snapshot, scan and synchronization errors, pending controller, and flow target/patch bookkeeping. The flow returns to idle; saved application records remain intact.
+- **S-02:** Failure path: closing during pending capture or network work succeeds immediately without waiting for the promise to settle; repeated cleanup is safe and never throws a busy-reset error.
+- **S-03:** Preserve: X keeps its existing back-or-home fallback behavior. Results Back, route departure, and unmount end the same session even if the tab component remains mounted; other screens' Back behavior is unchanged.
+
+### R-02 — Reopen ready for another independent scan
+
+- **S-04:** Given a closed scanner after a successful flower scan or failed scan, when the user opens Scan again, then they see a fresh preview with no old photo, report, error, spinner, or stale busy lock. Capture becomes available only after the new camera reports ready; a second capture reaches the scan flow successfully. Verify at least three consecutive close/reopen cycles.
+- **S-05:** Failure path: permission denial or camera mount failure produces the existing permission/error UI without enabling capture; after permission recovery or close/reopen with a working camera, scanning can proceed. An old camera's ready/error event cannot mark a new camera ready or broken.
+- **S-06:** Preserve: authenticated, foreground, focused, permission-granted, camera-ready gating remains enforced. New Scan and Retake still start fresh captures. A general Scan entry does not reuse a previous plant/device target, while a newly targeted entry uses its current route parameters.
+
+### R-03 — Isolate asynchronous work across sessions
+
+- **S-07:** Given a capture, scan, or synchronization pending when the scanner closes, when its success, failure, or finalizer arrives after reopening, then it cannot restore old state, release a new operation's lock, clear its busy indicator, start another request, or emit stale success audio/haptics. Where supported, the old client request's signal is aborted.
+- **S-08:** Failure path: when the old operation ignores abort or rejects late while a new capture/scan is pending, the new operation remains correctly locked and can finish normally; duplicate capture submissions are still blocked. Exercise delayed picture, scan, health-update, and plant-fetch completions.
+- **S-09:** Preserve: a synchronization failure while the same scanner session remains open retains its report and Retry Sync behavior without rerunning diagnosis or duplicating completed synchronization work. Background/foreground transitions without navigation preserve current report semantics and never allow capture in the background.
+
+Scenario-label correction during narrowing: the original draft accidentally reused scenario IDs, which the strict inventory rejects. Requirement IDs and scenario text are unchanged. R-01/S-01–S-03 retain S-01–S-03; former R-02/S-01–S-03 map to S-04–S-06; former R-03/S-01–S-03 map to S-07–S-09. No scenario is removed or deferred.
+
+## 5. Architecture
+
+### Structure
+
+Expected implementation and verification paths:
+
+```text
+frontend/app/(tabs)/scanner.tsx          session ownership, close/reentry, capture and feedback guards
+frontend/hooks/use-scan.ts              scan-flow lifetime and route-exit cleanup
+frontend/services/scan-flow.ts          cancel/reset contract and async state isolation if needed
+frontend/components/scan-viewfinder.tsx camera mount/readiness integration if needed
+frontend/tests/scanner-lifecycle.test.ts new component/hook lifecycle regressions
+frontend/tests/scan-flow.test.ts         cancellation/reset and overlapping-session regressions
+frontend/tests/bottom-nav-regression.test.ts existing route-target preservation coverage
+```
+
+### Key components and observed behavior
+
+The scanner is a retained tab. Its X handler currently invalidates capture generation, disables a ref, calls `flow.cancel()`, and navigates, but leaves photo and local state behind. The viewfinder renders a stored photo before considering the live camera. `useScan` cancels on blur; flow cancellation preserves reports/errors and is a no-op when not busy. `reset()` clears flow state but rejects while busy, so cleanup must cancel before reset. Results use the generic Screen Back action and need scanner-level route cleanup.
+
+Recommend one idempotent session-ending path coordinated between the scanner and hook: invalidate the session first, disable/unmount the camera, cancel client work, clear flow and local state, then navigate for explicit close. Route departure and unmount invoke equivalent cleanup without navigation loops. Keep session identity monotonic so old capture finalizers, permission/camera callbacks, and scan feedback cannot affect the next visit. Readiness belongs to the current camera mount. Avoid changing generic flow cancellation to always discard reports, because background cancellation and in-session retry have existing retention semantics.
+
+### Data flow
+
+Close/navigation away → invalidate session → disable preview and abort pending work → clear transient state → leave route.
+
+Reenter scanner → use current auth/permission/route context → mount fresh preview → current camera-ready callback → capture → existing scan and synchronization pipeline.
+
+### Contracts, blast radius, and rollback
+
+The load-bearing paths are native capture, client scan/synchronization, and Router tab reuse. No backend API, database, or credential contract changes are planned. Local source is authoritative for installed interfaces. Read-only npm registry checks on 2026-10-03 reported expo-camera 57.0.6 and expo-router 57.0.24 as latest; these are registry results, not an upgrade proposal. [Expo Camera documentation](https://docs.expo.dev/versions/latest/sdk/camera/) requires unmounting cameras on unfocused screens; use component lifetime management rather than relying on a platform-specific camera-active property.
+
+Blast radius is scanner entry/exit, capture, feedback, and Retry Sync; preserve general navigation and unrelated camera/device-discovery screens. Rollback is a scoped revert of the lifecycle implementation and its tests, with no migration or persisted-data rollback. Client cancellation cannot undo a request already committed on the server; a later normal data refresh may show that saved plant.
+
+## 6. Success Criteria
+
+| Criterion | Verification |
+| --- | --- |
+| All R-01–R-03 scenarios have executable regression coverage | Add behavioral tests that exercise actual scanner/hook handlers with deferred camera/network promises, retained tab reentry, and stale callbacks; service-only tests are insufficient |
+| Frontend checks stay green | `npm test --workspace=frontend` and `npm run typecheck --workspace=frontend` |
+| Candidate-wide regressions are understood | Run `npm test --workspaces`; resolve/report environment prerequisites and any failures explicitly before release |
+| Real camera closes and reopens | On a physical supported mobile device and camera-capable browser, scan a flower, close, reopen, and capture again for three cycles; repeat close during capture/analysis and after an error/results Back |
+| Visual and platform evidence is reviewable | Save before/after screenshots with scenario, platform, viewport, and observed result; record camera-release and second-capture observations separately because screenshots cannot prove them. List untested platforms explicitly |
+
+Baseline on 2026-10-03, source HEAD `3102e9c`: frontend tests passed 134/134 and frontend TypeScript passed. Existing scan-flow tests cover cancellation and retained-report retry, and navigation tests protect target clearing, but there is no scanner close/reopen component regression. The earlier release audit in this session ran the workspace gate: frontend 134/134 and backend 59/60 passed; the remaining startup test failed because the generated PostgreSQL client was absent. That pre-existing setup failure is not evidence against this proposed frontend fix and remains a release prerequisite; it was not repaired or rerun here. No device/browser camera reproduction has been performed during planning.
+
+## 7. Out of Scope
+
+No design overhaul, dependency upgrades, provider prompt/response changes, backend rollback endpoint, saved-record deletion, permission revocation, or broad authentication refactor. No new background-retention policy and no manual deletion of camera cache files. PRD v1 audit failures and the pre-existing untracked `AUDIT_REPORT.md` are outside this change. No delivery budget or requirement cuts were supplied.
+
+## 8. Visual Direction
+
+Preserve the existing scanner layout, typography, colors, and controls. Reopening should feel immediate, predictable, and fresh, with capture disabled until the new preview is ready. Avoid stale overlays, old flower photos, and lingering progress indicators. A design preference question was offered during planning; absent a response, keeping the existing design is the assumption, not recorded user approval of a redesign.
+
+## 9. Security & Trust Boundaries
+
+Camera payloads, route targets, and provider-derived reports remain untrusted inputs validated by the existing client/server boundaries. Keep authentication and ownership enforcement intact; provider secrets remain server-side and access/refresh token handling stays unchanged. Resetting discards transient image/report references without logging base64 data or credentials. Closed-session results must not repopulate the UI; backend errors remain sanitized through existing error handling.
+
+## 10. Dependencies & Risks
+
+The main risk is an old operation's finally block or native callback touching the reopened session; tests must force this ordering. Permission dialogs and app backgrounding are distinct from route close and must not accidentally discard an open report. Physical-device camera release cannot be established by Node tests alone. PRD v1 has no evaluation evidence and this workspace has an unrelated untracked audit file; this PRD does not claim either has been resolved. The exact lifecycle implementation remains subject to ticket-level review and verification.
