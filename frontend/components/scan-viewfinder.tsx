@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 type Props = {
   cameraRef: RefObject<CameraView | null>;
+  cameraKey: number;
   permission: PermissionResponse | null;
   enabled: boolean;
   focused: boolean;
@@ -35,6 +36,7 @@ type Props = {
 
 export function ScanViewfinder({
   cameraRef,
+  cameraKey,
   permission,
   photoUri,
   serviceFailure,
@@ -63,6 +65,7 @@ export function ScanViewfinder({
         />
       ) : permission?.granted && enabled ? (
         <CameraView
+          key={cameraKey}
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           facing="back"

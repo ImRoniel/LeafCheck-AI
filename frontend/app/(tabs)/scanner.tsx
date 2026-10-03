@@ -19,7 +19,7 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, usePathname, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   AppState,
   Linking,
@@ -81,6 +81,10 @@ export default function Camera() {
   const alive = useRef(true);
   const generation = useRef(0);
   const lock = useRef(false);
+  const readyRef = useRef(false);
+  const cameraGeneration = useRef(0);
+  const [cameraVersion, setCameraVersion] = useState(0);
+  const [closed, setClosed] = useState(false);
   const [ready, setReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [photo, setPhoto] = useState<{ uri: string; base64: string } | null>(
@@ -94,43 +98,77 @@ export default function Camera() {
   const data = useAppData();
   const flow = useScan();
   const busy = capturing || flow.scanning || flow.synchronizing;
-  const enabled = focused && active && auth.status === "authenticated";
+  const enabled = focused && active && auth.status === "authenticated"
+    && !!permission?.granted && !closed;
   const enabledRef = useRef(enabled);
+  const endFlowSession = flow.endSession;
+
+  const invalidateOperations = useCallback(() => {
+    ++generation.current;
+    ++cameraGeneration.current;
+    readyRef.current = false;
+    lock.current = false;
+  }, []);
+
+  const invalidateCapture = useCallback(() => {
+    invalidateOperations();
+    setCameraVersion(cameraGeneration.current);
+    setReady(false);
+    setCapturing(false);
+  }, [invalidateOperations]);
+
+  const resetSession = useCallback(() => {
+    invalidateCapture();
+    endFlowSession();
+    setPhoto(null);
+    setError("");
+  }, [invalidateCapture, endFlowSession]);
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
-  useEffect(() => {
+  useLayoutEffect(() => {
     alive.current = true;
+    // Also remount after React's development cleanup/setup replay.
+    invalidateCapture();
     const subscription = AppState.addEventListener("change", (state) => {
       setActive(state === "active");
       if (state !== "active") {
         enabledRef.current = false;
-        ++generation.current;
-        setReady(false);
+        invalidateCapture();
       }
     });
     return () => {
       alive.current = false;
+      enabledRef.current = false;
+      invalidateOperations();
       subscription.remove();
     };
-  }, []);
+  }, [invalidateCapture, invalidateOperations]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!focused || auth.status !== "authenticated") {
+      enabledRef.current = false;
+      // This tab remains mounted after navigation; end its local session too.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      resetSession();
+      setClosed(false);
+    }
+  }, [focused, auth.status, resetSession]);
+
+  useLayoutEffect(() => {
     enabledRef.current = enabled;
     if (!enabled) {
-      ++generation.current;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setReady(false);
+      invalidateCapture();
     }
-  }, [enabled]);
+  }, [enabled, invalidateCapture]);
 
   const refreshPlants = data.refresh;
   useEffect(() => {
-    if (flow.phase === "complete") void refreshPlants();
+    if (flow.phase === "complete" && enabledRef.current) void refreshPlants();
   }, [flow.phase, refreshPlants]);
 
   // ── Capture ─────────────────────────────────────────────────────────────
   const capture = async () => {
-    if (lock.current || !ready || !enabledRef.current || !camera.current)
+    if (lock.current || !readyRef.current || !enabledRef.current || !camera.current)
       return;
     lock.current = true;
     setCapturing(true);
@@ -151,32 +189,40 @@ export default function Camera() {
           "Image is too large. Retake with a lower-resolution setting.",
         );
       setPhoto({ uri: result.uri, base64: result.base64 });
+      // The preview is leaving the tree; its queued native events are now stale.
+      setCameraVersion(++cameraGeneration.current);
+      readyRef.current = false;
       setReady(false);
 
       // Auto-submit immediately for scan-first flow
-      await submitScan(result.base64);
+      await submitScan(result.base64, token);
     } catch (e) {
       if (alive.current && token === generation.current)
         setError(scanErrorMessage(e));
     } finally {
-      lock.current = false;
-      if (alive.current) setCapturing(false);
+      if (alive.current && token === generation.current) {
+        lock.current = false;
+        setCapturing(false);
+      }
     }
   };
 
   // ── Submit scan ─────────────────────────────────────────────────────────
-  const submitScan = async (base64?: string) => {
+  const submitScan = async (base64: string, token: number) => {
     setError("");
     try {
       await flow.scan({
-        imageBase64: base64 ?? photo!.base64,
+        imageBase64: base64,
         // Scan-first: plantId is optional
         ...(plantId ? { plantId } : {}),
         ...(deviceId ? { deviceId } : {}),
       });
+      if (!alive.current || token !== generation.current || !enabledRef.current) return;
       // Success haptic + chime sound
       playSuccessChime();
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {
+        // Device feedback is optional; a failed haptic must not reject a saved scan.
+      });
     } catch {
       /* Hook retains report and distinct errors. */
     }
@@ -185,17 +231,21 @@ export default function Camera() {
   const retrySync = async () => {
     if (lock.current || !enabledRef.current) return;
     lock.current = true;
+    const token = generation.current;
     setError("");
     try {
       await flow.retrySynchronization();
     } catch {
       /* Hook retains error. */
     } finally {
-      lock.current = false;
+      if (alive.current && token === generation.current) lock.current = false;
     }
   };
 
   const report = flow.report;
+  const cameraToken = cameraVersion;
+  const currentCamera = () => alive.current && enabledRef.current
+    && cameraToken === cameraGeneration.current;
 
   // ── Guest / unauthenticated gate ────────────────────────────────────────
   if (auth.status !== "authenticated") {
@@ -223,6 +273,7 @@ export default function Camera() {
     return (
       <ScanViewfinder
         cameraRef={camera}
+        cameraKey={cameraVersion}
         permission={permission}
         enabled={enabled}
         focused={focused}
@@ -240,38 +291,43 @@ export default function Camera() {
         }
         existingPlant={!!plantId}
         onClose={() => {
-          ++generation.current;
           enabledRef.current = false;
-          flow.cancel();
+          setClosed(true);
+          resetSession();
           if (router.canGoBack()) router.back();
           else router.replace("/(tabs)");
         }}
         onPermission={() => {
+          const token = generation.current;
           setError("");
           void (
             permission?.canAskAgain
               ? requestPermission()
               : Linking.openSettings()
-          ).catch(() =>
+          ).catch(() => {
+            if (!alive.current || token !== generation.current) return;
             setError(
               "We couldn’t open your camera settings. Please allow camera access in your device settings, then come back.",
-            ),
-          );
+            );
+          });
         }}
-        onReady={() => setReady(true)}
+        onReady={() => {
+          if (!currentCamera()) return;
+          readyRef.current = true;
+          setReady(true);
+        }}
         onMountError={() => {
+          if (!currentCamera()) return;
+          readyRef.current = false;
           setReady(false);
           setError(
             "We couldn’t start your camera. Close the scanner and try again. If needed, allow camera access in your device settings.",
           );
         }}
-        onCapture={() => void capture()}
-        onRetake={() => {
-          setPhoto(null);
-          setReady(false);
-          setError("");
-          flow.reset();
+        onCapture={() => {
+          if (currentCamera()) void capture();
         }}
+        onRetake={resetSession}
       />
     );
   }
@@ -418,12 +474,7 @@ export default function Camera() {
           <Pressable
             style={s.primaryButton}
             disabled={busy}
-            onPress={() => {
-              flow.reset();
-              setPhoto(null);
-              setReady(false);
-              setError("");
-            }}
+            onPress={resetSession}
           >
             <Text style={s.primaryButtonText}>New Scan</Text>
           </Pressable>
