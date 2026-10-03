@@ -350,7 +350,14 @@ async function runAttempt({
         detached: true,
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
-        env: process.env,
+        env: {
+          ...process.env,
+          ...(process.platform === "win32"
+            ? {
+                PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH || ""}`,
+              }
+            : {}),
+        },
       });
     } catch (error) {
       launchError = error.message;
