@@ -1,10 +1,11 @@
 ---
 ticket: T-04
-status: in_progress
+status: done
 size: M
 prd: .prd/prd-v1.md
 depends_on: [T-02, T-03]
 started: 2026-10-02T12:48:16Z
+finished: 2026-10-03T01:37:50Z
 ---
 
 ## Objective
@@ -25,10 +26,10 @@ Present the plant health summary and actionable care guidance to the user in a c
 
 ## Acceptance Criteria
 
-- [ ] The user can open a plant profile and see health metadata plus the current environmental context from the app state.
-- [ ] Missing or stale telemetry renders a degraded state rather than a false positive recommendation.
-- [ ] Plant state refresh after a scan remains scoped to the correct plant and account.
-- [ ] Type-safe app code continues to compile without introducing contract regressions in the app services.
+- [x] The user can open a plant profile and see health metadata plus the current environmental context from the app state.
+- [x] Missing or stale telemetry renders a degraded state rather than a false positive recommendation.
+- [x] Plant state refresh after a scan remains scoped to the correct plant and account.
+- [x] Type-safe app code continues to compile without introducing contract regressions in the app services.
 
 ## Verification
 
