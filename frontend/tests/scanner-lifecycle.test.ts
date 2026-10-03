@@ -81,3 +81,31 @@ test("guest, permission-denied, unfocused and background states cannot capture",
   h.unmount();
 });
 
+test("hook clears reports on route exit but preserves retry state across backgrounding", async () => {
+  const h = scannerHarness();
+  const pending = deferred<{ id: string; healthStatus: "healthy" }>();
+  h.behavior.update = () => pending.promise;
+  h.ready(); h.press("Capture and scan plant"); await h.settle();
+  assert.ok(h.flow.getState().report);
+  h.background("background");
+  assert.ok(h.flow.getState().report);
+  assert.ok(h.flow.getState().synchronizationError);
+  h.background("active");
+  h.route("/garden");
+  assert.deepEqual(h.flow.getState(), { phase: "idle", report: null, plant: null, error: null, synchronizationError: null });
+  pending.resolve({ id: "flower", healthStatus: "healthy" }); await h.settle();
+  assert.equal(h.flow.getState().phase, "idle");
+  h.unmount();
+});
+
+test("hook unmount aborts an outstanding request and drops the transient report", async () => {
+  const h = scannerHarness();
+  const pending = deferred<Awaited<ReturnType<typeof h.behavior.scan>>>();
+  h.behavior.scan = () => pending.promise;
+  h.ready(); h.press("Capture and scan plant"); await h.settle();
+  h.unmount();
+  assert.equal(h.signals[0].aborted, true);
+  assert.equal(h.flow.getState().phase, "idle");
+  pending.reject(new Error("late failure")); await h.settle();
+  assert.equal(h.flow.getState().report, null);
+});

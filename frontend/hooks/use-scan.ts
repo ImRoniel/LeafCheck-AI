@@ -17,15 +17,15 @@ export function useScan() {
   const focused =
     pathname === "/scanner" || pathname.endsWith("/(tabs)/scanner");
   useEffect(() => {
-    if (!focused) flow.cancel();
-  }, [focused, flow]);
+    if (!focused || status !== "authenticated") flow.endSession();
+  }, [focused, status, flow]);
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") flow.cancel();
     });
     return () => {
       sub.remove();
-      flow.cancel();
+      flow.endSession();
     };
   }, [flow]);
   const scan = (request: ScanRequest) =>
@@ -45,5 +45,6 @@ export function useScan() {
     retrySynchronization,
     cancel: flow.cancel,
     reset: flow.reset,
+    endSession: flow.endSession,
   };
 }

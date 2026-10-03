@@ -35,23 +35,33 @@ export function createScanFlow(
     state = { ...state, ...next };
     listeners.forEach((listener) => listener());
   };
+  const clear = () => {
+    plantId = undefined;
+    patched = false;
+    publish({ phase: "idle", report: null, plant: null, error: null, synchronizationError: null });
+  };
+  const assertCurrent = (token: number) => {
+    if (token !== generation) throw new ApiError("cancelled", "Scan cancelled");
+  };
 
   async function synchronize(token: number, signal: AbortSignal) {
     const report = state.report!;
+    const target = plantId!;
     publish({ phase: "synchronizing", synchronizationError: null });
     try {
       if (!patched) {
         await client.updatePlantHealth(
-          plantId!,
+          target,
           report.diagnostic.healthStatus,
           { signal },
         );
-        if (token !== generation) return;
+        assertCurrent(token);
         patched = true;
       }
-      const plant = await client.fetchPlant(plantId!, { signal });
-      if (plant.id !== plantId) throw new ApiError("validation", "The refreshed plant does not match this scan");
-      if (token === generation) publish({ phase: "complete", plant });
+      const plant = await client.fetchPlant(target, { signal });
+      assertCurrent(token);
+      if (plant.id !== target) throw new ApiError("validation", "The refreshed plant does not match this scan");
+      publish({ phase: "complete", plant });
     } catch (error) {
       if (token === generation)
         publish({ phase: "error", synchronizationError: asApiError(error) });
@@ -148,21 +158,21 @@ export function createScanFlow(
           : { phase: "error", error },
       );
     },
+    endSession() {
+      // Invalidate first: transports may settle after abort or ignore it entirely.
+      ++generation;
+      controller?.abort();
+      controller = undefined;
+      busy = false;
+      clear();
+    },
     reset() {
       if (busy)
         throw new ApiError(
           "busy",
           "Cancel the current operation before resetting",
         );
-      plantId = undefined;
-      patched = false;
-      publish({
-        phase: "idle",
-        report: null,
-        plant: null,
-        error: null,
-        synchronizationError: null,
-      });
+      clear();
     },
   };
 }

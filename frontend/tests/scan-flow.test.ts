@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createScanFlow } from "../services/scan-flow";
 import type { Plant, ScanResponse } from "../types";
+import { deferred } from "./helpers/scanner-harness";
 const report: ScanResponse = {
   success: true,
   plant: { id: "p", name: "Fern", species: "Fern" },
@@ -59,3 +60,63 @@ test("a mismatched refreshed plant never enters the completed scan state", async
   assert.equal(flow.getState().phase, "error");
   assert.ok(flow.getState().synchronizationError);
 });
+
+test("endSession is idempotent and clears successful and failed flow snapshots", async () => {
+  const flow = createScanFlow({ scanPlant: async () => report, updatePlantHealth: async () => ({ id: "p", healthStatus: "healthy" }), fetchPlant: async () => plant });
+  for (let i = 0; i < 3; i++) {
+    await flow.scan({ plantId: "p", imageBase64: "abc" });
+    flow.endSession(); flow.endSession();
+    assert.deepEqual(flow.getState(), { phase: "idle", report: null, plant: null, error: null, synchronizationError: null });
+  }
+  const failed = createScanFlow({ scanPlant: async () => { throw new Error("offline"); }, updatePlantHealth: async () => ({ id: "p", healthStatus: "healthy" }), fetchPlant: async () => plant });
+  await assert.rejects(failed.scan({ imageBase64: "abc" }));
+  failed.endSession();
+  assert.equal(failed.getState().error, null);
+  assert.equal(failed.getState().phase, "idle");
+});
+
+for (const stage of ["scan", "update", "fetch"] as const) {
+  for (const outcome of ["resolve", "reject"] as const) {
+    test(`closed ${stage} ${outcome} cannot alter or unlock a new pending scan`, async () => {
+      const old = deferred<ScanResponse | Plant | { id: string; healthStatus: "healthy" }>();
+      const next = deferred<ScanResponse>();
+      const entered = deferred<void>();
+      let scans = 0, patches = 0, fetches = 0;
+      let signal: AbortSignal | undefined;
+      const flow = createScanFlow({
+        scanPlant: async (_request, options) => {
+          if (++scans > 1) return next.promise;
+          signal = options?.signal;
+          if (stage === "scan") { entered.resolve(); return old.promise as Promise<ScanResponse>; }
+          return report;
+        },
+        updatePlantHealth: async () => {
+          patches++;
+          if (stage === "update" && patches === 1) { entered.resolve(); return old.promise as Promise<{ id: string; healthStatus: "healthy" }>; }
+          return { id: "p", healthStatus: "healthy" };
+        },
+        fetchPlant: async () => {
+          fetches++;
+          if (stage === "fetch" && fetches === 1) { entered.resolve(); return old.promise as Promise<Plant>; }
+          return plant;
+        },
+      });
+      const pending = assert.rejects(flow.scan({ plantId: "p", imageBase64: "old" }));
+      await entered.promise;
+      flow.endSession(); flow.endSession();
+      assert.equal(signal?.aborted, true);
+      assert.deepEqual(flow.getState(), { phase: "idle", report: null, plant: null, error: null, synchronizationError: null });
+      const fresh = flow.scan({ plantId: "p", imageBase64: "new" });
+      if (outcome === "reject") old.reject(new Error("late failure"));
+      else old.resolve(stage === "scan" ? report : stage === "fetch" ? plant : { id: "p", healthStatus: "healthy" });
+      await pending;
+      assert.equal(flow.getState().phase, "scanning");
+      assert.equal(flow.getState().report, null);
+      assert.equal(fetches, stage === "fetch" ? 1 : 0);
+      await assert.rejects(flow.scan({ imageBase64: "duplicate" }), /already running/);
+      next.resolve(report); await fresh;
+      assert.equal(flow.getState().phase, "complete");
+      assert.equal(patches, stage === "scan" ? 1 : 2);
+    });
+  }
+}
