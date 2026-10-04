@@ -1,0 +1,4 @@
+npm notice run leaf-check-ai-backend@1.0.0 test
+npm notice run node --import tsx/esm --experimental-test-module-mocks --test tests/*.test.mjs
+npm notice run leaf-check-ai-backend@1.0.0 test:scan-persistence
+npm notice run node scripts/test-scan-persistence.mjs

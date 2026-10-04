@@ -1,0 +1,155 @@
+# npm audit report
+
+braces  *
+Severity: high
+braces vulnerable to stack-exhaustion denial of service through deeply nested patterns - https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+fix available via `npm audit fix --force`
+Will install expo@44.0.6, which is a breaking change
+node_modules/braces
+  micromatch  >=0.2.0
+  Depends on vulnerable versions of braces
+  node_modules/micromatch
+    @expo/metro-file-map  *
+    Depends on vulnerable versions of micromatch
+    node_modules/@expo/metro-file-map
+      @expo/cli  <=0.0.0-canary-20231123-1b19f96-4 || >=0.0.1-canary-20231125-d600e44
+      Depends on vulnerable versions of @expo/code-signing-certificates
+      Depends on vulnerable versions of @expo/config
+      Depends on vulnerable versions of @expo/config-plugins
+      Depends on vulnerable versions of @expo/inline-modules
+      Depends on vulnerable versions of @expo/metro
+      Depends on vulnerable versions of @expo/metro-config
+      Depends on vulnerable versions of @expo/metro-file-map
+      Depends on vulnerable versions of @expo/prebuild-config
+      Depends on vulnerable versions of node-forge
+      node_modules/@expo/cli
+        expo  >=45.0.0-beta.1
+        Depends on vulnerable versions of @expo/cli
+        Depends on vulnerable versions of @expo/config
+        Depends on vulnerable versions of @expo/config-plugins
+        Depends on vulnerable versions of @expo/local-build-cache-provider
+        Depends on vulnerable versions of @expo/metro
+        Depends on vulnerable versions of @expo/metro-config
+        node_modules/expo
+    metro-file-map  *
+    Depends on vulnerable versions of micromatch
+    node_modules/metro-config/node_modules/metro-file-map
+    node_modules/metro-file-map
+      @expo/metro  *
+      Depends on vulnerable versions of metro
+      Depends on vulnerable versions of metro-config
+      Depends on vulnerable versions of metro-file-map
+      Depends on vulnerable versions of metro-transform-worker
+      node_modules/@expo/metro
+        @expo/metro-config  <=0.0.1-canary-20240418-8d74597 || >=0.1.49-alpha.0
+        Depends on vulnerable versions of @expo/config
+        Depends on vulnerable versions of @expo/metro
+        node_modules/@expo/metro-config
+      metro  >=0.71.0
+      Depends on vulnerable versions of metro-config
+      Depends on vulnerable versions of metro-file-map
+      Depends on vulnerable versions of metro-transform-worker
+      node_modules/metro
+      node_modules/metro-config/node_modules/metro
+        @react-native/community-cli-plugin  *
+        Depends on vulnerable versions of @react-native/metro-config
+        Depends on vulnerable versions of metro
+        Depends on vulnerable versions of metro-config
+        node_modules/@react-native/community-cli-plugin
+          react-native  >=0.73.0-nightly-20230506-1af868c52
+          Depends on vulnerable versions of @react-native/community-cli-plugin
+          Depends on vulnerable versions of @react-native/virtualized-lists
+          node_modules/react-native
+            @react-native/virtualized-lists  >=0.85.0-nightly-20260108-1236b6be4
+            Depends on vulnerable versions of react-native
+            node_modules/@react-native/virtualized-lists
+            react-native-reanimated  3.20.0-nightly-20250722-b6c8b9a3c - 4.0.0-nightly-20250309-9ce9085cb || 4.1.7 - 4.2.0-nightly-20251017-235c127fd || >=4.2.3
+            Depends on vulnerable versions of react-native
+            Depends on vulnerable versions of react-native-worklets
+            node_modules/react-native-reanimated
+            react-native-worklets  >=0.8.0-bundle-mode-preview-1
+            Depends on vulnerable versions of @react-native/metro-config
+            Depends on vulnerable versions of react-native
+            node_modules/react-native-worklets
+        metro-config  >=0.71.0
+        Depends on vulnerable versions of metro
+        node_modules/@expo/metro/node_modules/metro-config
+        node_modules/metro-config
+        node_modules/metro/node_modules/metro-config
+          @react-native/metro-config  *
+          Depends on vulnerable versions of metro-config
+          node_modules/@react-native/metro-config
+        metro-transform-worker  >=0.71.0
+        Depends on vulnerable versions of metro
+        node_modules/metro-config/node_modules/metro-transform-worker
+        node_modules/metro-transform-worker
+
+decode-uri-component  <=0.4.2
+Severity: moderate
+decode-uri-component: Denial of service via exponential decoding of malformed percent-encoded input - https://github.com/advisories/GHSA-vcc3-ghjq-m6fr
+fix available via `npm audit fix --force`
+Will install expo-router@58.0.13, which is a breaking change
+node_modules/decode-uri-component
+  query-string  5.0.0 - 9.4.1
+  Depends on vulnerable versions of decode-uri-component
+  node_modules/query-string
+    expo-router  1.2.2 - 3.1.2 || 5.2.0-canary-20250611-f0afe80 - 58.0.12
+    Depends on vulnerable versions of query-string
+    node_modules/expo-router
+
+deepmerge-ts  <8.0.0
+Severity: high
+DeepmergeTS has stack exhaustion when merging recursive object graphs - https://github.com/advisories/GHSA-ggr8-5vv4-36mx
+fix available via `npm audit fix --force`
+Will install prisma@6.12.0, which is a breaking change
+node_modules/deepmerge-ts
+  @prisma/config  6.13.0-dev.1 - 8.1.0-dev.4
+  Depends on vulnerable versions of deepmerge-ts
+  node_modules/@prisma/config
+    prisma  6.13.0-dev.1 - 8.1.0-dev.4
+    Depends on vulnerable versions of @prisma/config
+    node_modules/prisma
+
+node-forge  *
+Severity: high
+node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements - https://github.com/advisories/GHSA-86w9-cpqp-85rv
+fix available via `npm audit fix --force`
+Will install expo@44.0.6, which is a breaking change
+node_modules/node-forge
+  @expo/code-signing-certificates  *
+  Depends on vulnerable versions of node-forge
+  node_modules/@expo/code-signing-certificates
+
+uuid  <11.1.1
+Severity: moderate
+uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided - https://github.com/advisories/GHSA-w5hq-g745-h8pq
+fix available via `npm audit fix --force`
+Will install expo@44.0.6, which is a breaking change
+node_modules/xcode/node_modules/uuid
+  xcode  >=0.9.2
+  Depends on vulnerable versions of uuid
+  node_modules/xcode
+    @expo/config-plugins  *
+    Depends on vulnerable versions of xcode
+    node_modules/@expo/config-plugins
+      @expo/config  <=0.0.1-canary-20240418-8d74597 || >=3.3.23-alpha.0
+      Depends on vulnerable versions of @expo/config-plugins
+      node_modules/@expo/config
+        @expo/local-build-cache-provider  *
+        Depends on vulnerable versions of @expo/config
+        node_modules/@expo/local-build-cache-provider
+        @expo/prebuild-config  *
+        Depends on vulnerable versions of @expo/config
+        Depends on vulnerable versions of @expo/config-plugins
+        node_modules/@expo/prebuild-config
+      @expo/inline-modules  >=0.0.2-canary-20260409-6fc2991
+      Depends on vulnerable versions of @expo/config-plugins
+      node_modules/@expo/inline-modules
+      expo-splash-screen  55.0.10-canary-20260424-7bedc9d - 55.0.10-canary-20260429-a5e59cf || >=56.0.0-canary-20260212-4f61309
+      Depends on vulnerable versions of @expo/config-plugins
+      node_modules/expo-splash-screen
+
+33 vulnerabilities (11 moderate, 22 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force

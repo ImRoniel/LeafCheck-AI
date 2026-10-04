@@ -1,0 +1,4 @@
+npm notice run leaf-check-ai-frontend@1.0.0 test
+npm notice run node --import tsx --test tests/*.test.ts
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit

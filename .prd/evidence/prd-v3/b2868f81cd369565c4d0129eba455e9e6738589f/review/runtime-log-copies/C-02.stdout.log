@@ -1,0 +1,120 @@
+TAP version 13
+# Subtest: pinned library ESM parses task title and date; adapter extracts only action bullets
+ok 1 - pinned library ESM parses task title and date; adapter extracts only action bullets
+  ---
+  duration_ms: 369.239212
+  type: 'test'
+  ...
+# Subtest: missing, repeated, empty and unusable sections use a bounded review fallback
+ok 2 - missing, repeated, empty and unusable sections use a bounded review fallback
+  ---
+  duration_ms: 3.082957
+  type: 'test'
+  ...
+# Subtest: bullets, continuation details, deduplication and five-task limit preserve report order
+ok 3 - bullets, continuation details, deduplication and five-task limit preserve report order
+  ---
+  duration_ms: 5.441202
+  type: 'test'
+  ...
+# Subtest: absolute dates and default reminders ignore ambient timezone and relative clock
+ok 4 - absolute dates and default reminders ignore ambient timezone and relative clock
+  ---
+  duration_ms: 28.035148
+  type: 'test'
+  ...
+# Subtest: conditional and negative instructions retain their meaning and cannot control persistence
+ok 5 - conditional and negative instructions retain their meaning and cannot control persistence
+  ---
+  duration_ms: 3.309779
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2910.473336
+TAP version 13
+# Subtest: pinned library ESM parses task title and date; adapter extracts only action bullets
+ok 1 - pinned library ESM parses task title and date; adapter extracts only action bullets
+  ---
+  duration_ms: 330.59973
+  type: 'test'
+  ...
+# Subtest: missing, repeated, empty and unusable sections use a bounded review fallback
+ok 2 - missing, repeated, empty and unusable sections use a bounded review fallback
+  ---
+  duration_ms: 2.741773
+  type: 'test'
+  ...
+# Subtest: bullets, continuation details, deduplication and five-task limit preserve report order
+ok 3 - bullets, continuation details, deduplication and five-task limit preserve report order
+  ---
+  duration_ms: 5.312171
+  type: 'test'
+  ...
+# Subtest: absolute dates and default reminders ignore ambient timezone and relative clock
+ok 4 - absolute dates and default reminders ignore ambient timezone and relative clock
+  ---
+  duration_ms: 20.893281
+  type: 'test'
+  ...
+# Subtest: conditional and negative instructions retain their meaning and cannot control persistence
+ok 5 - conditional and negative instructions retain their meaning and cannot control persistence
+  ---
+  duration_ms: 2.774888
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2949.595946
+TAP version 13
+# Subtest: pinned library ESM parses task title and date; adapter extracts only action bullets
+ok 1 - pinned library ESM parses task title and date; adapter extracts only action bullets
+  ---
+  duration_ms: 313.852886
+  type: 'test'
+  ...
+# Subtest: missing, repeated, empty and unusable sections use a bounded review fallback
+ok 2 - missing, repeated, empty and unusable sections use a bounded review fallback
+  ---
+  duration_ms: 2.830234
+  type: 'test'
+  ...
+# Subtest: bullets, continuation details, deduplication and five-task limit preserve report order
+ok 3 - bullets, continuation details, deduplication and five-task limit preserve report order
+  ---
+  duration_ms: 4.594292
+  type: 'test'
+  ...
+# Subtest: absolute dates and default reminders ignore ambient timezone and relative clock
+ok 4 - absolute dates and default reminders ignore ambient timezone and relative clock
+  ---
+  duration_ms: 19.328853
+  type: 'test'
+  ...
+# Subtest: conditional and negative instructions retain their meaning and cannot control persistence
+ok 5 - conditional and negative instructions retain their meaning and cannot control persistence
+  ---
+  duration_ms: 2.999134
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2262.99058

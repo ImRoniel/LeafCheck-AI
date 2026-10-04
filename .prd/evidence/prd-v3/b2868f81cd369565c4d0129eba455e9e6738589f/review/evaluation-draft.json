@@ -1,0 +1,116 @@
+{
+  "environment": {
+    "tools": [
+      "Node native tests and TypeScript",
+      "Docker disposable PostgreSQL 16",
+      "Expo web startup",
+      "Two independent code reviewers",
+      "npm advisory audit; limited redacting heuristic/manual credential review"
+    ],
+    "limitations": [
+      "No supported mobile device or physical camera.",
+      "No browser automation/Chrome MCP; bundled DevTools cannot launch (missing libasound.so.2).",
+      "No live signed-in AI workflow or screenshots were observed.",
+      "22 high-severity existing dependency audit entries."
+    ]
+  },
+  "coverage_review": "No requirement was cut. Checks support S-01 through S-08 and S-10 through S-13. S-09 and S-14 require unobserved C-06; S-15 and S-16 require unobserved C-07. R-01/R-02 have automated evidence; R-03/R-04/R-05 remain blocked by required end-to-end or visual evidence. The additional required dependency audit failed.",
+  "adequacy": {
+    "verdict": "inadequate",
+    "note": "Automated evidence and code review do not establish the required supported device/browser outcomes or visual readability. C-06/C-07 remain unverified and C-10 failed; readiness must remain blocked."
+  },
+  "checks": [
+    {
+      "id": "C-01",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-02",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-03",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-04",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-05",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-06",
+      "kind": "review",
+      "required": true,
+      "result": "unverified",
+      "command": null,
+      "timestamp": "2026-10-04T08:27:00Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/b2868f81cd369565c4d0129eba455e9e6738589f/review/device-browser.md"
+      ],
+      "note": "Required missing observation remains unverified."
+    },
+    {
+      "id": "C-07",
+      "kind": "visual",
+      "required": true,
+      "result": "unverified",
+      "command": null,
+      "timestamp": "2026-10-04T08:27:00Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/b2868f81cd369565c4d0129eba455e9e6738589f/review/visual.md"
+      ],
+      "note": "Required missing observation remains unverified."
+    },
+    {
+      "id": "C-08",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-09",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "command": null,
+      "timestamp": "2026-10-04T08:27:00Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/b2868f81cd369565c4d0129eba455e9e6738589f/review/security.md"
+      ],
+      "note": "See candidate-bound review artifact."
+    },
+    {
+      "id": "C-10",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-11",
+      "kind": "command",
+      "required": true
+    },
+    {
+      "id": "C-12",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "command": null,
+      "timestamp": "2026-10-04T08:27:00Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/b2868f81cd369565c4d0129eba455e9e6738589f/review/code-quality.md"
+      ],
+      "note": "See candidate-bound review artifact."
+    }
+  ],
+  "visual_review": {
+    "applicable": true,
+    "reason": "Scanner and care-task UI changed; required visual observations and screenshots are unavailable."
+  }
+}
