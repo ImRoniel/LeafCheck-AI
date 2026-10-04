@@ -18,6 +18,8 @@ export type SetupStep =
 export interface LocalSpace {
   id: string;
   name: string;
+  background?: string;
+  status?: "archived" | "deleted";
   theme: SpaceTheme;
   light: RoomLight;
   createdAt: string;
@@ -36,6 +38,7 @@ export interface CareSchedule {
 
 export interface LocalState {
   version: 1;
+  profile?: { name?: string; photoUri?: string };
   experience: ExperienceLevel | null;
   spaces: LocalSpace[];
   guestPlants: Plant[];

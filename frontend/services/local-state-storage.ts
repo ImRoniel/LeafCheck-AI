@@ -41,6 +41,16 @@ function oneOf(value: unknown, values: readonly string[]): boolean {
   return typeof value === "string" && values.includes(value);
 }
 
+export function validProfilePhoto(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    if (url.protocol === "file:") return !url.host && !url.search && !url.hash &&
+      /^\/.*\/leafcheck-profile-[a-z0-9-]+\.jpg$/.test(url.pathname);
+    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password;
+  } catch { return false; }
+}
+
 /** Fail closed: unknown versions/corrupt state must never be replaced by empty defaults. */
 export function parseLocalState(value: unknown): LocalState {
   const fail = () => {
@@ -49,6 +59,11 @@ export function parseLocalState(value: unknown): LocalState {
     );
   };
   if (!record(value) || value.version !== 1) return fail();
+  if (value.profile !== undefined && (
+    !record(value.profile) ||
+    (value.profile.name !== undefined && !text(value.profile.name, 100)) ||
+    (value.profile.photoUri !== undefined && !validProfilePhoto(value.profile.photoUri))
+  )) return fail();
   if (
     value.careCompletions !== undefined &&
     (!Array.isArray(value.careCompletions) ||
@@ -96,6 +111,8 @@ export function parseLocalState(value: unknown): LocalState {
         record(s) &&
         text(s.id) &&
         text(s.name, 100) &&
+        (s.background === undefined || (typeof s.background === "string" && /^#[0-9a-fA-F]{6}$/.test(s.background))) &&
+        (s.status === undefined || oneOf(s.status, ["archived", "deleted"])) &&
         date(s.createdAt) &&
         oneOf(s.theme, ["living", "kitchen", "bedroom", "balcony"]) &&
         oneOf(s.light, ["low", "medium", "high"]),

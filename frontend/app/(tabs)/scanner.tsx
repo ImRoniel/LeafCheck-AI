@@ -11,6 +11,7 @@ import { Notice, Screen } from "@/components/screen";
 import { measurement } from "@/components/telemetry-history";
 import { useAppData } from "@/context/app-data";
 import { useAuth } from "@/context/auth";
+import { scanSpaceLocation } from "@/services/spaces";
 import { useScan } from "@/hooks/use-scan";
 import {
   scanErrorMessage,
@@ -87,9 +88,10 @@ export default function Camera() {
     null,
   );
   const [error, setError] = useState("");
-  const { plantId, deviceId } = useLocalSearchParams<{
+  const { plantId, deviceId, space } = useLocalSearchParams<{
     plantId?: string;
     deviceId?: string;
+    space?: string;
   }>();
   const data = useAppData();
   const flow = useScan();
@@ -173,6 +175,7 @@ export default function Camera() {
         // Scan-first: plantId is optional
         ...(plantId ? { plantId } : {}),
         ...(deviceId ? { deviceId } : {}),
+        ...scanSpaceLocation(space, plantId),
       });
       // Success haptic + chime sound
       playSuccessChime();

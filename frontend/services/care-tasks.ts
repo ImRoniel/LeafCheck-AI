@@ -193,3 +193,29 @@ export function undoCareTask(state: LocalState, id: string): LocalState {
     careCompletions: state.careCompletions.filter((item) => item.id !== id),
   };
 }
+
+/** Presentation groups use actual due times, independently of recommendation urgency. */
+export function groupCareTasks(tasks: ReturnType<typeof buildCareTasks>, now = new Date()) {
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
+  const pending = [...tasks.today, ...tasks.upcoming];
+  const dated = pending.filter(task => task.dueAt !== null).sort((a, b) =>
+    Date.parse(a.dueAt!) - Date.parse(b.dueAt!));
+  return {
+    overdue: dated.filter(task => Date.parse(task.dueAt!) < now.getTime()),
+    today: dated.filter(task => Date.parse(task.dueAt!) >= now.getTime() && Date.parse(task.dueAt!) <= endOfDay.getTime()),
+    upcoming: dated.filter(task => Date.parse(task.dueAt!) > endOfDay.getTime()),
+    manual: pending.filter(task => task.dueAt === null),
+    completed: tasks.completed,
+  };
+}
+
+export function careTaskDueLabel(task: GardenCareTask | CareCompletion, now = new Date()) {
+  if ("completedAt" in task) return `Completed ${new Date(task.completedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+  if (!task.dueAt) return "No due date";
+  const due = new Date(task.dueAt);
+  const sameDay = due.toDateString() === now.toDateString();
+  const time = due.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const date = sameDay ? `today, ${time}` : due.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  return `${due.getTime() < now.getTime() ? "Overdue ·" : "Due"} ${date}`;
+}

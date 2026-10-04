@@ -26,6 +26,7 @@ type Result = {
   tasks: CareTask[];
   saving: boolean;
   update(id: string, completed: boolean): Promise<void>;
+  skip(id: string): Promise<void>;
 };
 
 // Execute the actual task and polling hooks with deterministic effect scheduling.
@@ -106,6 +107,7 @@ function harness() {
   const polls: Poll[] = [];
   let response: CareTask[] = [];
   const mutations: {
+    status: string;
     signal: AbortSignal;
     resolve(value: CareTask): void;
     reject(error: Error): void;
@@ -181,7 +183,7 @@ function harness() {
           options: { signal: AbortSignal },
         ) =>
           new Promise<CareTask>((resolve, reject) =>
-            mutations.push({ signal: options.signal, resolve, reject }),
+            mutations.push({ status: _status, signal: options.signal, resolve, reject }),
           ),
       },
     },
@@ -282,5 +284,48 @@ test("task mutation locks duplicate taps and does not confirm a failed write", a
   await rejected;
   assert.equal(h.render().saving, false);
   assert.equal(h.render().tasks.length, 0);
+  h.dispose();
+});
+
+test("Skip uses SKIPPED only after a successful PATCH and retains previous status on failure", async () => {
+  const h = harness();
+  h.render();
+  await h.polls.at(-1)!.publish([task("a"), task("b")]);
+  const pending = h.render().skip("a");
+  assert.equal(h.mutations[0].status, "SKIPPED");
+  assert.equal(h.render().tasks[0].status, "PENDING");
+  h.mutations[0].resolve(task("a", "SKIPPED"));
+  await pending;
+  assert.equal(h.render().tasks[0].status, "SKIPPED");
+  const failed = h.render().skip("b");
+  const rejected = assert.rejects(failed, /offline/);
+  h.mutations[1].reject(new Error("offline"));
+  await rejected;
+  assert.equal(h.render().tasks[1].status, "PENDING");
+  h.dispose();
+});
+
+for (const event of ["blur", "background", "unmount"] as const) {
+  test(`Skip aborts on ${event} and ignores a late successful response`, async () => {
+    const h = harness();
+    h.render();
+    await h.polls.at(-1)!.publish([task("a")]);
+    const pending = h.render().skip("a");
+    h.render();
+    if (event === "blur") { h.focus(false); h.render(); }
+    if (event === "background") { h.background(); h.render(); }
+    if (event === "unmount") h.dispose();
+    assert.equal(h.mutations[0].signal.aborted, true);
+    h.mutations[0].resolve(task("a", "SKIPPED"));
+    await pending;
+    if (event !== "unmount") { assert.equal(h.render().tasks[0].status, "PENDING"); h.dispose(); }
+    assert.equal(h.writesAfterDispose(), 0);
+  });
+}
+
+test("disabled account task hook cannot Skip", async () => {
+  const h = harness();
+  await h.render(false).skip("a");
+  assert.equal(h.mutations.length, 0);
   h.dispose();
 });

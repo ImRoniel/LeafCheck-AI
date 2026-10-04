@@ -2,11 +2,23 @@ import { Action, Notice, Screen } from "@/components/screen";
 import { AppDataProvider } from "@/context/app-data";
 import { AuthProvider, useAuth } from "@/context/auth";
 import { LocalStateProvider, useLocalState } from "@/context/local-state";
-import { Stack } from "expo-router";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { Stack, useRootNavigationState, useRouter } from "expo-router";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator } from "react-native";
 function Routes() {
   const auth = useAuth();
   const local = useLocalState();
+  const router = useRouter();
+  const navigation = useRootNavigationState();
+  const reducedMotion = useReducedMotion();
+  const enteredGuest = useRef(false);
+  useEffect(() => {
+    if (auth.isGuest && local.ready && navigation?.key && !enteredGuest.current) {
+      enteredGuest.current = true;
+      router.replace("/(tabs)");
+    }
+  }, [auth.isGuest, local.ready, navigation?.key, router]);
   if (auth.isLoading)
     return (
       <Screen title="Restoring session">
@@ -21,7 +33,7 @@ function Routes() {
           label="Retry connection"
           onPress={() => void auth.retryRestore()}
         />
-        <Action label="Continue as guest" onPress={auth.enterGuest} />
+        <Action label="Continue without an account" onPress={auth.enterLocal} />
       </Screen>
     );
   const authenticated = auth.status === "authenticated";
@@ -53,10 +65,17 @@ function Routes() {
         )}
       </Screen>
     );
-  const setupRequired = active && local.data.onboarding.status === "pending";
+  const setupPending = local.data.onboarding.status === "pending";
+  const setupRequired = authenticated && setupPending;
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={setupRequired}>
+    <Stack
+      initialRouteName={auth.isGuest ? "(tabs)" : undefined}
+      screenOptions={{
+        headerShown: false,
+        animation: reducedMotion ? "none" : "slide_from_right",
+      }}
+    >
+      <Stack.Protected guard={setupRequired || (auth.isGuest && setupPending)}>
         <Stack.Screen name="setup" />
       </Stack.Protected>
       <Stack.Protected guard={active && !setupRequired}>
@@ -77,7 +96,10 @@ function Routes() {
         <Stack.Screen name="plant-profile" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="archives" />
-        <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+        <Stack.Screen name="modal" options={{
+          presentation: "modal",
+          animation: reducedMotion ? "none" : "slide_from_bottom",
+        }} />
       </Stack.Protected>
     </Stack>
   );

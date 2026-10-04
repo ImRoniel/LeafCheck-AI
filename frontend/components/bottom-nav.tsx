@@ -1,7 +1,9 @@
+import { AnimatedPressable } from "@/components/animated-pressable";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
-import type { ComponentProps } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, type ComponentProps } from "react";
+import { Animated, Easing, Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type BottomTabBarProps = Parameters<
@@ -9,22 +11,45 @@ type BottomTabBarProps = Parameters<
 >[0];
 
 const items = [
-  { name: "index", label: "Home", icon: "home-outline" },
-  { name: "garden", label: "My Garden", icon: "leaf-outline" },
-  { name: "tasks", label: "Care Tasks", icon: "checkbox-outline" },
+  { name: "index", label: "Home", icon: "home-outline", activeIcon: "home" },
+  { name: "spaces", label: "My Spaces", icon: "leaf-outline", activeIcon: "leaf" },
+  { name: "tasks", label: "Care Tasks", icon: "calendar-outline", activeIcon: "calendar" },
 ] as const;
+
+const isSelected = (name: string, activeName: string | undefined) =>
+  activeName === name ||
+  (name === "spaces" && ["space-detail", "garden"].includes(activeName ?? ""));
 
 export function BottomNav({ state, navigation }: BottomTabBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const renderItem = (item: (typeof items)[number]) => {
+  const reducedMotion = useReducedMotion();
+  const activeName = state.routes[state.index]?.name;
+  const selection = useRef(items.map(item =>
+    new Animated.Value(isSelected(item.name, activeName) ? 1 : 0),
+  )).current;
+  useEffect(() => {
+    // Reduced motion uses static styles; effect cleanup stops any running animation.
+    if (reducedMotion) return;
+    const animation = Animated.parallel(selection.map((value, index) =>
+      Animated.timing(value, {
+        toValue: isSelected(items[index].name, activeName) ? 1 : 0,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== "web",
+        isInteraction: false,
+      }),
+    ));
+    animation.start();
+    return () => animation.stop();
+  }, [activeName, reducedMotion, selection]);
+  const renderItem = (item: (typeof items)[number], index: number) => {
     const route = state.routes.find((route) => route.name === item.name);
     const active = state.routes[state.index];
-    const selected =
-      active?.name === item.name ||
-      (item.name === "garden" && active?.name === "space-detail");
+    const selected = isSelected(item.name, active?.name);
+    const color = selected ? "#1B6B36" : "#506557";
     return (
-      <Pressable
+      <AnimatedPressable
         key={item.name}
         accessibilityRole="tab"
         accessibilityLabel={item.label}
@@ -45,23 +70,27 @@ export function BottomNav({ state, navigation }: BottomTabBarProps) {
             navigation.emit({ type: "tabLongPress", target: route.key });
         }}
       >
-        <Ionicons
-          name={item.icon}
-          size={23}
-          color={selected ? "#1B6B36" : "#506557"}
-        />
-        <Text style={[s.label, selected && s.selected]}>{item.label}</Text>
-      </Pressable>
+        <Animated.View pointerEvents="none" style={{
+            transform: [{ scale: reducedMotion ? 1 : selection[index].interpolate({
+              inputRange: [0, 1], outputRange: [1, 1.04],
+            }) }],
+          }}>
+          {/* Expo icons do not expose a compatible native animation ref. */}
+          <Ionicons name={selected ? item.activeIcon : item.icon} size={24}
+            color={selected ? "#1B6B36" : "#506557"} />
+        </Animated.View>
+        <Text style={[s.label, selected && s.selected, { color }]}>{item.label}</Text>
+      </AnimatedPressable>
     );
   };
-  const horizontalInset = Math.max(12, insets.left || 0, insets.right || 0);
+  const horizontalInset = Math.max(8, insets.left || 0, insets.right || 0);
   return (
     <View
       pointerEvents="box-none"
       style={[
         s.outer,
         {
-          bottom: insets.bottom + 12,
+          bottom: Math.max(25, insets.bottom + 12),
           left: horizontalInset,
           right: horizontalInset,
         },
@@ -69,7 +98,7 @@ export function BottomNav({ state, navigation }: BottomTabBarProps) {
     >
       <View pointerEvents="box-none" style={s.dock}>
         <View style={s.bar}>{items.map(renderItem)}</View>
-        <Pressable
+        <AnimatedPressable
           accessibilityRole="button"
           accessibilityLabel="Scan Plant"
           accessibilityHint="Open the camera to identify or scan a plant"
@@ -77,56 +106,63 @@ export function BottomNav({ state, navigation }: BottomTabBarProps) {
           onPress={() => router.navigate("/(tabs)/scanner")}
         >
           <Ionicons name="camera-outline" size={26} color="#FFFFFF" />
-        </Pressable>
+        </AnimatedPressable>
       </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  outer: { position: "absolute", left: 12, right: 12, alignItems: "center" },
+  outer: { position: "absolute", alignItems: "center" },
   dock: {
     flexDirection: "row",
     alignItems: "center",
-    width: "100%",
-    maxWidth: 560,
-    gap: 12,
+    width: 303,
+    maxWidth: "100%",
+    gap: 10,
   },
   bar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 60,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "#E2EBE4",
+    minHeight: 58,
+    borderRadius: 29,
     backgroundColor: "#FFFFFF",
-    paddingVertical: 3,
-    paddingHorizontal: 4,
+    paddingVertical: 4,
+    shadowColor: "#193E27",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
   },
   item: {
     flex: 1,
-    minWidth: 48,
-    minHeight: 52,
+    minWidth: 0,
+    minHeight: 50,
+    paddingHorizontal: 2,
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
+    gap: 2,
   },
   label: {
     fontSize: 11,
     color: "#506557",
     textAlign: "center",
+    width: "100%",
     fontWeight: "600",
   },
   selected: { color: "#1B6B36", fontWeight: "800" },
   scan: {
-    width: 60,
-    height: 60,
+    width: 58,
+    height: 58,
     flexShrink: 0,
-    borderRadius: 30,
-    backgroundColor: "#1B6B36",
+    borderRadius: 29,
+    backgroundColor: "#278448",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#193E27",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  scanPressed: { backgroundColor: "#145329" },
+  scanPressed: { backgroundColor: "#1B6B36" },
 });

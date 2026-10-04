@@ -37,6 +37,7 @@ export interface SessionTransport {
   }): Promise<Tokens>;
   refresh(body: { refreshToken?: string }): Promise<Tokens>;
   me(): Promise<User>;
+  updateProfile?(name: string): Promise<User>;
   logout(token: string): Promise<void>;
 }
 export interface SessionCoordination {
@@ -325,6 +326,16 @@ export function createSessionCoordinator(
     },
     leaveGuest() {
       boundary("signedOut");
+    },
+    async updateProfile(name: string) {
+      if (state.status !== "authenticated" || !state.user || !transport.updateProfile)
+        throw new ApiError("validation", "Sign in to update your account profile.");
+      const generation = state.generation;
+      const userId = state.user.id;
+      const user = parseUser(await transport.updateProfile(name));
+      check(generation);
+      if (state.status !== "authenticated" || user.id !== userId) throw cancelled();
+      publish({ user });
     },
   };
 }

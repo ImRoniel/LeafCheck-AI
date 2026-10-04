@@ -1,19 +1,15 @@
 import { useAuth } from "@/context/auth";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useProfile } from "@/context/profile";
+import { ProfileButton } from "./profile-button";
+import { StyleSheet, Text, View } from "react-native";
 
 export function GreetingHeader({
   mockConnected = false,
 }: {
   mockConnected?: boolean;
 }) {
-  const router = useRouter();
   const auth = useAuth();
-  const profile = {
-    name: auth.user?.name || (auth.isGuest ? "Guest" : "Plant lover"),
-    photoUri: undefined as string | undefined,
-  };
+  const profile = useProfile();
   const date = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
@@ -34,34 +30,20 @@ export function GreetingHeader({
         <Text style={styles.date}>{date}</Text>
       </View>
       <View style={styles.rightColumn}>
-        <TouchableOpacity
-          style={styles.profileIcon}
-          onPress={() => router.replace("/profile")}
-          accessibilityRole="button"
-          accessibilityLabel="Open profile"
-        >
-          {profile.photoUri ? (
-            <Image
-              source={{ uri: profile.photoUri }}
-              style={styles.profileImage}
-            />
-          ) : (
-            <Ionicons name="person-outline" size={25} color="#20A64A" />
-          )}
-        </TouchableOpacity>
+        <ProfileButton />
         <View style={[styles.modePill, mockConnected && styles.autoPill]}>
           <Text style={styles.modeText}>
             {mockConnected
               ? "Mode: Auto (With IoT)"
               : auth.isGuest
-                ? "Guest • Local only"
+                ? "Local session"
                 : "Private collection"}
           </Text>
         </View>
         {mockConnected && (
           <Text style={styles.mockLabel}>
             Mock setup · No live connection
-            {auth.isGuest ? "\nGuest · Local only" : ""}
+            {auth.isGuest ? "\nLocal session" : ""}
           </Text>
         )}
       </View>
@@ -107,20 +89,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#FFFFFF",
     marginTop: 1,
-  },
-  profileIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 2,
-  },
-  profileImage: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
   },
   modePill: {
     backgroundColor: "#F5B800",
