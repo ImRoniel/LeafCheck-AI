@@ -1,2 +1,0 @@
-npm notice run leaf-check-ai-backend@1.0.0 test
-npm notice run node --import tsx/esm --experimental-test-module-mocks --test tests/*.test.mjs
