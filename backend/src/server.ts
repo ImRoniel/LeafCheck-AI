@@ -22,8 +22,12 @@ app.set("trust proxy", false);
 app.use(helmet());
 app.use(
   cors({
-    origin: (origin, callback) =>
-      callback(null, !!origin && authConfig.origins.includes(origin)),
+    origin: (origin, callback) => {
+      // For development: allow requests with no origin (mobile apps) and whitelist others
+      if (!origin) return callback(null, true); // Allow mobile apps
+      if (authConfig.origins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS blocked"), false);
+    },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
