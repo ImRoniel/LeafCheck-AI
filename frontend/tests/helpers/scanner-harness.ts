@@ -7,6 +7,7 @@ import { createScanFlow } from "../../services/scan-flow";
 import * as errors from "../../services/errors";
 import * as scanErrors from "../../services/scan-errors";
 import type { Plant, ScanRequest, ScanResponse } from "../../types";
+import type { PreScanResult } from "../../types/pre-scan-validation";
 
 export function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -52,13 +53,16 @@ export function scannerHarness() {
   let haptics = 0;
   let chimes = 0;
   let captures = 0;
+  let validations = 0;
   let refreshes = 0;
   let canGoBack = true;
   const navigation: string[] = [];
   const requests: ScanRequest[] = [];
   const signals: AbortSignal[] = [];
+  const validationSignals: AbortSignal[] = [];
   const behavior = {
     picture: async (): Promise<Picture> => picture,
+    validate: async (_uri: string, _signal?: AbortSignal): Promise<PreScanResult> => ({ valid: true, reason: "ok", guidance: "" }),
     scan: async (_request: ScanRequest): Promise<ScanResponse> => report,
     update: async () => ({ id: "flower", healthStatus: "healthy" as const }),
     fetch: async (): Promise<Plant> => plant,
@@ -141,7 +145,7 @@ export function scannerHarness() {
     runInNewContext(ts.transpileModule(readFileSync(file, "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     }).outputText, {
-      exports, console, Error, Promise,
+      exports, console, Error, Promise, AbortController,
       window: { AudioContext: class {
         currentTime = 0; destination = {};
         constructor() { chimes++; }
@@ -158,6 +162,11 @@ export function scannerHarness() {
         if (name.endsWith("services/scan-flow")) return { createScanFlow: () => flow };
         if (name.endsWith("services/errors")) return errors;
         if (name.endsWith("services/scan-errors")) return scanErrors;
+        if (name.endsWith("services/pre-scan-validation")) return { validatePreScan: (uri: string, signal?: AbortSignal) => {
+          validations++;
+          if (signal) validationSignals.push(signal);
+          return behavior.validate(uri, signal);
+        } };
         if (name === "expo-camera") return { CameraView: "CameraView", useCameraPermissions: () => [permission, () => behavior.permission()] };
         if (name === "expo-haptics") return { NotificationFeedbackType: { Success: "success" }, notificationAsync: async () => { haptics++; } };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
@@ -200,11 +209,11 @@ export function scannerHarness() {
     (node.type as unknown) === "Pressable" && (node.props.accessibilityLabel === label || text(node) === label));
   render();
   return {
-    behavior, flow, requests, signals, navigation,
+    behavior, flow, requests, signals, validationSignals, navigation,
     render,
     get root() { return root; },
     get preview() { return preview; },
-    get stats() { return { mounts, unmounts, captures, haptics, chimes, refreshes, writesAfterDispose }; },
+    get stats() { return { mounts, unmounts, captures, validations, haptics, chimes, refreshes, writesAfterDispose }; },
     get text() { return rendered.filter((n) => (n.type as unknown) === "Text").map(text).join(" "); },
     get images() { return rendered.filter((n) => (n.type as unknown) === "Image"); },
     button: findButton,

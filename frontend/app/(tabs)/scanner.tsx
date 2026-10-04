@@ -12,6 +12,7 @@ import { measurement } from "@/components/telemetry-history";
 import { useAppData } from "@/context/app-data";
 import { useAuth } from "@/context/auth";
 import { useScan } from "@/hooks/use-scan";
+import { validatePreScan } from "@/services/pre-scan-validation";
 import {
   scanErrorMessage,
   scanNeedsServiceRecovery,
@@ -87,6 +88,8 @@ export default function Camera() {
   const [closed, setClosed] = useState(false);
   const [ready, setReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const validationController = useRef<AbortController | null>(null);
   const [photo, setPhoto] = useState<{ uri: string; base64: string } | null>(
     null,
   );
@@ -104,6 +107,8 @@ export default function Camera() {
   const endFlowSession = flow.endSession;
 
   const invalidateOperations = useCallback(() => {
+    validationController.current?.abort();
+    validationController.current = null;
     ++generation.current;
     ++cameraGeneration.current;
     readyRef.current = false;
@@ -115,6 +120,7 @@ export default function Camera() {
     setCameraVersion(cameraGeneration.current);
     setReady(false);
     setCapturing(false);
+    setValidating(false);
   }, [invalidateOperations]);
 
   const resetSession = useCallback(() => {
@@ -194,7 +200,19 @@ export default function Camera() {
       readyRef.current = false;
       setReady(false);
 
-      // Auto-submit immediately for scan-first flow
+      const controller = new AbortController();
+      validationController.current = controller;
+      setValidating(true);
+      const validation = await validatePreScan(result.uri, controller.signal);
+      if (!alive.current || token !== generation.current || !enabledRef.current)
+        return;
+      validationController.current = null;
+      setValidating(false);
+      if (!validation.valid) {
+        setError(validation.guidance);
+        return;
+      }
+      // Upload only after every local check passes for the current camera session.
       await submitScan(result.base64, token);
     } catch (e) {
       if (alive.current && token === generation.current)
@@ -203,6 +221,8 @@ export default function Camera() {
       if (alive.current && token === generation.current) {
         lock.current = false;
         setCapturing(false);
+        setValidating(false);
+        validationController.current = null;
       }
     }
   };
@@ -283,11 +303,13 @@ export default function Camera() {
         serviceFailure={scanNeedsServiceRecovery(flow.error)}
         error={error || (flow.error ? scanErrorMessage(flow.error) : "")}
         status={
-          flow.scanning
-            ? "Getting to know your plant…"
-            : flow.synchronizing
-              ? "Saving your plant…"
-              : "Taking your photo…"
+          validating
+            ? "Checking your photo…"
+            : flow.scanning
+              ? "Getting to know your plant…"
+              : flow.synchronizing
+                ? "Saving your plant…"
+                : "Taking your photo…"
         }
         existingPlant={!!plantId}
         onClose={() => {
