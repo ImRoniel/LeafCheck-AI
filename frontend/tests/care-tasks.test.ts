@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildCareTasks,
+  groupCareTasks,
+  careTaskDueLabel,
   completeCareTask,
   undoCareTask,
 } from "../services/care-tasks";
@@ -13,6 +15,45 @@ import {
 import { initialLocalState, type CareSchedule } from "../types/local-state";
 import type { Plant } from "../types/plant";
 import type { CareTask } from "../types/scan";
+import type { GardenCareTask } from "../types/care-task";
+
+test("presentation groups exact due times and leaves unscheduled and future urgent checks undated or upcoming", () => {
+  const current = new Date(2026, 8, 4, 12);
+  const task = (id: string, due: Date | null, priority: GardenCareTask["priority"] = "routine"): GardenCareTask => ({
+    id, key: id, plantId: "p1", title: id, details: "", dueAt: due?.toISOString() ?? null, priority,
+  });
+  const pending = [
+    task("yesterday", new Date(2026, 8, 3, 9)),
+    task("earlier today", new Date(2026, 8, 4, 9)),
+    task("now", current),
+    task("tonight", new Date(2026, 8, 4, 23, 59, 59, 999)),
+    task("future urgent", new Date(2026, 8, 5, 0), "immediate"),
+    task("manual urgent", null, "immediate"),
+    task("manual routine", null),
+  ];
+  const groups = groupCareTasks({ today: pending, upcoming: [], completed: [] }, current);
+  assert.deepEqual(groups.overdue.map(task => task.id), ["yesterday", "earlier today"]);
+  assert.deepEqual(groups.today.map(task => task.id), ["now", "tonight"]);
+  assert.deepEqual(groups.upcoming.map(task => task.id), ["future urgent"]);
+  assert.deepEqual(groups.manual.map(task => task.id), ["manual urgent", "manual routine"]);
+  assert.equal(careTaskDueLabel(pending[5], current), "No due date");
+  assert.match(careTaskDueLabel(pending[1], current), /^Overdue.*today/);
+  assert.match(careTaskDueLabel(pending[2], current), /^Due today/);
+  assert.equal(groupCareTasks({ today: [pending[3]], upcoming: [], completed: [] }, new Date(2026, 8, 5, 0)).overdue.length, 1);
+});
+
+test("completed recurring tasks stay in history while their next occurrence is upcoming; undo restores overdue", () => {
+  const current = new Date(2026, 8, 4, 12);
+  const state = { ...initialLocalState(), schedules: { p1: schedule } };
+  const before = groupCareTasks(buildCareTasks([plant], state.schedules, [], current), current);
+  const water = before.overdue.find(task => task.title.includes("watering"))!;
+  const saved = completeCareTask(state, water, current);
+  const after = groupCareTasks(buildCareTasks([plant], state.schedules, saved.careCompletions, current), current);
+  assert.equal(after.completed[0].id, water.id);
+  assert.ok(after.upcoming.some(task => task.key === water.key));
+  const undone = undoCareTask(saved, water.id);
+  assert.ok(groupCareTasks(buildCareTasks([plant], state.schedules, undone.careCompletions, current), current).overdue.some(task => task.id === water.id));
+});
 
 test("server tasks merge by urgency and due date, preserve completion and omit skipped/deleted targets", () => {
   const base: CareTask = {

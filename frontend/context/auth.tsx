@@ -38,12 +38,16 @@ function useSession() {
     isLoading: state.status === "restoring",
     isAuthenticating: state.status === "authenticating",
     isGuest: state.status === "guest",
+    isLocal: state.status === "guest",
     login: session.login,
     register: session.register,
     logout: session.logout,
     retryRestore: session.restore,
     enterGuest: session.enterGuest,
     leaveGuest: session.leaveGuest,
+    enterLocal: session.enterGuest,
+    leaveLocal: session.leaveGuest,
+    updateProfile: session.updateProfile,
   };
 }
 const Context = createContext<ReturnType<typeof useSession> | null>(null);

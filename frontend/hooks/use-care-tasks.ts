@@ -71,7 +71,7 @@ export function useCareTasks(enabled: boolean) {
     }
   }, [authoritative]);
   const tasks = authoritative?.tasks ?? lastGood;
-  const update = async (id: string, completed: boolean) => {
+  const update = async (id: string, completed: boolean | "SKIPPED") => {
     if (
       !enabled ||
       !mounted.current ||
@@ -88,7 +88,7 @@ export function useCareTasks(enabled: boolean) {
     try {
       const task = await api.updateTaskStatus(
         id,
-        completed ? "COMPLETED" : "PENDING",
+        completed === "SKIPPED" ? "SKIPPED" : completed ? "COMPLETED" : "PENDING",
         { signal: controller.signal },
       );
       if (
@@ -109,5 +109,5 @@ export function useCareTasks(enabled: boolean) {
       }
     }
   };
-  return { ...resource, tasks, saving, update };
+  return { ...resource, tasks, saving, update, skip: (id: string) => update(id, "SKIPPED") };
 }

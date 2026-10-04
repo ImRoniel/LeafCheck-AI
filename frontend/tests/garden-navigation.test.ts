@@ -23,9 +23,15 @@ function load(path: string, overrides: Record<string, unknown>) {
       exports,
       require: (name: string) => {
         if (name in overrides) return overrides[name];
-        if (name === "react") return React;
+        if (name === "react") return {
+          ...React,
+          useRef: (value: unknown) => ({ current: value }),
+          useEffect: () => {},
+        };
         if (name === "react/jsx-runtime") return loadModule(name);
         if (name === "react-native") return web;
+        if (name === "@/components/animated-pressable") return { AnimatedPressable: web.Pressable };
+        if (name === "@/hooks/use-reduced-motion") return { useReducedMotion: () => false };
         throw new Error(`Unexpected import: ${name}`);
       },
     },
@@ -78,6 +84,7 @@ test("tab layout exposes only three primary tabs and retains hidden compatibilit
   );
   const { default: Layout } = load("app/(tabs)/_layout.tsx", {
     "@/components/bottom-nav": { BottomNav: () => null },
+    "@/context/auth": { useAuth: () => ({ isGuest: false }) },
     "expo-router": { Tabs },
   });
   const screens = elements(Layout({} as never)).filter(
@@ -87,7 +94,7 @@ test("tab layout exposes only three primary tabs and retains hidden compatibilit
     screens
       .filter((node) => node.props.options?.href !== null)
       .map((node) => node.props.name),
-    ["index", "garden", "tasks"],
+    ["index", "spaces", "tasks"],
   );
   for (const node of screens)
     assert.ok(existsSync(`app/(tabs)/${node.props.name}.tsx`));
@@ -97,6 +104,7 @@ test("custom tab bar stays visible on content routes and hides on scan routes", 
   const BottomNav = () => null;
   const { default: Layout } = load("app/(tabs)/_layout.tsx", {
     "@/components/bottom-nav": { BottomNav },
+    "@/context/auth": { useAuth: () => ({ isGuest: false }) },
     "expo-router": { Tabs: Object.assign(() => null, { Screen: () => null }) },
   });
   const layout = Layout({} as never) as React.ReactElement<{
@@ -134,7 +142,7 @@ test("bottom navigation emits tab events, respects prevention and keeps Scan an 
   const tree = BottomNav({
     state: {
       index: 0,
-      routes: ["index", "garden", "tasks"].map((name) => ({ name, key: name })),
+      routes: ["index", "spaces", "tasks"].map((name) => ({ name, key: name })),
     },
     navigation: {
       emit: (event: { type: string }) => {
@@ -157,7 +165,7 @@ test("bottom navigation emits tab events, respects prevention and keeps Scan an 
     true,
   );
   buttons
-    .find((node) => node.props.accessibilityLabel === "My Garden")
+    .find((node) => node.props.accessibilityLabel === "My Spaces")
     ?.props.onPress?.();
   prevent = true;
   buttons
@@ -168,8 +176,110 @@ test("bottom navigation emits tab events, respects prevention and keeps Scan an 
   )!;
   assert.equal(scan.props.accessibilityRole, "button");
   scan.props.onPress?.();
-  assert.deepEqual(navigated, ["garden", "/(tabs)/scanner"]);
+  assert.deepEqual(navigated, ["spaces", "/(tabs)/scanner"]);
   assert.deepEqual(events, ["tabPress", "tabPress"]);
+});
+
+test("My Spaces stays selected on Spaces and Space Details and opens the Spaces route", () => {
+  const { BottomNav } = load("components/bottom-nav.tsx", {
+    "expo-router": { useRouter: () => ({ navigate: () => {} }) },
+    "@expo/vector-icons": { Ionicons: () => null },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
+  });
+  for (const active of ["spaces", "space-detail"]) {
+    const navigated: string[] = [];
+    const routes = ["index", "spaces", "tasks", "space-detail"].map(name => ({ name, key: name }));
+    const tree = BottomNav({
+      state: { index: routes.findIndex(route => route.name === active), routes },
+      navigation: {
+        emit: () => ({ defaultPrevented: false }),
+        navigate: (name: string) => navigated.push(name),
+      },
+    } as never);
+    const tab = elements(tree).find(node => node.props.accessibilityLabel === "My Spaces")!;
+    assert.equal(tab.props.accessibilityState?.selected, true);
+    tab.props.onPress?.();
+    assert.deepEqual(navigated, active === "spaces" ? [] : ["spaces"]);
+  }
+});
+
+test("local and signed-in tab entry defaults to Dashboard", () => {
+  for (const isGuest of [true, false]) {
+    const { default: Layout } = load("app/(tabs)/_layout.tsx", {
+      "@/components/bottom-nav": { BottomNav: () => null },
+      "@/context/auth": { useAuth: () => ({ isGuest }) },
+      "expo-router": { Tabs: Object.assign(() => null, { Screen: () => null }) },
+    });
+    const tree = Layout({} as never) as React.ReactElement<{ initialRouteName: string }>;
+    assert.equal(tree.props.initialRouteName, "index");
+  }
+});
+
+test("tabs switch immediately with opaque scenes and preload only the three main screens", () => {
+  const Tabs = Object.assign(() => null, { Screen: () => null });
+  for (const reducedMotion of [false, true]) {
+    const { default: Layout } = load("app/(tabs)/_layout.tsx", {
+      "@/components/bottom-nav": { BottomNav: () => null },
+      "@/hooks/use-reduced-motion": { useReducedMotion: () => reducedMotion },
+      "expo-router": { Tabs },
+    });
+    const layout = Layout({} as never) as React.ReactElement<{
+      backBehavior: string;
+      screenOptions: {
+        animation: string;
+        sceneStyle: { backgroundColor: string; overflow: string };
+        transitionSpec?: unknown;
+        sceneStyleInterpolator?: unknown;
+      };
+    }>;
+    assert.equal(layout.props.backBehavior, "history");
+    const options = layout.props.screenOptions;
+    assert.equal(options.sceneStyle.backgroundColor, "#FFFFFF");
+    assert.equal(options.sceneStyle.overflow, "hidden");
+    assert.equal(options.animation, "none");
+    assert.equal(options.transitionSpec, undefined);
+    assert.equal(options.sceneStyleInterpolator, undefined);
+    for (const screen of elements(layout).filter(node => node.props.name)) {
+      const lazy = (screen.props.options as { lazy?: boolean }).lazy;
+      assert.equal(lazy, ["index", "spaces", "tasks"].includes(screen.props.name!) ? false : undefined);
+    }
+  }
+});
+
+test("root stack preserves guards while native pushes reverse on Back and reduced motion disables them", () => {
+  for (const reducedMotion of [false, true]) {
+    const Stack = Object.assign(() => null, { Screen: "Screen", Protected: "Protected" });
+    const { default: Layout } = load("app/_layout.tsx", {
+      "@/hooks/use-reduced-motion": { useReducedMotion: () => reducedMotion },
+      "@/components/screen": { Screen: "Screen", Notice: "Notice", Action: "Action" },
+      "@/context/auth": { AuthProvider: "AuthProvider", useAuth: () => ({ status: "authenticated", isGuest: false }) },
+      "@/context/local-state": { LocalStateProvider: "LocalStateProvider", useLocalState: () => ({ ready: true, data: { onboarding: { status: "complete" } } }) },
+      "@/context/app-data": { AppDataProvider: "AppDataProvider" },
+      "expo-router": { Stack, useRouter: () => ({}), useRootNavigationState: () => ({ key: "mounted" }) },
+    });
+    const invoke = (element: React.ReactElement<any>): React.ReactElement<any> => (element.type as (props: unknown) => React.ReactElement)(element.props);
+    const root = Layout({} as never) as React.ReactElement<any>;
+    const account = invoke(root.props.children as React.ReactElement);
+    const app = account.props.children as React.ReactElement<any>;
+    const routes = invoke(app.props.children);
+    assert.equal(routes.props.screenOptions.animation, reducedMotion ? "none" : "slide_from_right");
+    const groups = React.Children.toArray(routes.props.children).filter(React.isValidElement) as React.ReactElement<any>[];
+    assert.equal(groups[0].props.guard, false); // Signed-in setup is already complete.
+    assert.equal(groups[1].props.guard, true);
+    assert.equal(groups[2].props.guard, false); // Authentication routes remain protected.
+    const modal = elements(routes).find(node => node.props.name === "modal")!;
+    assert.equal((modal.props.options as any).animation, reducedMotion ? "none" : "slide_from_bottom");
+    assert.equal((modal.props.options as any).presentation, "modal");
+  }
+});
+
+test("collection entry points lead to My Spaces and Garden has no visible tab title", () => {
+  for (const file of ["components/plant-overview-card.tsx", "components/delete-plant-action.tsx", "app/(tabs)/search.tsx", "app/(tabs)/explore.tsx"]) {
+    const source = readFileSync(file, "utf8");
+    assert.match(source, /\/\(tabs\)\/spaces/);
+    assert.doesNotMatch(source, /\/\(tabs\)\/garden/);
+  }
+  assert.doesNotMatch(readFileSync("app/(tabs)/_layout.tsx", "utf8"), /title: "My Garden"/);
 });
 
 test("legacy camera redirect preserves target params; notifications lead to actionable tasks", () => {

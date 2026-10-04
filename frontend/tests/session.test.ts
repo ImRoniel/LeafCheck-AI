@@ -23,6 +23,50 @@ const deferred = <T>() => {
   });
   return { promise, resolve };
 };
+
+test("profile name updates use authenticated PATCH and publish validated server identity", async () => {
+  let patches = 0;
+  const { session } = setup(async (url, init) => {
+    if (String(url).endsWith("/refresh")) return json({ accessToken: "a1", refreshToken: "r2" });
+    if (init?.method === "PATCH") {
+      patches++;
+      assert.equal(String(url), "https://api.test/api/users/me");
+      assert.equal(new Headers(init.headers).get("Authorization"), "Bearer a1");
+      assert.deepEqual(JSON.parse(String(init.body)), { name: "New Name" });
+      return json({ ...user, name: "New Name" });
+    }
+    return json(user);
+  });
+  await session.restore();
+  await session.updateProfile("  New Name  ");
+  assert.equal(session.snapshot().user?.name, "New Name");
+  assert.equal(patches, 1);
+  await session.logout();
+  session.enterGuest();
+  await assert.rejects(session.updateProfile("Local"), /Sign in/);
+  assert.equal(patches, 1);
+  assert.equal(session.snapshot().user, null);
+  assert.equal(session.snapshot().token, null);
+});
+
+test("late profile update cannot restore identity after switching to local access", async () => {
+  const patch = deferred<Response>();
+  const started = deferred<void>();
+  const { session } = setup(async (url, init) => {
+    if (String(url).endsWith("/refresh")) return json({ accessToken: "a1", refreshToken: "r2" });
+    if (init?.method === "PATCH") { started.resolve(); return patch.promise; }
+    return json(user);
+  });
+  await session.restore();
+  const update = session.updateProfile("New");
+  await started.promise;
+  await session.logout();
+  session.enterGuest();
+  patch.resolve(json({ ...user, name: "New" }));
+  await assert.rejects(update, (error: unknown) => error instanceof ApiError && error.kind === "cancelled");
+  assert.equal(session.snapshot().status, "guest");
+  assert.equal(session.snapshot().user, null);
+});
 function setup(
   fetch: typeof globalThis.fetch,
   native = true,

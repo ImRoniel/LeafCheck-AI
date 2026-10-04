@@ -2,6 +2,6 @@ import { Redirect } from "expo-router";
 
 export default function SearchRedirect() {
   return (
-    <Redirect href={{ pathname: "/(tabs)/garden", params: { view: "all" } }} />
+    <Redirect href="/(tabs)/spaces" />
   );
 }

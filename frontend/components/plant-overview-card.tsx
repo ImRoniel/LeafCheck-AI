@@ -20,7 +20,7 @@ export function PlantOverviewCard() {
   const [activePage, setActivePage] = useState(0);
   const pageWidth = Math.max(280, width - 74);
   const visibleDots = Math.min(Math.max(spaces.length, 1), 5);
-  const openSpaces = () => router.navigate("/(tabs)/garden");
+  const openSpaces = () => router.navigate("/(tabs)/spaces");
   const openSpace = (space: string) =>
     router.navigate({ pathname: "/(tabs)/space-detail", params: { space } });
 

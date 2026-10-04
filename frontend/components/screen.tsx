@@ -1,7 +1,6 @@
 import { useRouter } from "expo-router";
 import { Children, type PropsWithChildren } from "react";
 import {
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -10,24 +9,30 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { sanitizeErrorMessage } from "../services/errors";
+import { AnimatedPressable as Pressable } from "./animated-pressable";
 export function Screen({
   children,
   title,
   refresh,
   loading = false,
   back = false,
+  backgroundColor,
+  fill = false,
 }: PropsWithChildren<{
   title?: string;
   refresh?: () => void;
   loading?: boolean;
   back?: boolean;
+  backgroundColor?: string;
+  fill?: boolean;
 }>) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   return (
-    <View style={ui.screen}>
+    <View style={[ui.screen, backgroundColor && { backgroundColor }]}>
       <ScrollView
         contentContainerStyle={{
+          flexGrow: fill ? 1 : undefined,
           paddingTop: insets.top + 20,
           paddingHorizontal: 22,
           paddingBottom: insets.bottom + 115,

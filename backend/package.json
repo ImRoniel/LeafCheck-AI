@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "npm run db:generate:all",
     "dev": "node --import tsx/esm src/server.ts",
+    "predev:watch": "npm run db:generate:all",
     "dev:watch": "node --watch --import tsx/esm src/server.ts",
     "build": "npm run db:generate:all && tsc && node scripts/package-prisma-client.mjs",
     "test": "node --import tsx/esm --experimental-test-module-mocks --test tests/*.test.mjs",

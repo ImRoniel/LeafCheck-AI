@@ -18,7 +18,7 @@ export function DeletePlantAction({ id, name }: { id: string; name: string }) {
     setError(null);
     try {
       await deletePlant(id);
-      router.replace("/(tabs)/garden");
+      router.replace("/(tabs)/spaces");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to delete plant.");
     } finally {

@@ -264,6 +264,12 @@ export function createApiClient(
         timeoutMs: config.timeoutMs ?? 10000,
         ...options,
       }),
+    updateProfile: (name: string) => {
+      const normalized = name.trim();
+      if (!normalized || Array.from(normalized).length > 100)
+        throw new ApiError("validation", "Enter a name of 100 characters or fewer.");
+      return request("/api/users/me", parseUser, {}, "PATCH", { name: normalized });
+    },
     logout: (token: string) =>
       request<void>(
         "/api/auth/logout",

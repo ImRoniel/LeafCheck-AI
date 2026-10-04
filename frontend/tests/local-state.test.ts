@@ -42,6 +42,23 @@ test("account keys cannot overlap guest or other accounts", () => {
   assert.notEqual(localStateKey("a:b"), localStateKey("a%3Ab"));
 });
 
+test("local profile survives reload without crossing account boundaries or requiring migration", async () => {
+  const { storage } = memoryStorage();
+  assert.equal(parseLocalState(initialLocalState()).profile, undefined);
+  const local = createLocalStateStore(storage, localStateKey(null));
+  await local.load();
+  await local.update(state => ({ ...state, profile: { name: "Fern Friend", photoUri: "https://images.test/avatar.jpg" } }));
+  const restored = createLocalStateStore(storage, localStateKey(null));
+  const account = createLocalStateStore(storage, localStateKey("u1"));
+  await Promise.all([restored.load(), account.load()]);
+  assert.equal(restored.snapshot().data.profile?.name, "Fern Friend");
+  assert.equal(restored.snapshot().data.profile?.photoUri, "https://images.test/avatar.jpg");
+  assert.equal(account.snapshot().data.profile, undefined);
+  for (const photoUri of ["javascript:alert(1)", "file:///private/photo", "https://user:password@images.test/a", "invalid"]) {
+    assert.throws(() => parseLocalState({ ...initialLocalState(), profile: { photoUri } }));
+  }
+});
+
 test("serialized updates and remounted stores preserve independent changes", async () => {
   const { storage } = memoryStorage();
   const a = createLocalStateStore(storage, "shared");

@@ -27,6 +27,13 @@
       "expo-router",
       ["expo-secure-store", { "configureAndroidBackup": true }],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow LeafCheck AI to choose a profile photo from your gallery.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow LeafCheck AI to photograph a leaf for analysis.",

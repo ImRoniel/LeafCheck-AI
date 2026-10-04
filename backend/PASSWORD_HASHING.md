@@ -13,7 +13,6 @@ Use Node.js 24 LTS (validated here on 24.12.0) and npm. From the repository root
 
 ```sh
 npm ci
-npm run db:generate:all --workspace=backend
 npm run dev --workspace=backend
 ```
 
@@ -21,6 +20,14 @@ Configure database connections, JWT secrets, and external services separately as
 described in AUTH_DEPLOYMENT.md and the main README. Environment files/secrets are
 not committed. This fix does not provision databases or bypass organizational
 policies for other dependencies (including Prisma engines).
+
+`dev` and `dev:watch` automatically run `db:generate:all` before starting the
+server, just as `build` does. This generates the MongoDB client and the separate
+PostgreSQL client at `backend/src/generated/postgres-client`; generated files are
+not committed. Generation does not push schemas or change database data. To
+generate clients without starting the server, run
+`npm run db:generate:all --workspace=backend`. Stop running backend processes
+before regenerating on Windows if Prisma reports an engine DLL lock.
 
 For a production build:
 

@@ -116,7 +116,7 @@ function CareForm({
         added in the next implementation step.
       </Notice>
       <Action
-        label={action.busy ? "Saving…" : "Save schedule & open my garden"}
+        label={action.busy ? "Saving…" : "Save schedule"}
         disabled={action.busy}
         onPress={() => void save()}
       />

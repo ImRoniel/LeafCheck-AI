@@ -56,6 +56,7 @@ export default function Garden() {
         returnKeyType="search"
       />
       {!!query && <Action label="Clear search" onPress={() => setQuery("")} />}
+      <Action label="My Spaces" onPress={() => router.push("/(tabs)/spaces")} />
       <CollectionState />
       {!data.guest && (
         <Action
