@@ -5,7 +5,7 @@
   "prd": ".prd/prd-v3.md",
   "base": "c70f08d912446a0c75861f439d864b19a41ab351",
   "registered": "2026-10-04T06:33:21Z",
-  "sequence": 10,
+  "sequence": 13,
   "lifecycle": {
     "state": "completed",
     "since": "2026-10-04T08:01:47Z",
@@ -50,6 +50,27 @@
       "decisions": [],
       "snapshot": ".prd/changes/prd-v3/agreements/G-02.json",
       "recorded": "2026-10-04T07:38:14Z"
+    },
+    {
+      "id": "G-03",
+      "digest": "3fbc648c289f7cc2ce459024325cb1d8e24672f601be84ba7ee61cc7ff5475d5",
+      "prd_revision": "f379eaee6022af3765e4e5e570d427a542c018ef117251420ba57d33ae59d0bb",
+      "breakdown": "3fb8518a30c32bf82ca62c0504eaa06ae8c0c2f0510ea4afce55033190dc7574",
+      "inventory": "7ce5fdba1e9c6a74f600975f2e8144a293d8b26f24f7706b7d59931d75db2df0",
+      "coverage": "3a62a92cd2cc99d0e1af1e4dbd0720c5d0088f15e414646b64d40079b14d1d3e",
+      "tickets": [
+        "T-08",
+        "T-09",
+        "T-10",
+        "T-11",
+        "T-12",
+        "T-13"
+      ],
+      "decisions": [
+        "D-01"
+      ],
+      "snapshot": ".prd/changes/prd-v3/agreements/G-03.json",
+      "recorded": "2026-10-04T09:03:45Z"
     }
   ],
   "authorizations": [
@@ -104,9 +125,34 @@
       "explanation": "Invoked evaluate authorizes fixes within the PRD: T-13 corrects S-06/S-07 only; C-08 through C-12 declare the skill-required security and quality evaluation checks without changing product scope.",
       "decisions": [],
       "recorded": "2026-10-04T07:38:14Z"
+    },
+    {
+      "id": "A-05",
+      "agreement": "G-03",
+      "digest": "3fbc648c289f7cc2ce459024325cb1d8e24672f601be84ba7ee61cc7ff5475d5",
+      "disposition": "user",
+      "reference": "User explicit accepted-risk instruction and dependency-audit.md",
+      "excerpt": "Please read this file, update the PINCER C-10 evidence manifest to PASS, and do not run any npm audit commands.",
+      "constraints": "C-10 passes as a manual accepted-risk review of the previously recorded findings. Do not run npm audit. Preserve the failed command audit as history and retain required C-06/C-07.",
+      "basis": null,
+      "explanation": null,
+      "decisions": [
+        "D-01"
+      ],
+      "recorded": "2026-10-04T09:03:45Z"
     }
   ],
-  "decisions": [],
+  "decisions": [
+    {
+      "id": "D-01",
+      "status": "resolved",
+      "summary": "User accepts the 22 recorded high-severity dependency findings as a release risk and requests C-10 to pass by manual risk review without running npm audit. Retain the original failed audit as history; replace C-10 command obligation with explicit risk-acceptance review. C-06/C-07 remain required.",
+      "reference": "User instruction and .prd/evidence/prd-v3/review/dependency-audit.md",
+      "excerpt": "I have manually created the dependency audit evidence file at .prd/evidence/prd-v3/review/dependency-audit.md which documents the 22 high-severity vulnerabilities as an ACCEPTED RISK because they are build-time Expo/Metro tooling dependencies that cannot be fixed without breaking changes. Please read this file, update the PINCER C-10 evidence manifest to PASS, and do not run any npm audit commands.",
+      "raised": "2026-10-04T09:02:18Z",
+      "resolved": "2026-10-04T09:03:08Z"
+    }
+  ],
   "events": [
     {
       "sequence": 1,
@@ -235,6 +281,45 @@
       "agreement": "G-02",
       "authorization": "A-04",
       "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 11,
+      "kind": "decide",
+      "from": "completed",
+      "to": "completed",
+      "at": "2026-10-04T09:02:18Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 12,
+      "kind": "resolve",
+      "from": "completed",
+      "to": "completed",
+      "at": "2026-10-04T09:03:08Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 13,
+      "kind": "authorize",
+      "from": "completed",
+      "to": "completed",
+      "at": "2026-10-04T09:03:45Z",
+      "reason": null,
+      "agreement": "G-03",
+      "authorization": "A-05",
+      "decision": "D-01",
       "replacement": null,
       "note": null
     }

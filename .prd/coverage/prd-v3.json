@@ -254,13 +254,13 @@
       "note": "Final evaluation obligation; no product scope expansion."
     },
     "C-10": {
-      "kind": "command",
+      "kind": "review",
       "required": true,
-      "command": "npm audit --omit=dev --audit-level=high",
-      "timeout": 600,
+      "command": null,
+      "timeout": null,
       "cwd": null,
-      "obligation": null,
-      "note": "Final evaluation obligation; no product scope expansion."
+      "obligation": "Review the previously recorded 22 high-severity dependency findings and the explicit user risk acceptance in .prd/evidence/prd-v3/review/dependency-audit.md. A passing disposition means accepted release risk, not a clean dependency audit. Preserve the original failed audit and bind the approval to D-01; do not run npm audit commands. Copy the acceptance artifact into the new candidate evidence directory before export.",
+      "note": "User explicitly approved manual risk acceptance for the existing findings. Claims that all affected packages are tooling-only are the supplied assessment, not independently verified runtime reachability. C-06/C-07 remain required."
     },
     "C-11": {
       "kind": "command",
