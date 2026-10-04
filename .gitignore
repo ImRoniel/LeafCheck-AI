@@ -100,3 +100,7 @@ AGENTS.md
 
 # pincer runtime state (added by pincer init)
 .pincer/
+
+#android and ios build artifacts
+android/
+ios/
