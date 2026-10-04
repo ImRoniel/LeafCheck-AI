@@ -203,7 +203,7 @@ export default function Camera() {
       const controller = new AbortController();
       validationController.current = controller;
       setValidating(true);
-      const validation = await validatePreScan(result.uri, controller.signal);
+      const validation = await validatePreScan(result, controller.signal);
       if (!alive.current || token !== generation.current || !enabledRef.current)
         return;
       validationController.current = null;

@@ -7,7 +7,7 @@ import { createScanFlow } from "../../services/scan-flow";
 import * as errors from "../../services/errors";
 import * as scanErrors from "../../services/scan-errors";
 import type { Plant, ScanRequest, ScanResponse } from "../../types";
-import type { PreScanResult } from "../../types/pre-scan-validation";
+import type { CapturedImageMetadata, PreScanResult } from "../../types/pre-scan-validation";
 
 export function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -23,8 +23,8 @@ export const report: ScanResponse = {
   telemetry: null, careTasks: [], notification: null,
 };
 export const plant: Plant = { id: "flower", name: "Flower", species: "Rose", healthStatus: "healthy", createdAt: "2026-10-03T00:00:00Z", updatedAt: "2026-10-03T00:00:00Z" };
-export const picture = { uri: "memory:flower", base64: "synthetic-image" };
-type Picture = { uri: string; base64?: string };
+export const picture = { uri: "memory:flower", base64: "synthetic-image", width: 640, height: 480 };
+type Picture = { uri: string; base64?: string; width?: number; height?: number };
 type Props = Record<string, unknown> & { children?: React.ReactNode };
 export type Element = React.ReactElement<Props>;
 type Effect = { deps?: readonly unknown[]; cleanup?: () => void };
@@ -62,7 +62,7 @@ export function scannerHarness() {
   const validationSignals: AbortSignal[] = [];
   const behavior = {
     picture: async (): Promise<Picture> => picture,
-    validate: async (_uri: string, _signal?: AbortSignal): Promise<PreScanResult> => ({ valid: true, reason: "ok", guidance: "" }),
+    validate: async (_image: CapturedImageMetadata, _signal?: AbortSignal): Promise<PreScanResult> => ({ valid: true, reason: "ok", guidance: "" }),
     scan: async (_request: ScanRequest): Promise<ScanResponse> => report,
     update: async () => ({ id: "flower", healthStatus: "healthy" as const }),
     fetch: async (): Promise<Plant> => plant,
@@ -162,10 +162,10 @@ export function scannerHarness() {
         if (name.endsWith("services/scan-flow")) return { createScanFlow: () => flow };
         if (name.endsWith("services/errors")) return errors;
         if (name.endsWith("services/scan-errors")) return scanErrors;
-        if (name.endsWith("services/pre-scan-validation")) return { validatePreScan: (uri: string, signal?: AbortSignal) => {
+        if (name.endsWith("services/pre-scan-validation")) return { validatePreScan: (image: CapturedImageMetadata, signal?: AbortSignal) => {
           validations++;
           if (signal) validationSignals.push(signal);
-          return behavior.validate(uri, signal);
+          return behavior.validate(image, signal);
         } };
         if (name === "expo-camera") return { CameraView: "CameraView", useCameraPermissions: () => [permission, () => behavior.permission()] };
         if (name === "expo-haptics") return { NotificationFeedbackType: { Success: "success" }, notificationAsync: async () => { haptics++; } };

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { deferred, picture, scannerHarness } from "./helpers/scanner-harness";
+import { validatePreScan } from "../services/pre-scan-validation";
 import type { PreScanResult } from "../types/pre-scan-validation";
 
 const pass: PreScanResult = { valid: true, reason: "ok", guidance: "" };
@@ -17,7 +18,7 @@ test("scanner waits for validation, locks duplicate taps and submits a passing c
   h.unmount();
 });
 
-for (const reason of ["blur", "underexposed", "overexposed", "screen", "printed_photo", "invalid_image", "validation_unavailable", "validation_timeout"] as const) {
+for (const reason of ["image_too_small", "low_resolution", "invalid_image", "cancelled"] as const) {
   test(`${reason} never uploads and retake clears feedback`, async () => {
     const h = scannerHarness();
     h.behavior.validate = async () => ({ valid: false, reason, guidance: `Retake: ${reason}` });
@@ -61,3 +62,23 @@ test("old validation cannot overwrite or unlock a new capture session", async ()
   h.behavior.validate = async () => pass; fresh.resolve(picture); await h.settle();
   assert.equal(h.requests.length, 1); h.unmount();
 });
+
+for (const invalid of ["small_file", "small_dimensions", "missing_dimensions"] as const) {
+  test(`real JS scanner validator rejects ${invalid} before upload`, async () => {
+    const h = scannerHarness();
+    h.behavior.validate = validatePreScan;
+    h.behavior.picture = async () => ({ uri: "file:///cache/photo.jpg",
+      base64: Buffer.alloc(invalid === "small_file" ? 1024 : 60 * 1024).toString("base64"),
+      width: invalid === "small_dimensions" ? 100 : invalid === "missing_dimensions" ? undefined : 640,
+      height: 480,
+    });
+    h.ready(); h.press("Capture and scan plant"); await h.settle();
+    assert.equal(h.requests.length, 0); assert.ok(h.button("Try another photo"));
+    h.press("Try another photo");
+    h.behavior.picture = async () => ({ uri: "file:///cache/photo.jpg", width: 640, height: 480,
+      base64: Buffer.alloc(60 * 1024).toString("base64") });
+    h.ready(); h.press("Capture and scan plant"); await h.settle();
+    assert.equal(h.requests.length, 1); assert.equal(h.flow.getState().phase, "complete");
+    h.unmount();
+  });
+}
