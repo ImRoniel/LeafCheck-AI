@@ -1,0 +1,183 @@
+{
+  "schema": 3,
+  "runtime": 3,
+  "change": "prd-v3",
+  "prd": ".prd/prd-v3.md",
+  "base": "c70f08d912446a0c75861f439d864b19a41ab351",
+  "registered": "2026-10-04T06:33:21Z",
+  "sequence": 7,
+  "lifecycle": {
+    "state": "completed",
+    "since": "2026-10-04T07:24:14Z",
+    "reason": null,
+    "note": null,
+    "superseded_by": null
+  },
+  "agreements": [
+    {
+      "id": "G-01",
+      "digest": "ad941e05fae0496eaadacc26594df8e2b45124676acd7db23e2b40884fdc8c4f",
+      "prd_revision": "f379eaee6022af3765e4e5e570d427a542c018ef117251420ba57d33ae59d0bb",
+      "breakdown": "a4bb9ebd4dafbacdc32da54b430e6f8ea3658b9d25f5325dda8533289892f018",
+      "inventory": "7ce5fdba1e9c6a74f600975f2e8144a293d8b26f24f7706b7d59931d75db2df0",
+      "coverage": "7d544a6c8a5317210b3333716c8e830503a28bcb0456980f5ed6db0ca6f8c810",
+      "tickets": [
+        "T-08",
+        "T-09",
+        "T-10",
+        "T-11",
+        "T-12"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v3/agreements/G-01.json",
+      "recorded": "2026-10-04T06:34:56Z"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "A-01",
+      "agreement": "G-01",
+      "digest": "ad941e05fae0496eaadacc26594df8e2b45124676acd7db23e2b40884fdc8c4f",
+      "disposition": "user",
+      "reference": "User invoked pincer-narrow immediately after the PRD v3 draft and proposed rescan/default-reminder architecture were presented in this conversation.",
+      "excerpt": "$pincer-narrow",
+      "constraints": "Authorize the PRD v3 ticket breakdown under the invoked narrow workflow. Implementation starts on a subsequent user request such as pincer-code. Preserve the project rule requiring an explicit request before git commits.",
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-04T06:36:11Z"
+    },
+    {
+      "id": "A-02",
+      "agreement": "G-01",
+      "digest": "ad941e05fae0496eaadacc26594df8e2b45124676acd7db23e2b40884fdc8c4f",
+      "disposition": "user",
+      "reference": "User invoked pincer-code after the PRD v3 ticket breakdown was presented in this conversation.",
+      "excerpt": "$pincer-code",
+      "constraints": "Implement and verify the approved PRD v3 tickets sequentially. Preserve the explicit project no-commit rule. Required device/browser and visual obligations remain for evaluation.",
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-04T07:16:09Z"
+    },
+    {
+      "id": "A-03",
+      "agreement": "G-01",
+      "digest": "ad941e05fae0496eaadacc26594df8e2b45124676acd7db23e2b40884fdc8c4f",
+      "disposition": "user",
+      "reference": "User reply approving commits and evaluation",
+      "excerpt": "yes you can commit it to complete the implementation and workflow recodrs",
+      "constraints": "Commit the completed implementation, workflow records and evaluation evidence; retain agreed feature scope.",
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-04T07:30:19Z"
+    }
+  ],
+  "decisions": [],
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "register",
+      "from": null,
+      "to": "planned",
+      "at": "2026-10-04T06:33:21Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 2,
+      "kind": "adopt",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-04T06:34:56Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 3,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-04T06:36:11Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 4,
+      "kind": "activate",
+      "from": "planned",
+      "to": "active",
+      "at": "2026-10-04T06:39:00Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 5,
+      "kind": "authorize",
+      "from": "active",
+      "to": "active",
+      "at": "2026-10-04T07:16:09Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 6,
+      "kind": "complete",
+      "from": "active",
+      "to": "completed",
+      "at": "2026-10-04T07:24:14Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 7,
+      "kind": "authorize",
+      "from": "completed",
+      "to": "completed",
+      "at": "2026-10-04T07:30:19Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-03",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    }
+  ],
+  "evaluations": [],
+  "legacy": {
+    "receipts": {},
+    "authorization_text": null,
+    "migrated_from": null,
+    "migrated": null
+  },
+  "coverage": {
+    "map": ".prd/coverage/prd-v3.json",
+    "adopted": "2026-10-04T06:34:56Z",
+    "agreement": "G-01"
+  }
+}

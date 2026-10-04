@@ -7,6 +7,7 @@
     "dev:watch": "node --watch --import tsx/esm src/server.ts",
     "build": "npm run db:generate:all && tsc && node scripts/package-prisma-client.mjs",
     "test": "node --import tsx/esm --experimental-test-module-mocks --test tests/*.test.mjs",
+    "test:scan-persistence": "node scripts/test-scan-persistence.mjs",
     "start": "node dist/server.js",
     "db:generate": "prisma generate --schema=prisma/schema.prisma",
     "db:push": "prisma db push --schema=prisma/schema.prisma",
@@ -24,7 +25,8 @@
     "express-rate-limit": "^8.7.0",
     "hash-wasm": "^4.12.0",
     "helmet": "^8.3.0",
-    "jose": "^6.2.12"
+    "jose": "^6.2.12",
+    "tasknotes-nlp-core": "0.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

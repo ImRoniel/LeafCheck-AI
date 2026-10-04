@@ -465,11 +465,21 @@ export default function Camera() {
             </>
           )}
           {flow.phase === "complete" && (
-            <View style={s.successBanner}>
-              <Text style={s.successText}>
-                ✅ Plant saved and health synchronized
-              </Text>
-            </View>
+            <>
+              <View style={s.successBanner}>
+                <Text style={s.successText}>
+                  {`Plant saved. ${report.careTasks.length} care ${report.careTasks.length === 1 ? "task" : "tasks"} added.`}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open Care Tasks"
+                style={s.secondaryButton}
+                onPress={() => router.push("/(tabs)/tasks")}
+              >
+                <Text style={s.secondaryButtonText}>Open Care Tasks</Text>
+              </Pressable>
+            </>
           )}
           <Pressable
             style={s.primaryButton}

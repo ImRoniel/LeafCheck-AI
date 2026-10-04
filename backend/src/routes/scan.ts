@@ -5,17 +5,12 @@
 //
 // Orchestrates the scan-first diagnostic flow:
 //   1. Pl@ntNet  → identify species from image
-//   2. Auto-create Plant if none provided
-//   3. Save PlantIdentification record in PostgreSQL
-//   4. Parallel  → Promise.all([PlantSpecCache lookup, latest SensorReading])
-//      4a. Cache miss → Perenual API fetch → insert PlantSpecCache
-//      4b. MongoDB  → findFirst SensorReading for device
-//   5. Freshness → calculate age of telemetry data
-//   6. Gemini    → structured prompt producing:
-//        - Diagnostic report  → saved to AIAnalysis (archive)
-//        - Notification time  → stored in AIAnalysis
-//        - Care tasks         → saved to CareTask table
-//   7. Return    → full diagnostic report to client
+//   2. Resolve owned plant context without creating a new plant yet
+//   3. Parallel species-spec cache/Perenual lookup and optional MongoDB telemetry
+//   4. Gemini → image + references + telemetry freshness → JSON report
+//   5. Parse report Care actions through tasknotes-nlp-core; validate mapped tasks
+//   6. PostgreSQL transaction → plant + identification + analysis + tasks + health
+//   7. Return saved report and tasks for garden/task-screen synchronization
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Request, Response, Router } from "express";
@@ -28,7 +23,10 @@ import { identifyPlant } from "../lib/plantnet.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import { validateScanImage } from "../lib/scan-input.js";
-import { validateScanOutput } from "../lib/scan-output.js";
+import { validateScanEnvelope, validateScanOutput } from "../lib/scan-output.js";
+import { reportCareTasks } from "../lib/report-care-tasks.js";
+import { persistScan } from "../lib/scan-persistence.js";
+import type { Prisma } from "../generated/postgres-client/index.js";
 import type { ScanRequest } from "../types/scan.js";
 
 export const scanRouter = Router();
@@ -243,7 +241,8 @@ Actual Sensor Readings (from ESP32 hardware):
 Data Freshness: ${freshnessContext}`
       : `\n${freshnessContext}`;
 
-    const currentTime = new Date().toISOString();
+    const scanTime = new Date();
+    const currentTime = scanTime.toISOString();
     const prompt = `You are an expert plant pathologist and agronomist AI for the LeafCheck smart plant care system.
 Current UTC Time: ${currentTime}
 
@@ -257,23 +256,15 @@ Analyze the provided plant image along with the environmental data. Compare actu
 You MUST respond with a valid JSON object with exactly this structure (no markdown, no code fences, just raw JSON):
 {
   "healthStatus": "healthy" | "warning" | "critical",
-  "diagnosticReport": "A detailed personalized diagnostic report as a single string. Include: 1) Overall health assessment, 2) Specific diagnoses with confidence and severity, 3) Environmental assessment comparing actual vs ideal conditions, 4) Detailed care recommendations. Be thorough, evidence-based, and actionable.",
-  "careTasks": [
-    {
-      "title": "Short task title",
-      "taskType": "WATERING" | "FERTILIZING" | "PRUNING" | "REPOTTING" | "PEST_CONTROL" | "LIGHT_ADJUSTMENT" | "OTHER",
-      "description": "Detailed description of what the user needs to do",
-      "urgency": "routine" | "immediate" | "urgent",
-      "dueDate": "ISO 8601 date-time for when this task is due, calculated from the current time based on your plant health assessment"
-    }
-  ],
+  "diagnosticReport": "A personalized report as a single string with health assessment, diagnoses with confidence/severity, environmental assessment and care recommendations. Finish with exactly one Care actions section as specified below.",
   "notification": {
     "notifyAt": "ISO 8601 date-time for when the user should be notified to check on this plant next, based on your diagnosis",
     "reason": "Why the user should check on the plant at that time"
   }
 }
 
-Generate at least 1 and at most 5 care tasks. The tasks should be specific, actionable manual care steps the user must perform. Calculate realistic due dates based on the urgency of each issue.
+In diagnosticReport, put the heading "Care actions:" on its own line, followed by 1 to 5 dash bullets. Each bullet must contain one short English manual action beginning with a verb (Check, Inspect, Water, Move, Review, etc.). Preserve conditions: prefer "Check soil moisture; water only if dry" over unconditional watering when moisture is unknown. Include "on YYYY-MM-DD at HH:mm UTC" using a realistic absolute future date based on the Current UTC Time above. Optional urgency is written "Urgency: routine", "Urgency: immediate" or "Urgency: urgent". For example: "- Inspect the undersides of leaves on YYYY-MM-DD at HH:mm UTC. Urgency: routine" (replace placeholders with real dates).
+Use no nested bullets, recurrence syntax, tags, or separate careTasks JSON field. Keep each title short and each action self-contained, with no diagnosis prose under Care actions. Never turn an instruction not to treat into an affirmative treatment.
 For the notification, determine the optimal time to remind the user to re-check based on the overall health status and most urgent concern.
 If sensor data is stale or unavailable, note this limitation in your assessment.`;
 
@@ -298,6 +289,7 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
 
     // Parse the structured JSON from Gemini
     let geminiOutput: unknown;
+    let structuredReport = true;
     try {
       // Strip markdown code fences if Gemini wraps them
       const cleaned = rawText
@@ -306,6 +298,7 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
         .trim();
       geminiOutput = JSON.parse(cleaned);
     } catch {
+      structuredReport = false;
       // Fallback: extract from the raw text heuristically
       console.warn(
         "[Scan] Gemini did not return valid JSON. Using heuristic fallback.",
@@ -321,16 +314,6 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
             ? "warning"
             : "healthy",
         diagnosticReport: rawText,
-        careTasks: [
-          {
-            title: "Review plant health",
-            taskType: "OTHER",
-            description:
-              "The AI analysis has been completed. Review the diagnostic report and take appropriate action.",
-            urgency: "routine",
-            dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          },
-        ],
         notification: {
           notifyAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
           reason: "Routine follow-up check recommended.",
@@ -338,112 +321,36 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
       };
     }
 
-    validateScanOutput(geminiOutput);
-    // Validate health status
-    const healthStatus = ["healthy", "warning", "critical"].includes(
-      geminiOutput.healthStatus,
-    )
-      ? geminiOutput.healthStatus
-      : "healthy";
-
-    if (!plantId) {
-      // Scan-first: auto-create plant from identification
-      const newPlant = await prismaPg.plant.create({
-        data: {
-          name:
-            identification.commonName ??
-            identification.speciesName.split(" ")[0],
-          species: identification.speciesName,
-          location: location?.trim() || undefined,
-          userId,
-          healthStatus: "unknown",
-          imageUrl: undefined,
-          lastScannedAt: new Date(),
-        },
-        select: { id: true, name: true, species: true, deviceId: true },
-      });
-      plant = newPlant;
-      console.log("[Scan] Auto-created plant id=%s", plant.id);
-    }
-
-    // ── Step 3: Save identification to PostgreSQL ─────────────────────────
-    await prismaPg.plantIdentification.create({
-      data: {
-        plantId: plant.id,
+    validateScanEnvelope(geminiOutput);
+    // Ignore any provider careTasks field: the report is the sole task source.
+    const output = {
+      healthStatus: geminiOutput.healthStatus,
+      diagnosticReport: geminiOutput.diagnosticReport,
+      notification: geminiOutput.notification,
+      careTasks: reportCareTasks(structuredReport ? geminiOutput.diagnosticReport : "Unstructured report requires review.", scanTime),
+    };
+    validateScanOutput(output);
+    const healthStatus = output.healthStatus;
+    const saved = await persistScan(prismaPg, {
+      userId, plantId,
+      name: identification.commonName ?? identification.speciesName.split(" ")[0],
+      species: identification.speciesName,
+      location: location?.trim() || undefined,
+      scanTime, output,
+      identification: {
         speciesName: identification.speciesName,
         commonName: identification.commonName,
         confidence: identification.confidence,
-        rawResponse: identification.rawResponse as object,
+        rawResponse: identification.rawResponse as Prisma.InputJsonValue,
       },
+      telemetrySnapshot: latestReading
+        ? JSON.parse(JSON.stringify(latestReading)) as Prisma.InputJsonValue : undefined,
+      idealSpecs: specs
+        ? JSON.parse(JSON.stringify(specs)) as Prisma.InputJsonValue : undefined,
     });
-
-    // ── Step 7: Save AIAnalysis to PostgreSQL (Archive) ───────────────────
-    const analysis = await prismaPg.aIAnalysis.create({
-      data: {
-        plantId: plant.id,
-        userId,
-        healthStatus,
-        diagnoses: [],
-        recommendations: [],
-        rawAnalysisText: geminiOutput.diagnosticReport || rawText,
-        speciesName: identification.speciesName,
-        telemetrySnapshot: latestReading
-          ? (JSON.parse(JSON.stringify(latestReading)) as object)
-          : undefined,
-        idealSpecs: specs
-          ? (JSON.parse(JSON.stringify(specs)) as object)
-          : undefined,
-        notificationTime: geminiOutput.notification?.notifyAt
-          ? new Date(geminiOutput.notification.notifyAt)
-          : undefined,
-        notificationReason: geminiOutput.notification?.reason ?? undefined,
-        isArchived: true,
-        archivedAt: new Date(),
-      },
-    });
-    console.log(
-      "[Scan] Step 7: Saved AIAnalysis id=%s (archived)",
-      analysis.id,
-    );
-
-    // ── Step 8: Create CareTask records ───────────────────────────────────
-    const tasks = geminiOutput.careTasks ?? [];
-    const validTasks = tasks.map((task) => ({
-      title: task.title,
-      taskType: task.taskType,
-      description: task.description,
-      urgency: task.urgency,
-      dueDate: task.dueDate,
-    }));
-
-    if (prismaPg.careTask && validTasks.length > 0) {
-      await prismaPg.careTask.createMany({
-        data: validTasks.map((task) => ({
-          plantId: plant.id,
-          userId,
-          analysisId: analysis.id,
-          title: task.title,
-          taskType: task.taskType || "OTHER",
-          description: task.description || "",
-          urgency: task.urgency || "routine",
-          status: "PENDING",
-          dueDate: new Date(task.dueDate),
-        })),
-      });
-      console.log("[Scan] Step 8: Created %d care tasks.", validTasks.length);
-    }
-
-    // ── Step 9: Update plant health + lastScannedAt ───────────────────────
-    if (prismaPg.plant?.update) {
-      await prismaPg.plant.update({
-        where: { id: plant.id, userId },
-        data: {
-          healthStatus,
-          lastScannedAt: new Date(),
-          species: identification.speciesName,
-        },
-      });
-    }
+    plant = saved.plant;
+    const analysis = saved.analysis;
+    const validTasks = saved.careTasks;
 
     // ── Step 10: Return to client ─────────────────────────────────────────
     res.status(201).json({
@@ -461,7 +368,7 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
       diagnostic: {
         id: analysis.id,
         healthStatus,
-        rawAnalysisText: geminiOutput.diagnosticReport || rawText,
+        rawAnalysisText: output.diagnosticReport,
         telemetryFreshness: freshnessContext,
       },
       telemetry: latestReading
@@ -475,8 +382,8 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
         : null,
       careTasks: validTasks,
       notification: {
-        notifyAt: geminiOutput.notification.notifyAt,
-        reason: geminiOutput.notification.reason,
+        notifyAt: output.notification.notifyAt,
+        reason: output.notification.reason,
       },
     });
   } catch (error: unknown) {

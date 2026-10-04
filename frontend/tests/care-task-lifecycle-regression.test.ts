@@ -51,6 +51,35 @@ runInNewContext(
 const harness = fixture.harness!;
 const task = fixture.task!;
 
+test("focus and fresh client session restore account task status from authoritative GET", async () => {
+  const h = harness();
+  h.render();
+  await h.polls.at(-1)!.publish([task("generated")]);
+  const mutation = h.render().update("generated", true);
+  h.render();
+  const persisted = task("generated", "COMPLETED");
+  h.mutations[0].resolve(persisted);
+  await mutation;
+  h.focus(false); h.render();
+  const previous = h.polls.length;
+  h.focus(true); h.render();
+  assert.ok(h.polls.length > previous);
+  await h.polls.at(-1)!.publish([persisted]);
+  assert.equal(h.render().tasks[0].status, "COMPLETED");
+  h.dispose();
+  const fresh = harness();
+  assert.equal(fresh.render().tasks.length, 0);
+  await fresh.polls.at(-1)!.publish([persisted]);
+  assert.equal(fresh.render().tasks[0].id, "generated");
+  assert.equal(fresh.render().tasks[0].status, "COMPLETED");
+  const undo = fresh.render().update("generated", false);
+  fresh.render();
+  fresh.mutations[0].resolve(task("generated"));
+  await undo;
+  assert.equal(fresh.render().tasks[0].status, "PENDING");
+  fresh.dispose();
+});
+
 test("authoritative GET retires confirmed overlays, including after another failed reload", async () => {
   const h = harness();
   h.render();

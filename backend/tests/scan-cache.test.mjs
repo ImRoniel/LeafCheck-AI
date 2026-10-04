@@ -31,6 +31,16 @@ let latestReading;
 let telemetryReads;
 let responseText;
 let guidanceQueries;
+let taskWrites;
+let identificationWrites;
+let healthWrites;
+let writeOrder;
+let writeFailure;
+const captureWrite = (stage, data) => {
+  writeOrder.push(stage);
+  if (writeFailure === stage) throw new Error("private persistence detail");
+  return data;
+};
 const originalKey = process.env.GEMINI_API_KEY;
 
 before(async () => {
@@ -46,8 +56,17 @@ before(async () => {
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
     namedExports: {
       prismaPg: {
+        $transaction: async function (operation) {
+          const snapshot = { plantCreates, analyses: [...analyses], taskWrites: [...taskWrites], identificationWrites: [...identificationWrites], healthWrites: [...healthWrites] };
+          try { return await operation(this); }
+          catch (error) {
+            ({ plantCreates, analyses, taskWrites, identificationWrites, healthWrites } = snapshot);
+            throw error;
+          }
+        },
         plant: {
-          create: async () => {
+          create: async ({ data }) => {
+            captureWrite("plant", data);
             plantCreates++;
             return {
               id: "new-plant",
@@ -59,11 +78,20 @@ before(async () => {
           findFirst: async () => plantOwned ? ({
             id: "00000000-0000-4000-8000-000000000001",
             userId: "owner",
+            name: "Basil",
+            species: speciesName,
             deviceId: linkedDevice,
           }) : null,
+          update: async ({ data }) => {
+            healthWrites.push(captureWrite("health", data));
+            return data;
+          },
         },
         device: { findFirst: async ({ where }) => deviceOwned ? { id: where.id, userId: "owner" } : null },
-        plantIdentification: { create: async () => ({ id: "identification" }) },
+        plantIdentification: { create: async ({ data }) => {
+          identificationWrites.push(captureWrite("identification", data));
+          return { id: "identification" };
+        } },
         plantSpecCache: {
           findUnique: async (args) => {
             reads.push(args);
@@ -75,15 +103,18 @@ before(async () => {
           },
         },
         aIAnalysis: {
-          findMany: async (query) => { guidanceQueries.push(query); return []; },
+          findMany: async (query) => { guidanceQueries.push(query); return analyses.map((data, index) => ({ id: `analysis-${index + 1}`, ...data })); },
           create: async ({ data }) => {
-            analyses.push(data);
+            analyses.push(captureWrite("analysis", data));
             return { id: `analysis-${analyses.length}` };
           },
         },
         careTask: {
-          findMany: async (query) => { guidanceQueries.push(query); return []; },
-          createMany: async () => ({ count: 1 }),
+          findMany: async (query) => { guidanceQueries.push(query); return taskWrites.map((data, index) => ({ id: `task-${index + 1}`, ...data })); },
+          create: async ({ data }) => {
+            taskWrites.push(captureWrite("tasks", data));
+            return { id: `task-${taskWrites.length}`, ...data };
+          },
         },
       },
     },
@@ -152,6 +183,11 @@ beforeEach(() => {
   telemetryReads = 0;
   responseText = "healthy";
   guidanceQueries = [];
+  taskWrites = [];
+  identificationWrites = [];
+  healthWrites = [];
+  writeOrder = [];
+  writeFailure = null;
   perenualData = {
     speciesName,
     commonName: "Basil",
@@ -192,6 +228,53 @@ test("cache hit skips Perenual and insertion", async () => {
   assert.equal(inserts.length, 0);
   assert.deepEqual(analyses[0].idealSpecs, winner);
 });
+
+test("saved task fields match the public response and trusted scan ownership", async () => {
+  const diagnosticReport = "Inspect leaves.\nCare actions:\n- Inspect leaves on 2027-01-01 at 09:00 UTC\n- Check soil moisture; water only if dry on 2027-01-02 at 10:00 UTC";
+  responseText = JSON.stringify({ healthStatus: "warning", diagnosticReport, careTasks: [{ title: "Contradictory provider task" }], notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" } });
+  const result = await scan(true);
+  assert.equal(result.status, 201);
+  assert.equal(result.body.careTasks.length, 2);
+  assert.equal(result.body.careTasks[0].title, "Inspect leaves");
+  assert.match(result.body.careTasks[1].description, /only if dry/);
+  assert.equal(result.body.diagnostic.rawAnalysisText, diagnosticReport);
+  assert.equal(analyses[0].rawAnalysisText, diagnosticReport);
+  assert.deepEqual(result.body.notification, { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" });
+  assert.deepEqual(taskWrites, result.body.careTasks.map((task) => ({ ...task, dueDate: new Date(task.dueDate), plantId: "new-plant", userId: "owner", analysisId: result.body.diagnostic.id, status: "PENDING" })));
+  assert.deepEqual(writeOrder, ["plant", "identification", "analysis", "tasks", "tasks", "health"]);
+  assert.equal(identificationWrites[0].plantId, "new-plant");
+  assert.equal(healthWrites[0].healthStatus, "warning");
+  assert.equal((await scan()).status, 201);
+  assert.equal(plantCreates, 1);
+  const loadedTasks = await (await fetch(`${baseUrl}/api/scan/tasks`)).json();
+  assert.equal(loadedTasks.length, 4);
+  assert.equal(loadedTasks[0].title, result.body.careTasks[0].title);
+  const archives = await (await fetch(`${baseUrl}/api/scan/archives`)).json();
+  assert.equal(archives[0].rawAnalysisText, diagnosticReport);
+});
+
+test("report without actions always writes one review task regardless of provider task array", async () => {
+  responseText = JSON.stringify({ healthStatus: "healthy", diagnosticReport: "Healthy plant.", careTasks: [], notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" } });
+  assert.equal((await scan()).status, 201);
+  assert.equal(taskWrites.length, 1);
+  assert.equal(taskWrites[0].title, "Review plant health");
+  assert.equal(healthWrites.length, 1);
+});
+
+for (const stage of ["plant", "identification", "analysis", "tasks", "health"]) {
+  test(`failure at ${stage} is sanitized and rolls back all scan writes`, async () => {
+    writeFailure = stage;
+    const result = await scan(true);
+    assert.equal(result.status, 500);
+    assert.equal(result.body.code, "SCAN_FAILED");
+    assert.doesNotMatch(JSON.stringify(result.body), /private persistence/);
+    assert.equal(plantCreates, 0);
+    assert.equal(analyses.length, 0);
+    assert.equal(identificationWrites.length, 0);
+    assert.equal(taskWrites.length, 0);
+    assert.equal(healthWrites.length, 0);
+  });
+}
 
 test("plant guidance is filtered by the owned plant before limiting history", async () => {
   const plantId = "00000000-0000-4000-8000-000000000001";
@@ -264,8 +347,8 @@ test("malformed AI structures fail safely before creating plants or analyses", a
     notification: { notifyAt: new Date().toISOString(), reason: "Follow up" },
   };
   for (const output of [null, [], {}, { ...valid, healthStatus: ["healthy"] },
-    { ...valid, diagnosticReport: {} }, { ...valid, careTasks: "water" },
-    { ...valid, careTasks: [null] }, { ...valid, notification: { notifyAt: "invalid", reason: "x" } },
+    { ...valid, diagnosticReport: {} }, { ...valid, diagnosticReport: "x".repeat(50001) },
+    { ...valid, notification: { notifyAt: "invalid", reason: "x" } },
   ]) {
     responseText = JSON.stringify(output);
     const result = await scan(true);
