@@ -44,8 +44,9 @@ test("absolute dates and default reminders ignore ambient timezone and relative 
     ["on 2027-01-01", "2027-01-01T09:00:00.000Z"],
     ["on 2026-10-05 at 00:00 UTC", "2026-10-05T00:00:00.000Z"],
     ["on 2027-01-01T12:34:56Z", "2027-01-01T12:34:56.000Z"],
+    ["on 2027-01-01 at 09:00 UTC only if dry", "2027-01-01T09:00:00.000Z"],
   ]) assert.equal(reportCareTasks(report(`- Check soil ${suffix}`), now)[0].dueDate, expected);
-  for (const suffix of ["", "tomorrow", "on 11/06/2026", "on 2026-02-30", "on 2026-10-01", "on 2027-01-01 at 29:00 UTC", "on 2027-01-01T09:00:00+08:00", "on 2027-01-01 at 09:00 PM", "on 2027-01-01 at 09:00 PDT", "on 2027-01-01 at 09:00:30 UTC", "every week", "on 2027-01-01 or 2027-01-02"]) {
+  for (const suffix of ["", "tomorrow", "on 11/06/2026", "on 2026-02-30", "on 2026-10-01", "on 2027-01-01 at 29:00 UTC", "on 2027-01-01T09:00:00+08:00", "on 2027-01-01 at 09:00 PM", "on 2027-01-01 at 09:00 PDT", "on 2027-01-01 at 09:00 CET", "on 2027-01-01 at 09:00 +0800", "on 2027-01-01 at 09:00 UTC+8", "on 2027-01-01 at 09:00 Europe/Paris", "on 2027-01-01 at 09:00:30 UTC", "every week", "on 2027-01-01 or 2027-01-02"]) {
     const task = reportCareTasks(report(`- Check soil ${suffix}`), now)[0];
     assert.equal(task.dueDate, "2026-10-05T23:30:00.000Z", suffix);
     assert.match(task.description, /Default reminder/);

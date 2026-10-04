@@ -45,9 +45,10 @@ function deadline(text: string, now: Date): { date: string; defaulted: boolean }
   const due = new Date(iso);
   // Round trip rejects impossible calendar dates and out-of-range times.
   if (!Number.isFinite(due.getTime()) || due.toISOString() !== iso || due <= now) return fallback;
-  // Reject partial matches to unsupported timezones or malformed explicit times.
+  // A scheduling match must end or continue with ordinary care prose. Unknown
+  // suffixes (including zones/offsets) cannot silently inherit the UTC policy.
   const after = text.slice(date.index! + date[0].length);
-  if (/^(?:T|:|\s+(?:at\s+)?\d|\s*[+-]\d{2}:|\s*(?:a\.?m\.?|p\.?m\.?|GMT|PST|PDT|EST|EDT|CST|CDT|MST|MDT)\b)/i.test(after)) return fallback;
+  if (after && !/^(?:\s*$|[.,;!?)](?:\s|$)|\s+(?:if|when|only|once|unless|after|before|until|and|with|to|for)\b)/i.test(after)) return fallback;
   return { date: iso, defaulted: false };
 }
 
