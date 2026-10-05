@@ -1,6 +1,6 @@
 # PRD v3 frontend device verification
 
-Date: 2026-10-05. Platform: Linux, Node 22.23.3; Expo web/Metro with the existing frontend dependencies. No commits were requested or created.
+Date: 2026-10-05. Automated platform: Linux, Node 22.23.3; Expo web/Metro with the existing frontend dependencies. Implementation was committed as `d53445a`. The user subsequently authorized committing T-12 and finalizing PRD v3.
 
 ## Automated observations
 
@@ -19,32 +19,38 @@ T-09 initially failed because the existing activity harness read a frontend-rela
 
 The integration harness initially produced repeated collection hydration because its useCallback mock did not preserve dependencies. The mock now matches React callback memoization, and the integration waits for initial provider hydration before measuring profile requests. Updating AppData also required the existing spaces/claim provider harnesses to supply the real validator module. No assertions were suppressed. The full suite subsequently passed.
 
-## Local Expo observations and limits
+## Initial agent Expo observations and limits
 
 The frontend's existing `.env` supplies EXPO_PUBLIC_API_URL. Its configured backend's `/health` returned HTTP 200 on a read-only request. No credentials were printed and no live claim/pair mutation was performed.
 
 `CI=1 npm run web --workspace=frontend -- --port 8081` could not start inside the sandbox (port probing reported an unusable port). The approved retry, `CI=1 npm run web --workspace=frontend -- --port 8087`, started Metro at http://localhost:8087. A read-only request to `/plant-profile` returned HTTP 200. Expo reported web bundling of expo-router/entry.js (1129 modules) and server bundling (1106 modules). Version validation used Expo's local dependency map because networking was disabled; bundling completed. These observations prove startup/bundling only.
 
-No browser executable, browser automation tool or native Expo client was available. Two authenticated test accounts and a device MAC with readings were not provided. The live environment question remains unanswered. A backend health response and controlled HTTP fixtures do not establish actual account/device state or prove live navigation.
+During the initial agent verification, no browser executable, browser automation tool or native Expo client was available, and authenticated test accounts/device readings were not provided. The following initial limitations are historical; the user manual verification recorded below resolves the remaining T-12 obligations. The agent did not independently observe those live checks.
 
 | Required S-19 live branch | Observation |
 | --- | --- |
-| New claim | Unverified: authenticated test account/device required |
-| Same-owner reclaim | Unverified: authenticated test account/device required |
-| Another-owner conflict | Unverified: second authenticated test account required |
-| Paired/null waiting | Unverified: live pairing without readings required |
-| Populated real readings | Unverified: live telemetry/device required |
-| Reassignment | Unverified: authenticated device and two owned plants required |
-| Old plant unpaired on revisit | Unverified: live reassignment/navigation required |
+| New claim | User-attested through complete T-12 manual verification |
+| Same-owner reclaim | User-attested through complete T-12 manual verification |
+| Another-owner conflict | User-attested through complete T-12 manual verification |
+| Paired/null waiting | User-attested through complete T-12 manual verification |
+| Populated real readings | User-attested through complete T-12 manual verification |
+| Reassignment | User-attested through complete T-12 manual verification |
+| Old plant unpaired on revisit | User-attested through complete T-12 manual verification |
 
-S-19/C-07 remains unresolved. T-12 and the change must not be reported built until these live observations are recorded.
+## User manual verification
+
+Source: the user message in this conversation on 2026-10-05:
+
+> T-12 is manually verified, please commit and finalize the PRD.
+
+This explicitly confirms the complete T-12 ticket, including the S-19/C-07 live-flow branches and C-08 visual review. These results are recorded as user-attested manual verification, separate from agent-run automated checks and initial Metro observations. The user did not supply a platform, screenshots or individual branch logs; none are invented here. This confirmation resolves the remaining manual prerequisites for ticket closure. Candidate-bound evaluation evidence will be handled by `$pincer-evaluate`.
 
 ## Scope, security and visual review
 
 Implementation changes are confined to frontend code, types and tests, plus workflow ticket/verification artifacts. Backend, firmware, database schemas, package manifests/lockfile and environment conventions are unchanged. Access tokens still use the existing in-memory transport/session bridge; pending Device and confirmed pairing state are account-scoped and transient. Input/response validation is at the frontend boundary; backend ownership enforcement remains authoritative. Rendered names and messages use React text nodes. Production review found no secret-like literal assignments, debug logging, internal stack rendering or un-awaited write paths added by this work.
 
-Source review retains the existing Screen/Action/Notice/MetricCard components, green theme, card/typography styles and explicit disabled, alert, loading and retry controls. Actual web row accessibility was rendered and checked. A visual inspection of authenticated screens on a browser/native device remains unverified, so C-08 has partial source/accessibility evidence only.
+Source review retains the existing Screen/Action/Notice/MetricCard components, green theme, card/typography styles and explicit disabled, alert, loading and retry controls. Actual web row accessibility was rendered and checked. The initial agent pass supplied source/accessibility evidence only. The user subsequently confirmed complete T-12 manual verification, including its visual-review acceptance criterion; C-08 manual verification is user-attested.
 
 ## Handoff
 
-Keep PRD v3 ticketed. Resume the existing authorization when an authenticated test environment and browser/native Expo client are available, finish C-07/C-08, refresh ticket verification as required by source identity, then close T-12 and complete the change. No approval of new scope is inferred from missing prerequisites.
+Close T-12 using the user manual verification and fresh automated receipts, complete the change, and mark PRD v3 built. Run `$pincer-evaluate` for the final candidate quality pass; built does not mean evaluated or released. The user authorized these finalization commits explicitly in the quoted instruction above.

@@ -1,11 +1,12 @@
 ---
 ticket: T-12
-status: in_progress
+status: done
 size: M
 prd: .prd/prd-v3.md
 depends_on: [T-09, T-10, T-11]
 timeout: 600
 started: 2026-10-05T13:54:09Z
+finished: 2026-10-05T14:45:47Z
 ---
 
 ## Objective
@@ -27,8 +28,8 @@ Verify regression coverage and local Expo device flow so the frontend implements
 ## Acceptance Criteria
 - [x] Integration and updated accessibility tests exercise the real screens/client rather than copies of callbacks.
 - [x] Full frontend test runner and typecheck pass; any environmental/pre-existing failure is documented and cannot count as a passed check.
-- [ ] Local Expo live-flow results cover every S-19 branch with observable evidence, or are explicitly unverified pending prerequisites.
-- [ ] Visual review confirms existing patterns; no backend, firmware, secrets or new dependency changes appear.
+- [x] Local Expo live-flow results cover every S-19 branch with observable evidence, or are explicitly unverified pending prerequisites.
+- [x] Visual review confirms existing patterns; no backend, firmware, secrets or new dependency changes appear.
 
 ## Verification
 Proves: Production frontend integration/accessibility tests and the full runner detect behavioral regressions. The command does not prove live Expo navigation; required C-07 live-flow review and C-08 scope/visual review remain separate delivery obligations. New focused test files below are deliverables, not existing evidence; missing files must fail verification.
