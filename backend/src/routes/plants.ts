@@ -1,11 +1,14 @@
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { demoDeviceId, seedDemoTelemetry } from "../lib/demo-telemetry.js";
+import { serializeDevice } from "../lib/device.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
-import { ownedPlant, resourceId } from "../lib/ownership.js";
+import { ownedDevice, ownedPlant, resourceId } from "../lib/ownership.js";
 import { pairPlantDevice } from "../lib/plant-pairing.js";
 import { prismaPg } from "../lib/prisma-pg.js";
+import { prisma } from "../lib/prisma.js";
 import { Plant } from "../types/plant.js";
+import type { TelemetryPayload } from "../types/sensor.js";
 
 export const plantsRouter = Router();
 plantsRouter.use(requireAuth);
@@ -157,6 +160,46 @@ plantsRouter.patch(
       resourceId(req.params.id), res.locals.auth.user.id, targetDevice,
     );
     res.json(serializePlant(plant));
+  }),
+);
+
+plantsRouter.get(
+  "/:id/telemetry",
+  asyncRoute(async (_req, res) => {
+    const plant: Awaited<ReturnType<typeof ownedPlant>> = res.locals.plant;
+    if (plant.deviceId === null) {
+      res.json({ paired: false, device: null, telemetry: null });
+      return;
+    }
+    const device = await ownedDevice(plant.deviceId, res.locals.auth.user.id);
+    // PostgreSQL IDs identify owned resources; hardware uses its MAC in MongoDB.
+    const reading = await prisma.sensorReading.findFirst({
+      where: { deviceId: device.macAddress },
+      orderBy: { timestamp: "desc" },
+    });
+    let telemetry: TelemetryPayload | null = null;
+    if (reading) {
+      const lux = reading.lightLevel ?? 0;
+      telemetry = {
+        deviceId: reading.deviceId,
+        timestamp: reading.timestamp.toISOString(),
+        soilMoisture: {
+          percentage: reading.soilMoisture,
+          rawAnalogValue: reading.soilMoistureRaw ?? 0,
+          status: reading.soilMoisture > plant.maxMoisture ? "overwatered"
+            : reading.soilMoisture < plant.minMoisture ? "dry" : "optimal",
+        },
+        lightLevel: {
+          lux,
+          status: lux < 500 ? "insufficient" : lux > 50_000 ? "excessive" : "optimal",
+        },
+        environment: {
+          temperatureCelsius: reading.temperature,
+          humidityPercentage: reading.humidity,
+        },
+      };
+    }
+    res.json({ paired: true, device: serializeDevice(device), telemetry });
   }),
 );
 

@@ -1,10 +1,12 @@
 ---
 ticket: T-03
-status: open
+status: done
 size: M
 prd: .prd/prd-v1.md
 depends_on: [T-02]
 timeout: 600
+started: 2026-10-05T07:59:35Z
+finished: 2026-10-05T08:02:59Z
 ---
 
 ## Objective
@@ -24,12 +26,12 @@ Expose latest hardware telemetry through the owned plant and its paired Device M
 - Test both database failure paths for sanitized 500 responses. Preserve UUID-based legacy endpoints and demo consumers; explicitly demonstrate that a UUID-only reading does not match this MAC-only BFF.
 
 ## Acceptance Criteria
-- [ ] GET /api/plants/:plantId/telemetry uses existing authentication and ownedPlant UUID validation. Anonymous callers get 401, invalid IDs 400, missing/foreign plants or foreign associated devices 404, before Mongo access.
-- [ ] Fetch the associated PostgreSQL Device and validate its ownership. Unpaired plants return 200 {paired:false,device:null,telemetry:null} without Mongo queries.
-- [ ] Query sensorReading.findFirst by device.macAddress with timestamp descending; return paired true, standard Device fields, and the TelemetryPayload or null when no reading exists. Query only MAC keys; no UUID fallback.
-- [ ] Use plant moisture bounds with strict below/above and inclusive optimal boundaries. Test all soil states/boundaries, custom thresholds, ISO time, sensor mappings, nullable raw/lux fallback, and 500/50000 light thresholds.
-- [ ] Test both database failure paths for sanitized 500 responses. Preserve UUID-based legacy endpoints and demo consumers; explicitly demonstrate that a UUID-only reading does not match this MAC-only BFF.
-- [ ] Run the verification block successfully and commit this endpoint with a conventional message after verification; include its code and tests, and preserve unrelated work.
+- [x] GET /api/plants/:plantId/telemetry uses existing authentication and ownedPlant UUID validation. Anonymous callers get 401, invalid IDs 400, missing/foreign plants or foreign associated devices 404, before Mongo access.
+- [x] Fetch the associated PostgreSQL Device and validate its ownership. Unpaired plants return 200 {paired:false,device:null,telemetry:null} without Mongo queries.
+- [x] Query sensorReading.findFirst by device.macAddress with timestamp descending; return paired true, standard Device fields, and the TelemetryPayload or null when no reading exists. Query only MAC keys; no UUID fallback.
+- [x] Use plant moisture bounds with strict below/above and inclusive optimal boundaries. Test all soil states/boundaries, custom thresholds, ISO time, sensor mappings, nullable raw/lux fallback, and 500/50000 light thresholds.
+- [x] Test both database failure paths for sanitized 500 responses. Preserve UUID-based legacy endpoints and demo consumers; explicitly demonstrate that a UUID-only reading does not match this MAC-only BFF.
+- [x] Run the verification block successfully and commit this endpoint with a conventional message after verification; include its code and tests, and preserve unrelated work.
 
 ## Verification
 Proves: HTTP tests exercise this endpoint's accepted and rejected inputs, owner isolation, response contracts and failure paths; the full backend suite detects regressions and TypeScript checks strict compilation. New focused tests must be implemented, so this block cannot pass before delivery.
