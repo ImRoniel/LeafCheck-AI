@@ -82,7 +82,7 @@ export default function PlantProfile() {
           </View>
           {editing ? (
             <EditPlantForm
-              key={plant.id}
+              key={`edit:${plant.id}`}
               plant={plant}
               onCancel={() => setEditing(false)}
               onSaved={() => {
@@ -108,9 +108,9 @@ export default function PlantProfile() {
               })
             }
           />
-          {auth.status === "authenticated" ? <PlantTelemetry key={plant.id} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} /> : <><PlantCareSummary key={plant.id} plant={plant} telemetry={null} linked={false} /><Notice>Sign in to connect a sensor.</Notice></>}
+          {auth.status === "authenticated" ? <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} /> : <><PlantCareSummary key={plant.id} plant={plant} telemetry={null} linked={false} /><Notice>Sign in to connect a sensor.</Notice></>}
           {!editing && (
-            <DeletePlantAction key={plant.id} id={plant.id} name={plant.name} />
+            <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} />
           )}
         </>
       )}

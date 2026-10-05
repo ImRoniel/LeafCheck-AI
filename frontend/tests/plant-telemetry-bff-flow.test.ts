@@ -7,6 +7,26 @@ import { elements, press, profileHarness, plantId, accountId, testPlant } from "
 
 const device = { id: "22222222-2222-4222-8222-222222222222", name: "Bedroom sensor", macAddress: "LC-A50528", userId: accountId, status: "ONLINE" as const, createdAt: testPlant.createdAt, updatedAt: testPlant.updatedAt };
 const zero = { deviceId: device.macAddress, timestamp: testPlant.createdAt, environment: { temperatureCelsius: 0, humidityPercentage: 0 }, soilMoisture: { percentage: 0, rawAnalogValue: 0, status: "dry" as const }, lightLevel: { lux: 0, status: "insufficient" as const } };
+test("profile sibling identity remains unique while editing and changes with the plant", async (t) => {
+  const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
+  t.after(flow.dispose);
+  const identities = () => elements(flow.render()).filter((child) => ["PlantTelemetry", "EditPlantForm", "DeletePlantAction"].includes(String(child.type)));
+  const normal = identities();
+  assert.equal(normal.length, 2);
+  assert.equal(new Set(normal.map((child) => child.key)).size, 2);
+  press(flow.render(), "Edit plant details");
+  const editing = identities();
+  assert.equal(editing.length, 2);
+  assert.equal(new Set(editing.map((child) => child.key)).size, 2);
+  assert.equal(editing.find((child) => child.type === "PlantTelemetry")?.key, normal.find((child) => child.type === "PlantTelemetry")?.key);
+  const otherId = "44444444-4444-4444-8444-444444444444";
+  flow.target(otherId);
+  flow.metadata({ plants: [{ ...testPlant, id: otherId }] });
+  const switched = identities();
+  assert.equal(switched.length, 2);
+  assert.equal(new Set(switched.map((child) => child.key)).size, 2);
+  for (const child of switched) assert.ok(!normal.some((previous) => previous.key === child.key));
+});
 for (const payload of [{ paired: false, device: null, telemetry: null }, { paired: true, device, telemetry: null }, { paired: true, device, telemetry: zero }] as PlantTelemetry[]) {
   test(`production profile renders ${!payload.paired ? "unpaired" : payload.telemetry ? "zero metrics" : "waiting"} from one BFF`, async () => {
     let reads = 0;

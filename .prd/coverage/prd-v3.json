@@ -137,15 +137,18 @@
     },
     "S-17": {
       "tickets": [
-        "T-11"
+        "T-11",
+        "T-13"
       ],
       "checks": [
-        "C-04"
+        "C-04",
+        "C-09"
       ]
     },
     "S-18": {
       "tickets": [
-        "T-12"
+        "T-12",
+        "T-13"
       ],
       "checks": [
         "C-01",
@@ -153,7 +156,8 @@
         "C-03",
         "C-04",
         "C-05",
-        "C-08"
+        "C-08",
+        "C-09"
       ]
     },
     "S-19": {
@@ -184,6 +188,10 @@
       "rationale": null
     },
     "T-12": {
+      "role": "implements",
+      "rationale": null
+    },
+    "T-13": {
       "role": "implements",
       "rationale": null
     }
@@ -251,6 +259,15 @@
       "cwd": null,
       "obligation": "Review loading/disabled controls, accessible alert/retry states, unpaired/waiting/metrics cards and contextual pairing navigation against existing frontend styles. Inspect the diff for frontend-only implementation, unchanged backend/firmware/dependencies, no credential leakage, and preserved .env ignore/example conventions.",
       "note": null
+    },
+    "C-09": {
+      "kind": "command",
+      "required": true,
+      "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts\nnpm run typecheck --workspace=frontend",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Regression proof for browser-confirmed duplicate React sibling identity in normal and editing profile states."
     }
   }
 }
