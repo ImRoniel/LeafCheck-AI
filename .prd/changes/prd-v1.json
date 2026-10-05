@@ -5,7 +5,7 @@
   "prd": ".prd/prd-v1.md",
   "base": "f8b7026159a72d2ecb5951ee50bfc069eb815762",
   "registered": "2026-10-05T07:44:18Z",
-  "sequence": 1,
+  "sequence": 2,
   "lifecycle": {
     "state": "planned",
     "since": "2026-10-05T07:44:18Z",
@@ -13,8 +13,37 @@
     "note": null,
     "superseded_by": null
   },
-  "agreements": [],
-  "authorizations": [],
+  "agreements": [
+    {
+      "id": "G-01",
+      "digest": "226465fb436e7068aaf1a523294d78039dba97fb28b916e1c458391af6ff70da",
+      "prd_revision": "0c8e22a8ddbfd7f89f87aa96be253f4eb6d2f74f0b7a9d3afcb941c0f21b4a7a",
+      "breakdown": "4ebc7a0fe122fe04e955047d889ea12495465478a6462be0600646650532bf3b",
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v1/agreements/G-01.json",
+      "recorded": "2026-10-05T07:44:58Z"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "A-01",
+      "agreement": "G-01",
+      "digest": "226465fb436e7068aaf1a523294d78039dba97fb28b916e1c458391af6ff70da",
+      "disposition": "user",
+      "reference": "User endpoint brief and subsequent pincer-narrow invocation in this conversation",
+      "excerpt": "Task: Implement the following three API endpoints. Use TypeScript. Follow our existing file structure and use the ownedPlant and ownedDevice helpers where applicable. Commit your changes after each endpoint is implemented and verified.",
+      "constraints": null,
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-05T07:44:58Z"
+    }
+  ],
   "decisions": [],
   "events": [
     {
@@ -26,6 +55,19 @@
       "reason": null,
       "agreement": null,
       "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 2,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-05T07:44:58Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
       "decision": null,
       "replacement": null,
       "note": null
