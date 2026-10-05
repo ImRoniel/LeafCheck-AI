@@ -1,0 +1,519 @@
+{
+  "schema": 3,
+  "prd": ".prd/prd-v2.md",
+  "base": "c442e0cd94f3503f7851787a84b0fff0086a03a0",
+  "candidate": "23d9cc54ea5c283f8afe31a2f532eee153383c4d",
+  "created": "2026-10-05T09:08:50Z",
+  "environment": {
+    "os": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "node": "v22.23.3",
+    "tools": [
+      "Node v22.23.3",
+      "npm 12.2.0",
+      "Git and Bash",
+      "Native Node test runner and installed TypeScript compiler"
+    ],
+    "limitations": [
+      "No installed standalone secret scanner; redacted heuristic and manual history review are not exhaustive.",
+      "Existing npm audit failures: workspace 22 high and backend 3 high; no critical. Dependency upgrades are outside this PRD.",
+      "Freshness fixtures model fresh-clone portable evidence, not retained local attempts; no deployment or live database verification claimed.",
+      "Backend module mocking is experimental.",
+      "The actual release audit is a post-export step and is recorded separately; C-07 does not attest a future audit result."
+    ]
+  },
+  "coverage_review": "Reviewed all R-01 through R-03 and S-01 through S-08 against source, tickets and declared checks. Git fixtures exercise current/stale/invalid status and readiness, evidence-only commits and rejection paths, with legacy/migrated authority retained. Static generation/tracking tests and semantic review protect guidance. Backend baseline and compilation preserve the device API. T-07 resolves the circular review timing without cutting any scenario. Candidate delivery describes evaluated implementation; the actual post-export audit follows the committed evaluation and is reported separately.",
+  "requirements": [
+    {
+      "id": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-04",
+        "T-05"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-06"
+      ],
+      "checks": [
+        "C-03",
+        "C-06"
+      ],
+      "scenarios": [
+        "S-05",
+        "S-06"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-04",
+        "T-05",
+        "T-06",
+        "T-07"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-07"
+      ],
+      "scenarios": [
+        "S-07",
+        "S-08"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    }
+  ],
+  "checks": [
+    {
+      "id": "C-01",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "node --test scripts/tests/pincer-freshness.test.mjs",
+      "timestamp": "2026-10-05T09:06:29Z",
+      "artifacts": [
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-01.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000076-20261005T090519Z-9a2f9f",
+        "sequence": 76,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T09:05:19Z",
+        "finished": "2026-10-05T09:06:29Z",
+        "source_before": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "source_after": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "check_digest": "283c0e38c40de5378c4217ddb93ccef682c14973da4bfad8ee01295330417ccd",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "0d770115d04ac176690ecc3b18c1b759a3a296b25b907e823d0e7e72f06b21d2",
+        "truncated": false
+      },
+      "declared": "283c0e38c40de5378c4217ddb93ccef682c14973da4bfad8ee01295330417ccd"
+    },
+    {
+      "id": "C-02",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "node --test scripts/pincer-runtime/runner.test.cjs",
+      "timestamp": "2026-10-05T09:06:57Z",
+      "artifacts": [
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-02.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000077-20261005T090656Z-35d48e",
+        "sequence": 77,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T09:06:56Z",
+        "finished": "2026-10-05T09:06:57Z",
+        "source_before": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "source_after": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "check_digest": "3f071c684e33ce7c593d86fc903d6569f395e79a8ae84811239a039395611048",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "f974637b4686fad25c7a26554ea47fd97afe46a6154d4f36d597b9810bce49e5",
+        "truncated": false
+      },
+      "declared": "3f071c684e33ce7c593d86fc903d6569f395e79a8ae84811239a039395611048"
+    },
+    {
+      "id": "C-03",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "node --test scripts/tests/pincer-release-guidance.test.mjs",
+      "timestamp": "2026-10-05T09:06:58Z",
+      "artifacts": [
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-03.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000078-20261005T090658Z-6ac77f",
+        "sequence": 78,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T09:06:58Z",
+        "finished": "2026-10-05T09:06:58Z",
+        "source_before": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "source_after": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "check_digest": "e1adb7a5648633799b78cefb716c8c89c839df5c84532726c5d985c22878d133",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "bdde9bd2b569ebb59e20b33e37596d28240f9a40831faae4a52cd54150d94e9b",
+        "truncated": false
+      },
+      "declared": "e1adb7a5648633799b78cefb716c8c89c839df5c84532726c5d985c22878d133"
+    },
+    {
+      "id": "C-04",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "npm test --workspace=backend",
+      "timestamp": "2026-10-05T09:07:44Z",
+      "artifacts": [
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-04.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000079-20261005T090659Z-34979a",
+        "sequence": 79,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T09:06:59Z",
+        "finished": "2026-10-05T09:07:44Z",
+        "source_before": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "source_after": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "check_digest": "619686aa749ac2b7e9715309d5fb2fa420cdb584fc175c00c0067f7efb4092c2",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "e6f2b904a4bd4472ab868736551b1adf8c7d541ef505c14aea772b6a19e67af1",
+        "truncated": false
+      },
+      "declared": "619686aa749ac2b7e9715309d5fb2fa420cdb584fc175c00c0067f7efb4092c2"
+    },
+    {
+      "id": "C-05",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "npx tsc --noEmit -p backend/tsconfig.json",
+      "timestamp": "2026-10-05T09:07:57Z",
+      "artifacts": [
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-05.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000080-20261005T090753Z-acf2c2",
+        "sequence": 80,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T09:07:53Z",
+        "finished": "2026-10-05T09:07:57Z",
+        "source_before": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "source_after": "62157b179c22876601aff5d8746573460321d20f8ddd02c21bfe5474f10a8b11",
+        "check_digest": "f35f91458b1d303f71340f88107b3879f15fba123307b2988fea6a15baabede3",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "a87f7ff26db95fc6f1bc835e1f70f140973bbb9579af56869bced1ec9625e4d8",
+        "truncated": false
+      },
+      "declared": "f35f91458b1d303f71340f88107b3879f15fba123307b2988fea6a15baabede3"
+    },
+    {
+      "id": "C-06",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-05T09:08:49Z",
+      "artifacts": [
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/code-quality.md",
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/guidance.md",
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/red-green.md",
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/security-audit.md",
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/secret-history.json",
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/dependency-audit.json",
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/invalid-input-smoke.log"
+      ],
+      "note": "Guidance/reviewer assessment passed; C-07 circularity fixed through T-07. Failed supplementary dependency audits are explicitly recorded as failed, not treated as passed checks.",
+      "provenance": "authored",
+      "declared": "6f1a884157b6a318251a548286464d94a6b8d6ccffe6c0e3f6df921b05b0776b"
+    },
+    {
+      "id": "C-07",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-05T09:08:49Z",
+      "artifacts": [
+        ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/delivery.md"
+      ],
+      "note": "Pre-export scoped history and current verification review only. No future audit result claimed; actual read-only audit follows the evaluation commit separately.",
+      "provenance": "authored",
+      "declared": "6db446ed856541371425b275f5938ea0573f790202d561cc554c551f24e8679e"
+    }
+  ],
+  "visual_review": {
+    "applicable": false,
+    "reason": "Workflow tooling and textual guidance only; no frontend/UI changes or visual requirements."
+  },
+  "artifacts": [
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-01.log",
+      "sha256": "0d770115d04ac176690ecc3b18c1b759a3a296b25b907e823d0e7e72f06b21d2"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-02.log",
+      "sha256": "f974637b4686fad25c7a26554ea47fd97afe46a6154d4f36d597b9810bce49e5"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-03.log",
+      "sha256": "bdde9bd2b569ebb59e20b33e37596d28240f9a40831faae4a52cd54150d94e9b"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-04.log",
+      "sha256": "e6f2b904a4bd4472ab868736551b1adf8c7d541ef505c14aea772b6a19e67af1"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/C-05.log",
+      "sha256": "a87f7ff26db95fc6f1bc835e1f70f140973bbb9579af56869bced1ec9625e4d8"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/checks/invalid-input-smoke.log",
+      "sha256": "c6e055dcbb6eb22ca0f50475128713f1d3435b55a6951026c7ba67a0312b4502"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/coverage/inventory.json",
+      "sha256": "4b905a7386ffafdaf1e2f8cad1bba8e772f9e2e9a11b4937e478ca08fdcc91c7"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/coverage/map.json",
+      "sha256": "2e1980643121d645aed75b593702b23a3f86ad095842f47b59d6424a724d3e4c"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/code-quality.md",
+      "sha256": "bfc47f01298af2e38e718b1c26af5a7f306f195ee95cc1cfc72dfeebc90101d0"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/delivery.md",
+      "sha256": "14ddbf52f59818b9bc2f4e350fea8237a26d3e5cdf4a3592a6f9700222618ff1"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/dependency-audit.json",
+      "sha256": "e313ea24dcb05440d7be74e757c8bfab28fd079becb2e33ef2a8bc36d318935e"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/guidance.md",
+      "sha256": "094694db6ee51afd7b86a80b7e409278ce16abd59e29ef617b91444077fa446c"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/red-green.md",
+      "sha256": "b96aa8d272246038b150cce75a1c36477eec905a4902654d966b7fb92a1b53cf"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/secret-history.json",
+      "sha256": "55b03047392666eff957461afeebfdac21141a3225f74cd0854e54241b8654cb"
+    },
+    {
+      "path": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/review/security-audit.md",
+      "sha256": "63de0992571c10f4b3f40186df88384001b88af8784ab6967a1b581b01c4c11b"
+    }
+  ],
+  "change": {
+    "id": "prd-v2",
+    "prd_revision": "8c61d4293465448901cf5273dfbc542a1c9aa1e9619fa574bdf6f9aedd5a2034",
+    "base": "c442e0cd94f3503f7851787a84b0fff0086a03a0"
+  },
+  "coverage": {
+    "agreement": "832c4f06c744b1d8a840fc5550631b329f45662017c6a6d55c547eafaa89e831",
+    "authorization": "A-03",
+    "inventory": "500623c9b19d872fab1fa59e835cac4f9563f0a949cb8b95114fcdc3d18a8f47",
+    "map": "230262133f9d848762196aba1bcff0d29b12d19a612fb2ca2aa6e3ceb1cd42a4",
+    "snapshots": {
+      "inventory": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/coverage/inventory.json",
+      "map": ".prd/evidence/prd-v2/23d9cc54ea5c283f8afe31a2f532eee153383c4d/coverage/map.json"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "S-01",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-05"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-02",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-04",
+        "T-05"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-03",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-04",
+        "T-05"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-04",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-04",
+        "T-05"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-05",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-06"
+      ],
+      "checks": [
+        "C-03",
+        "C-06"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-06",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-06"
+      ],
+      "checks": [
+        "C-03",
+        "C-06"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-07",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-04",
+        "T-05"
+      ],
+      "checks": [
+        "C-01",
+        "C-02"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-08",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-05",
+        "T-06",
+        "T-07"
+      ],
+      "checks": [
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-07"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    }
+  ],
+  "adequacy": {
+    "verdict": "adequate",
+    "note": "C-01 covers the changed trust boundary with observable Git/status/readiness positive and negative tests; unchanged validation before the mode-specific follower step is also reviewed. C-03 is a static contract/generation check supported by semantic C-06 review. C-07 reviews pre-export delivery only; the separate post-export audit must actually run. Existing dependency audit failures are supplementary known issues outside PRD scope, not passed command results."
+  },
+  "delivery": {
+    "original": true,
+    "agreed": true
+  }
+}

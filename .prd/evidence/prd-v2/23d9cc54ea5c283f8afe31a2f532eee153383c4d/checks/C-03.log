@@ -1,0 +1,46 @@
+$ node --test scripts/tests/pincer-release-guidance.test.mjs
+
+--- stdout ---
+TAP version 13
+# Subtest: release guidance retains explicit mode-specific authority and rejection obligations
+ok 1 - release guidance retains explicit mode-specific authority and rejection obligations
+  ---
+  duration_ms: 6.56638
+  type: 'test'
+  ...
+# Subtest: release static contract rejects missing authority and clean-tree clauses
+ok 2 - release static contract rejects missing authority and clean-tree clauses
+  ---
+  duration_ms: 4.496683
+  type: 'test'
+  ...
+# Subtest: canonical release guidance and both adapters are durably tracked
+ok 3 - canonical release guidance and both adapters are durably tracked
+  ---
+  duration_ms: 20.958385
+  type: 'test'
+  ...
+# Subtest: delivery review separates pre-export evidence from the actual post-export audit
+ok 4 - delivery review separates pre-export evidence from the actual post-export audit
+  ---
+  duration_ms: 1.351531
+  type: 'test'
+  ...
+# Subtest: release adapters match isolated canonical regeneration without changing the worktree
+ok 5 - release adapters match isolated canonical regeneration without changing the worktree
+  ---
+  duration_ms: 43.918692
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 171.091386
+--- stderr ---
+
+--- outcome passed (exit 0) ---

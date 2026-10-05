@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "prd": ".prd/prd-v2.md",
+  "digest": "500623c9b19d872fab1fa59e835cac4f9563f0a949cb8b95114fcdc3d18a8f47",
+  "projection": "pincer inventory 1\nprd .prd/prd-v2.md\nrequirement R-01 38a2cc0bf88473dc351366dabcd4a5c6c407039c3cc71a4d84dd4932d84b60d3\nrequirement R-02 9087b72922d31ef8a93d883791d8352cd355d549d59a8f72dadc4af7c0a980d1\nrequirement R-03 bc23a115bf0dc8ebafa0c87708face6ae48f4d18f713b01af0cf452ad633c599\nscenario S-01 R-01 2210539ff9c439a24530dc027e0c942cba46248afe7d39cb462a2db730e8ea13\nscenario S-02 R-01 52493aef60e11f110aadfa936e7f5b1955ad6c068211368c0da2687382f8c3ad\nscenario S-03 R-01 f4d4e5f92ac960011ddcdf3e5d76841327044fece8451cf159f4fc92dabc542c\nscenario S-04 R-01 f2daf4d258b1f6a60928731922dd0c2a8462198d0e492cfba9fa2c7f8107365a\nscenario S-05 R-02 a0dabe9f28260020a4838d9a9b24afbb421a80ee4e636f19e913d8861f65bf2b\nscenario S-06 R-02 342764cf784784cc7e318481a4ada3a4d1eb6e9a20c009659f37f440084c1371\nscenario S-07 R-03 ec8a74f6e19ccd4d74f56cad08582d900e1b7709469f72063487353e13d52946\nscenario S-08 R-03 378b7aeedb301eeb0ba38cf2f1280cd7a3b0f647a6ed5a21628280d8061ebaa3\n",
+  "requirements": {
+    "R-01": {
+      "title": "Consistent changes-mode freshness",
+      "text": "Consistent changes-mode freshness",
+      "digest": "38a2cc0bf88473dc351366dabcd4a5c6c407039c3cc71a4d84dd4932d84b60d3",
+      "line": 34,
+      "end": 39,
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04"
+      ]
+    },
+    "R-02": {
+      "title": "Durable mode-specific release guidance",
+      "text": "Durable mode-specific release guidance",
+      "digest": "9087b72922d31ef8a93d883791d8352cd355d549d59a8f72dadc4af7c0a980d1",
+      "line": 41,
+      "end": 44,
+      "scenarios": [
+        "S-05",
+        "S-06"
+      ]
+    },
+    "R-03": {
+      "title": "Regression evidence and reviewable delivery",
+      "text": "Regression evidence and reviewable delivery",
+      "digest": "bc23a115bf0dc8ebafa0c87708face6ae48f4d18f713b01af0cf452ad633c599",
+      "line": 46,
+      "end": 49,
+      "scenarios": [
+        "S-07",
+        "S-08"
+      ]
+    }
+  },
+  "scenarios": {
+    "S-01": {
+      "requirement": "R-01",
+      "text": "Given a completed evaluated change and an evidence-only follow-up commit containing matching NOTES.md, validated candidate artifacts and its valid evaluation locator, changes-mode status reports Notes current, Evaluation current and Evidence ok; the readiness gate succeeds.",
+      "digest": "2210539ff9c439a24530dc027e0c942cba46248afe7d39cb462a2db730e8ea13",
+      "line": 36,
+      "end": 36
+    },
+    "S-02": {
+      "requirement": "R-01",
+      "text": "A committed source/test/configuration/PRD change after the candidate, or dirty source, still produces stale freshness and blocks readiness. A clean-tree release check still rejects any uncommitted mutation; evidence follower recognition cannot waive it.",
+      "digest": "52493aef60e11f110aadfa936e7f5b1955ad6c068211368c0da2687382f8c3ad",
+      "line": 37,
+      "end": 37
+    },
+    "S-03": {
+      "requirement": "R-01",
+      "text": "A malformed or misnamed changed locator, an altered listed artifact with an invalid digest, or an unlisted file in the evidence directory is rejected. Missing/untracked evidence, invalid metadata, wrong candidate/base ancestry and invalid selected-change evidence remain failures through existing validation.",
+      "digest": "f4d4e5f92ac960011ddcdf3e5d76841327044fece8451cf159f4fc92dabc542c",
+      "line": 38,
+      "end": 38
+    },
+    "S-04": {
+      "requirement": "R-01",
+      "text": "Legacy and migrated modes preserve their existing Notes freshness contract. Changes-mode Evaluation remains authoritative; an overwritten or absent root compatibility summary cannot replace the selected change's locator or convert invalid Evaluation evidence into current readiness.",
+      "digest": "f2daf4d258b1f6a60928731922dd0c2a8462198d0e492cfba9fa2c7f8107365a",
+      "line": 39,
+      "end": 39
+    },
+    "S-05": {
+      "requirement": "R-02",
+      "text": "The release checklist and canonical release playbook distinguish legacy/migrated Notes authority from changes-mode Evaluation authority. They retain current authorization, completed lifecycle, valid tracked evidence, strict coverage/adequacy, local-attempt freshness and clean-tree requirements; a valid locator evidence-only commit is not described as a source mutation.",
+      "digest": "a0dabe9f28260020a4838d9a9b24afbb421a80ee4e636f19e913d8861f65bf2b",
+      "line": 43,
+      "end": 43
+    },
+    "S-06": {
+      "requirement": "R-02",
+      "text": "The repository retains the changed canonical release playbook and checklist despite existing ignore rules, and Codex/Copilot release adapters match that playbook after generation. No unrelated prompt or skill changes are included. Existing evaluation instructions permitting locator commits remain consistent with the corrected release rules.",
+      "digest": "342764cf784784cc7e318481a4ada3a4d1eb6e9a20c009659f37f440084c1371",
+      "line": 44,
+      "end": 44
+    },
+    "S-07": {
+      "requirement": "R-03",
+      "text": "Native Node behavioral tests using temporary Git repositories exercise valid evidence-only commits and the relevant rejection scenarios from R-01, including unchanged legacy behavior; the tests fail against the original Notes freshness defect. Existing Bash-runner regression tests remain green.",
+      "digest": "ec8a74f6e19ccd4d74f56cad08582d900e1b7709469f72063487353e13d52946",
+      "line": 48,
+      "end": 48
+    },
+    "S-08": {
+      "requirement": "R-03",
+      "text": "The backend's 93-test baseline and strict TypeScript compilation remain green. The correction is delivered through associated tickets, fresh verification, scoped commits, a new committed candidate/evaluation and a read-only release audit; PRD v1's recorded candidate and artifacts are preserved.",
+      "digest": "378b7aeedb301eeb0ba38cf2f1280cd7a3b0f647a6ed5a21628280d8061ebaa3",
+      "line": 49,
+      "end": 49
+    }
+  }
+}

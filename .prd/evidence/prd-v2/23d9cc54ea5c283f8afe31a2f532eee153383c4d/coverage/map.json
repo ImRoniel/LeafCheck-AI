@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "path": ".prd/coverage/prd-v2.json",
+  "digest": "230262133f9d848762196aba1bcff0d29b12d19a612fb2ca2aa6e3ceb1cd42a4",
+  "map": {
+    "schema": 1,
+    "change": "prd-v2",
+    "prd": ".prd/prd-v2.md",
+    "scenarios": {
+      "S-01": {
+        "tickets": [
+          "T-05"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-02": {
+        "tickets": [
+          "T-04",
+          "T-05"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-03": {
+        "tickets": [
+          "T-04",
+          "T-05"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-04": {
+        "tickets": [
+          "T-04",
+          "T-05"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-05": {
+        "tickets": [
+          "T-06"
+        ],
+        "checks": [
+          "C-03",
+          "C-06"
+        ]
+      },
+      "S-06": {
+        "tickets": [
+          "T-06"
+        ],
+        "checks": [
+          "C-03",
+          "C-06"
+        ]
+      },
+      "S-07": {
+        "tickets": [
+          "T-04",
+          "T-05"
+        ],
+        "checks": [
+          "C-01",
+          "C-02"
+        ]
+      },
+      "S-08": {
+        "tickets": [
+          "T-05",
+          "T-06",
+          "T-07"
+        ],
+        "checks": [
+          "C-04",
+          "C-05",
+          "C-07",
+          "C-03"
+        ]
+      }
+    },
+    "scope": {},
+    "tickets": {
+      "T-04": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-05": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-06": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-07": {
+        "role": "implements",
+        "rationale": null
+      }
+    },
+    "checks": {
+      "C-01": {
+        "kind": "command",
+        "required": true,
+        "command": "node --test scripts/tests/pincer-freshness.test.mjs",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": null
+      },
+      "C-02": {
+        "kind": "command",
+        "required": true,
+        "command": "node --test scripts/pincer-runtime/runner.test.cjs",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": null
+      },
+      "C-03": {
+        "kind": "command",
+        "required": true,
+        "command": "node --test scripts/tests/pincer-release-guidance.test.mjs",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": null
+      },
+      "C-04": {
+        "kind": "command",
+        "required": true,
+        "command": "npm test --workspace=backend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": null
+      },
+      "C-05": {
+        "kind": "command",
+        "required": true,
+        "command": "npx tsc --noEmit -p backend/tsconfig.json",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": null
+      },
+      "C-06": {
+        "kind": "review",
+        "required": true,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "Review checklist, canonical release playbook and both adapters against all S-05 obligations and existing evaluation locator-commit guidance; verify generation drift is limited to release files.",
+        "note": null
+      },
+      "C-07": {
+        "kind": "review",
+        "required": true,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "Pre-export delivery review: inspect scoped commits and fresh verification history, confirm PRD v1 candidate/records/artifacts are unchanged, and review that the candidate is ready for evaluation. The actual post-export release audit is recorded separately after committing the evaluation; this review does not attest a future audit result. Failed or missing verification remains explicitly unverified.",
+        "note": null
+      }
+    }
+  }
+}

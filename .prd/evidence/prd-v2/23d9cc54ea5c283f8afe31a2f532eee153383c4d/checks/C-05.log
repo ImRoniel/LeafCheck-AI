@@ -1,0 +1,8 @@
+$ npx tsc --noEmit -p backend/tsconfig.json
+
+--- stdout ---
+
+--- stderr ---
+npm notice run leaf-check-ai-workspace@1.0.0 npx
+npm notice run 'tsc' --noEmit -p backend/tsconfig.json
+--- outcome passed (exit 0) ---

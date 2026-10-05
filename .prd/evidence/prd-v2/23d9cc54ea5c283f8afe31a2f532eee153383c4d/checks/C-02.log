@@ -1,0 +1,22 @@
+$ node --test scripts/pincer-runtime/runner.test.cjs
+
+--- stdout ---
+TAP version 13
+# Subtest: the recorded Bash executable can launch checks through native Node
+ok 1 - the recorded Bash executable can launch checks through native Node
+  ---
+  duration_ms: 58.699906
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 297.023803
+--- stderr ---
+
+--- outcome passed (exit 0) ---

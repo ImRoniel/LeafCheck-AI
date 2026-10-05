@@ -1,0 +1,238 @@
+$ node --test scripts/tests/pincer-freshness.test.mjs
+
+--- stdout ---
+TAP version 13
+# Subtest: characterization: dirty mutation of src/app.js blocks candidate readiness
+ok 1 - characterization: dirty mutation of src/app.js blocks candidate readiness
+  ---
+  duration_ms: 2838.059847
+  type: 'test'
+  ...
+# Subtest: characterization: committed mutation of src/app.js blocks candidate readiness
+ok 2 - characterization: committed mutation of src/app.js blocks candidate readiness
+  ---
+  duration_ms: 2727.687809
+  type: 'test'
+  ...
+# Subtest: characterization: dirty mutation of test/app.test.js blocks candidate readiness
+ok 3 - characterization: dirty mutation of test/app.test.js blocks candidate readiness
+  ---
+  duration_ms: 2470.7966
+  type: 'test'
+  ...
+# Subtest: characterization: committed mutation of test/app.test.js blocks candidate readiness
+ok 4 - characterization: committed mutation of test/app.test.js blocks candidate readiness
+  ---
+  duration_ms: 2870.777413
+  type: 'test'
+  ...
+# Subtest: characterization: dirty mutation of package.json blocks candidate readiness
+ok 5 - characterization: dirty mutation of package.json blocks candidate readiness
+  ---
+  duration_ms: 2250.089398
+  type: 'test'
+  ...
+# Subtest: characterization: committed mutation of package.json blocks candidate readiness
+ok 6 - characterization: committed mutation of package.json blocks candidate readiness
+  ---
+  duration_ms: 2235.272819
+  type: 'test'
+  ...
+# Subtest: characterization: dirty mutation of .prd/prd-v1.md blocks candidate readiness
+ok 7 - characterization: dirty mutation of .prd/prd-v1.md blocks candidate readiness
+  ---
+  duration_ms: 2385.182809
+  type: 'test'
+  ...
+# Subtest: characterization: committed mutation of .prd/prd-v1.md blocks candidate readiness
+ok 8 - characterization: committed mutation of .prd/prd-v1.md blocks candidate readiness
+  ---
+  duration_ms: 2227.429561
+  type: 'test'
+  ...
+# Subtest: characterization: rejects malformed locator
+ok 9 - characterization: rejects malformed locator
+  ---
+  duration_ms: 2035.375035
+  type: 'test'
+  ...
+# Subtest: characterization: rejects misnamed selected locator
+ok 10 - characterization: rejects misnamed selected locator
+  ---
+  duration_ms: 2109.060062
+  type: 'test'
+  ...
+# Subtest: characterization: rejects altered artifact digest
+ok 11 - characterization: rejects altered artifact digest
+  ---
+  duration_ms: 2133.513129
+  type: 'test'
+  ...
+# Subtest: characterization: rejects unlisted committed evidence file
+ok 12 - characterization: rejects unlisted committed evidence file
+  ---
+  duration_ms: 2064.377961
+  type: 'test'
+  ...
+# Subtest: characterization: rejects unlisted dirty evidence file
+ok 13 - characterization: rejects unlisted dirty evidence file
+  ---
+  duration_ms: 2119.142846
+  type: 'test'
+  ...
+# Subtest: characterization: rejects missing artifact
+ok 14 - characterization: rejects missing artifact
+  ---
+  duration_ms: 1948.433952
+  type: 'test'
+  ...
+# Subtest: characterization: rejects untracked artifact
+ok 15 - characterization: rejects untracked artifact
+  ---
+  duration_ms: 2058.939814
+  type: 'test'
+  ...
+# Subtest: characterization: rejects missing manifest
+ok 16 - characterization: rejects missing manifest
+  ---
+  duration_ms: 1930.652039
+  type: 'test'
+  ...
+# Subtest: characterization: rejects untracked manifest
+ok 17 - characterization: rejects untracked manifest
+  ---
+  duration_ms: 1945.793318
+  type: 'test'
+  ...
+# Subtest: characterization: rejects invalid evidence metadata
+ok 18 - characterization: rejects invalid evidence metadata
+  ---
+  duration_ms: 2017.779059
+  type: 'test'
+  ...
+# Subtest: characterization: rejects unavailable candidate
+ok 19 - characterization: rejects unavailable candidate
+  ---
+  duration_ms: 2739.931836
+  type: 'test'
+  ...
+# Subtest: characterization: rejects wrong selected change evidence
+ok 20 - characterization: rejects wrong selected change evidence
+  ---
+  duration_ms: 2087.881384
+  type: 'test'
+  ...
+# Subtest: characterization: rejects wrong selected PRD evidence
+ok 21 - characterization: rejects wrong selected PRD evidence
+  ---
+  duration_ms: 2074.82857
+  type: 'test'
+  ...
+# Subtest: characterization: legacy Notes remains authoritative and rejects locator follow-up commits
+ok 22 - characterization: legacy Notes remains authoritative and rejects locator follow-up commits
+  ---
+  duration_ms: 456.699838
+  type: 'test'
+  ...
+# Subtest: characterization: migrated Notes remains authoritative and rejects locator follow-up commits
+ok 23 - characterization: migrated Notes remains authoritative and rejects locator follow-up commits
+  ---
+  duration_ms: 603.014111
+  type: 'test'
+  ...
+# Subtest: characterization: changes Evaluation stays authoritative with missing root Notes
+ok 24 - characterization: changes Evaluation stays authoritative with missing root Notes
+  ---
+  duration_ms: 2282.059804
+  type: 'test'
+  ...
+# Subtest: characterization: changes Evaluation stays authoritative with overwritten root Notes
+ok 25 - characterization: changes Evaluation stays authoritative with overwritten root Notes
+  ---
+  duration_ms: 2312.103916
+  type: 'test'
+  ...
+# Subtest: characterization: malformed other locator cannot become an allowed follower
+ok 26 - characterization: malformed other locator cannot become an allowed follower
+  ---
+  duration_ms: 2132.234613
+  type: 'test'
+  ...
+# Subtest: characterization: misnamed other locator cannot become an allowed follower
+ok 27 - characterization: misnamed other locator cannot become an allowed follower
+  ---
+  duration_ms: 2167.492242
+  type: 'test'
+  ...
+# Subtest: characterization: rejects nonancestor base commits
+ok 28 - characterization: rejects nonancestor base commits
+  ---
+  duration_ms: 2107.307365
+  type: 'test'
+  ...
+# Subtest: characterization: rejects nonancestor candidate commits
+ok 29 - characterization: rejects nonancestor candidate commits
+  ---
+  duration_ms: 2027.563527
+  type: 'test'
+  ...
+# Subtest: characterization: legacy Notes rejects missing metadata
+ok 30 - characterization: legacy Notes rejects missing metadata
+  ---
+  duration_ms: 304.626366
+  type: 'test'
+  ...
+# Subtest: characterization: legacy Notes rejects wrong PRD metadata
+ok 31 - characterization: legacy Notes rejects wrong PRD metadata
+  ---
+  duration_ms: 297.331547
+  type: 'test'
+  ...
+# Subtest: characterization: legacy Notes rejects short commit metadata
+ok 32 - characterization: legacy Notes rejects short commit metadata
+  ---
+  duration_ms: 317.860565
+  type: 'test'
+  ...
+# Subtest: characterization: legacy Notes rejects missing manifest metadata
+ok 33 - characterization: legacy Notes rejects missing manifest metadata
+  ---
+  duration_ms: 383.563004
+  type: 'test'
+  ...
+# Subtest: characterization: legacy Notes rejects unavailable ancestry metadata
+ok 34 - characterization: legacy Notes rejects unavailable ancestry metadata
+  ---
+  duration_ms: 421.464788
+  type: 'test'
+  ...
+# Subtest: changes mode: valid locator evidence commit keeps Notes, Evaluation and Evidence current
+ok 35 - changes mode: valid locator evidence commit keeps Notes, Evaluation and Evidence current
+  ---
+  duration_ms: 2128.948894
+  type: 'test'
+  ...
+# Subtest: changes mode: another structurally valid locator follows the same existing policy
+ok 36 - changes mode: another structurally valid locator follows the same existing policy
+  ---
+  duration_ms: 2155.762725
+  type: 'test'
+  ...
+# Subtest: changes mode: dirty Notes cannot satisfy the separate clean-tree release condition
+ok 37 - changes mode: dirty Notes cannot satisfy the separate clean-tree release condition
+  ---
+  duration_ms: 2236.99047
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 69809.455957
+--- stderr ---
+
+--- outcome passed (exit 0) ---
