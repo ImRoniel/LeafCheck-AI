@@ -5,7 +5,7 @@
   "prd": ".prd/prd-v2.md",
   "base": "c442e0cd94f3503f7851787a84b0fff0086a03a0",
   "registered": "2026-10-05T08:26:10Z",
-  "sequence": 1,
+  "sequence": 2,
   "lifecycle": {
     "state": "planned",
     "since": "2026-10-05T08:26:10Z",
@@ -13,8 +13,37 @@
     "note": null,
     "superseded_by": null
   },
-  "agreements": [],
-  "authorizations": [],
+  "agreements": [
+    {
+      "id": "G-01",
+      "digest": "16f0ec8e787d0f7b467254e34858a21c4d82fc295ddd4f8039d1732c9cc4dc3a",
+      "prd_revision": "f480b66118d750198895fc3264974cd1c76556f266670157f7e622d52df4289d",
+      "breakdown": "134a6043bfe4e074050d3e9b2597421a9f9bc0d08c6f5321e1dc6013fa260a84",
+      "tickets": [
+        "T-04",
+        "T-05",
+        "T-06"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v2/agreements/G-01.json",
+      "recorded": "2026-10-05T08:26:57Z"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "A-01",
+      "agreement": "G-01",
+      "digest": "16f0ec8e787d0f7b467254e34858a21c4d82fc295ddd4f8039d1732c9cc4dc3a",
+      "disposition": "user",
+      "reference": "User invoked pincer-narrow after the PRD v2 handover, authorizing its same-scope breakdown under the supplied skill.",
+      "excerpt": "$pincer-narrow",
+      "constraints": null,
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-05T08:26:57Z"
+    }
+  ],
   "decisions": [],
   "events": [
     {
@@ -26,6 +55,19 @@
       "reason": null,
       "agreement": null,
       "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 2,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-05T08:26:57Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
       "decision": null,
       "replacement": null,
       "note": null
