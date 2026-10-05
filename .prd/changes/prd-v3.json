@@ -1,0 +1,143 @@
+{
+  "schema": 3,
+  "runtime": 3,
+  "change": "prd-v3",
+  "prd": ".prd/prd-v3.md",
+  "base": "f0469715f8ccb9ad76f8a9901341b3d7629f2190",
+  "registered": "2026-10-05T09:47:35Z",
+  "sequence": 4,
+  "lifecycle": {
+    "state": "planned",
+    "since": "2026-10-05T09:47:35Z",
+    "reason": null,
+    "note": null,
+    "superseded_by": null
+  },
+  "agreements": [
+    {
+      "id": "G-01",
+      "digest": "fd7b2507c307f58df08be06c3fdfa4592d2158091fc17a5878e15b7868e9f2ba",
+      "prd_revision": "dce8d4d064c9a0d46302d730991ed1f55a8ac9d9f8894197281194d93b33df0a",
+      "breakdown": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inventory": null,
+      "coverage": null,
+      "tickets": [],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v3/agreements/G-01.json",
+      "recorded": "2026-10-05T09:48:04Z"
+    },
+    {
+      "id": "G-02",
+      "digest": "d945c74c4369bda2b9cca676c31033f08cda0a826d5f5042029600ce72fc7359",
+      "prd_revision": "dce8d4d064c9a0d46302d730991ed1f55a8ac9d9f8894197281194d93b33df0a",
+      "breakdown": "c0f532e2c4212e4f316a3e4050dcad7da91410c1d052467ff9c77703a6bee964",
+      "inventory": "8679f6f2f636d03905b35488546982a0bc9a8369020a28bdc726cfe28287a136",
+      "coverage": "652a13c8080644dfd3db953c64cbbb6702c2c7b909d5c8f1b42943e9612fe83f",
+      "tickets": [
+        "T-08",
+        "T-09",
+        "T-10",
+        "T-11",
+        "T-12"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v3/agreements/G-02.json",
+      "recorded": "2026-10-05T09:52:51Z"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "A-01",
+      "agreement": "G-01",
+      "digest": "fd7b2507c307f58df08be06c3fdfa4592d2158091fc17a5878e15b7868e9f2ba",
+      "disposition": "user",
+      "reference": "User pincer-plan frontend integration brief, 2026-10-05",
+      "excerpt": "Please implement the following frontend changes",
+      "constraints": "Focus strictly on the React Native/Expo frontend. Use existing styling and component patterns. Do not add new dependencies unless absolutely necessary.",
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-05T09:48:04Z"
+    },
+    {
+      "id": "A-02",
+      "agreement": "G-02",
+      "digest": "d945c74c4369bda2b9cca676c31033f08cda0a826d5f5042029600ce72fc7359",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-01",
+      "explanation": "The user invoked pincer-narrow after reviewing PRD v3. This breakdown implements all 19 authorized frontend scenarios without scope cuts; ticket order and focused verification details exercise the delegated implementation scope. Live Expo evidence remains a required review, and project rules prohibit unrequested commits.",
+      "decisions": [],
+      "recorded": "2026-10-05T09:52:52Z"
+    }
+  ],
+  "decisions": [],
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "register",
+      "from": null,
+      "to": "planned",
+      "at": "2026-10-05T09:47:35Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 2,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-05T09:48:04Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 3,
+      "kind": "adopt",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-05T09:52:51Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 4,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-05T09:52:52Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    }
+  ],
+  "evaluations": [],
+  "legacy": {
+    "receipts": {},
+    "authorization_text": null,
+    "migrated_from": null,
+    "migrated": null
+  },
+  "coverage": {
+    "map": ".prd/coverage/prd-v3.json",
+    "adopted": "2026-10-05T09:52:51Z",
+    "agreement": "G-02"
+  }
+}

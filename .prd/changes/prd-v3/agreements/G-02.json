@@ -1,0 +1,251 @@
+{
+  "schema": 2,
+  "change": "prd-v3",
+  "agreement": "G-02",
+  "digest": "d945c74c4369bda2b9cca676c31033f08cda0a826d5f5042029600ce72fc7359",
+  "projection": "pincer agreement 2\nchange prd-v3\nprd .prd/prd-v3.md dce8d4d064c9a0d46302d730991ed1f55a8ac9d9f8894197281194d93b33df0a\ninventory 8679f6f2f636d03905b35488546982a0bc9a8369020a28bdc726cfe28287a136\ncoverage .prd/coverage/prd-v3.json 652a13c8080644dfd3db953c64cbbb6702c2c7b909d5c8f1b42943e9612fe83f\nticket T-08 d8bce873aa1eec8a96dab382c6fd6d2cfcd36afb5f61cc1a46a155b84c9c24c7\nticket T-09 8f07925f66e52e70e8a6879abe22e662cfc61473fb59bae4d054824821a2cc6e\nticket T-10 6970fe4a77ead01156dd0642fefd4c355754f123ecb25ca9d7820fb415378770\nticket T-11 56b5626dd60c4b460049dbe405030f93091e7cfa92d4fcc9ae744f9c9b79a1eb\nticket T-12 c64fb3d9e16c44c80dcf8e60910329d6b05762846c80cbc6d750cb6297aa97b5\n",
+  "prd": {
+    "path": ".prd/prd-v3.md",
+    "revision": "dce8d4d064c9a0d46302d730991ed1f55a8ac9d9f8894197281194d93b33df0a",
+    "text": "---\nversion: 3\ndate: 2026-10-05\n---\n\n# Frontend device claiming, pairing and plant telemetry\n\n## Problem\n\nThe backend supports authenticated device claiming, plant pairing and a plant-scoped telemetry BFF, but the Expo connection flow still simulates discovery and saves mock assignments locally. Plant Profile separately fetches metadata and device telemetry and can mistake a local mapping for a real pairing. Users need server-confirmed connections and clear unpaired, waiting, loading and failure states.\n\nSource: the user's `$pincer-plan` brief in this session, headed “Context: We have successfully implemented the backend API endpoints for IoT Device Claiming, Plant Pairing, and the Telemetry BFF.” Its requested Scanner → Assignment → Plant Profile flow, three service functions, conflict handling, frontend-only constraint and existing styling are retained below.\n\nPlanning profile: standard. This is a brownfield change across authenticated mutations, account state, navigation and telemetry rendering; the current suite is not green and the BFF intentionally omits plant metadata.\n\n## Solution\n\nUse the existing authenticated API client to claim a entered or camera-scanned MAC, retain the returned device UUID in account-scoped global state, and pair it to an owned plant. Read current pairing and latest telemetry exclusively through the BFF on profile focus and refresh. Preserve profile metadata through the existing AppData plant collection, with explicit collection loading/error recovery for deep links; no profile `fetchPlant` or legacy latest-reading request. Retain existing styling and dependencies. The user authorized frontend integration with the words “Please implement the following frontend changes”; this invocation produces the planning artifact for `$pincer-narrow`, not implementation.\n\nAssumption surfaced during discovery: the BFF has no plant metadata. The draft follows the explicit single-request constraint using collection metadata; the optional discovery question proposes a `fetchPlant` fallback only if the user permits it. No fallback is authorized by this draft. Existing collection loading may make its own list request; “single request” refers to the profile's plant/sensor retrieval, not application-wide traffic.\n\n## Scope\n\n| This PRD covers | This PRD does NOT cover |\n| --- | --- |\n| Typed claim, pair/unpair and BFF client functions and validators | Backend endpoints, schemas, migrations or firmware |\n| Manual MAC input and camera barcode/QR input using existing Expo Camera | Bluetooth discovery, invented nearby-device results |\n| Scanner → plant assignment → real success → profile navigation | Real Space pairing or guest device claiming |\n| Account-scoped pending claimed UUID, busy/errors/cancellation | JWT persistence, new token handling or dependencies |\n| BFF profile states, reassignment refresh and metadata preservation | Automatic watering or fabricated sensor readings |\n\n## Requirements\n\n### R-01 — Authenticated API contracts\n\n- **S-01:** `claimDevice(macAddress, name?)` posts `{ macAddress, name? }` to `/api/devices/claim`, validates the returned Device, and retains its UUID separately from its MAC. LC-A50528 and backend-supported colon/hyphen MAC forms are accepted after trimming and normalization; invalid MAC/name input is rejected visibly.\n- **S-02:** `pairDeviceToPlant(plantId, deviceId)` patches `{ deviceId }` to `/api/plants/:plantId/pair-device`, accepts a UUID or null, and validates the returned Plant. Null is supported by the service without adding an unsolicited unpair UI.\n- **S-03:** `fetchPlantTelemetry(plantId)` gets `/api/plants/:plantId/telemetry` and validates the discriminated paired/unpaired contract, including nullable telemetry and the existing nested metric payload. Malformed successful responses become typed validation failures rather than fake defaults.\n- **S-04:** All three functions reuse Bearer authentication, one-time 401 refresh, timeout/cancellation and status-preserving errors. No access JWT is written to storage and HTTP failures are never converted into successful pairing or unpaired state.\n\n### R-02 — Claim and carry a real device\n\n- **S-05:** Entering LC-A50528 or scanning that value submits a single claim and advances directly to assignment with the returned device UUID available in global account state. Existing demo timers and mock hardware lookups are absent from this real path.\n- **S-06:** Claim pending state disables duplicate submissions. HTTP 409 displays an alert explaining the device is already claimed by another account, leaves the user on Scanner, and permits correction/retry; other failures have actionable retry messages.\n- **S-07:** Camera permission denial allows manual entry. Duplicate scan events do not cause repeated claims. Blur, cancel, unmount or account changes prevent late responses from advancing or leaking a previous account's pending device.\n\n### R-03 — Pair to an owned plant\n\n- **S-08:** Assignment lists existing owned plants, preserves a valid locked contextual plant target, and calls the pairing service with that plant ID and the claimed UUID. Missing claim state, invalid/deleted contextual targets and unsupported Space targets cannot silently select another destination or create a local mock assignment.\n- **S-09:** Pairing disables repeat submission, exposes loading and recoverable failure, and reports success only after backend confirmation. The success handoff offers navigation to the paired Plant Profile and requires no mock record.\n- **S-10:** Reassigning a device already paired to another plant makes only the intended backend pairing mutation. Update/invalidate collection state so the old plant loses its cached link, refresh pairing state on profile focus, and show a successful assignment message; visiting the old plant shows “No sensor paired”. A failed collection refresh after a successful write must not claim the pairing failed or trigger a second mutation automatically.\n- **S-11:** Guest access requires sign-in for real claiming/pairing. Existing manual plant care and image scanning remain available; existing local Space/demo records never establish server pairing.\n\n### R-04 — Unified profile telemetry states\n\n- **S-12:** Profile focus/refresh issues one BFF read for pairing/latest readings, shows a spinner or existing skeleton while pending, and cancels stale responses when the plant or session changes. Profile and PlantTelemetry do not call `fetchPlant`, `useSensorData` or the legacy latest endpoint for this read.\n- **S-13:** `paired: false` displays a “No sensor paired” card and “Pair a Sensor” action carrying the current plant target into Scanner; local mapping and demo data cannot override this state.\n- **S-14:** `paired: true` displays `device.name`. Non-null telemetry shows temperature Celsius, humidity percentage, soil moisture percentage and lux using the nested backend fields; valid zero values remain zero. Null telemetry displays “Waiting for first sensor reading...” without fabricated metrics.\n- **S-15:** BFF failure has a visible retry state distinct from unpaired/waiting. Any retained readings must be labelled stale/error; no previous plant's readings appear during navigation.\n- **S-16:** PlantTelemetry accepts the unified payload and callbacks for parent refresh instead of a deviceId-driven latest-fetch prop. Care guidance still receives the real readings or null. History, if retained, loads only through explicit user action using the hardware MAC, never the Device UUID and never an automatic extra profile request.\n- **S-17:** Existing name/image/species/location, edit/delete, thresholds, care guidance and image scanning use AppData metadata. Deep links wait for collection hydration, expose collection retry on failure and handle genuinely missing plants. Demo seeding/local mapping actions no longer influence real pairing/latest state on this screen; existing demo features outside this path remain outside scope.\n\n### R-05 — Verification and delivery\n\n- **S-18:** Frontend typecheck and meaningful API/flow tests cover claim 409, Bearer headers, UUID versus MAC, pairing failure/reassignment, account cancellation and all BFF states. Update mock-specific flow assertions for the real path; preserve unrelated tests and document baseline failures separately from new regressions.\n- **S-19:** Run Expo locally and verify authenticated Scanner → Assignment → Plant Profile against the existing backend: new claim, same-owner reclaim, another-owner conflict, waiting for a first reading, populated readings, reassignment and old-plant unpaired state. Record actual observations and missing credentials/hardware/backend prerequisites; starting Metro alone is not end-to-end verification.\n\n## Architecture\n\n### Structure and components\n\nPrimary frontend paths: `services/api.ts`, `services/validators.ts`, `types/`, `context/app-data.tsx`, `app/device-connection/scanner.tsx`, `assignment.tsx`, `success.tsx`, `app/plant-profile.tsx`, `components/plant-telemetry.tsx` and their frontend tests. Selection must be bypassed or guarded so a legacy route cannot supply mock IDs to real assignment. Entry/route types and management links may need compatibility adjustments within frontend only.\n\nAppData owns an ephemeral pending claimed Device inside its existing account-remounted provider and collection invalidation after pairing. It must not reuse the local plant→device mapping store as server authority. Assignment validates targets from the owned plant collection. Profile owns BFF loading, cancellation and retry; PlantTelemetry renders its payload. Global collection metadata remains the source of profile details and uses existing edit/delete refresh behavior.\n\nData flow: MAC input → shared authenticated transport → claimed Device UUID → pending account state → selected plant → pairing PATCH → confirmed success and collection refresh → focus-triggered BFF → profile states and metric cards.\n\n### Verified backend contract (read-only inspection)\n\n`backend/src/routes/devices.ts` returns a bare serialized Device (201 on create, 200 on same-owner reclaim, 409 on another owner's claim). `backend/src/lib/device.ts` serializes id, name, macAddress, userId, status and ISO timestamps. `backend/src/routes/plants.ts` returns a serialized Plant for pairing; telemetry returns exactly `{ paired: false, device: null, telemetry: null }` or `{ paired: true, device, telemetry }`. Telemetry fields are `environment.temperatureCelsius`, `environment.humidityPercentage`, `soilMoisture.percentage`, `lightLevel.lux`, timestamp and hardware-MAC `deviceId`. These are local integration contracts, not an external API inferred from memory. No database changes or queries are planned.\n\n### Brownfield protection and rollback\n\nThe shared transport, account-remount behavior and profile navigation are load-bearing. Existing API, auth, mock connection, accessibility, guidance and history tests protect them, though many mock assumptions will need replacement for this path. Initial frontend typecheck passed; the default suite failed before changes (230 passed, 42 failed in the first run), and repeat results differed. A serial run (`node --import tsx --test --test-concurrency=1 tests/*.test.ts` from frontend) reported 32 passing files and three failing files: scanner-care-task-feedback, scanner-lifecycle and scanner-pre-validation. Logs are in `/tmp/leafcheck-plan-frontend-tests.log` and `/tmp/leafcheck-plan-frontend-serial.log`; the cause is not established. Do not promise a green baseline without results.\n\nBlast radius is frontend connection navigation, plant collection linkage and profile sensor rendering. Backend ownership and atomic reassignment remain authoritative. Rollback reverts only the frontend integration commits; claims/pairings already stored by the backend remain real state and must not be undone by local storage restoration.\n\n## Visual Direction\n\nCalm, clear, familiar. Preserve the current light theme, green accents, existing typography, device screen steps and Action/Notice/MetricCard components. Use visible disabled/busy states and accessible alerts/status announcements. Avoid a redesign, mock discovery language, permission dead ends and success copy that implies automatic watering.\n\n## Security & Trust Boundaries\n\nEntered/scanned MACs, route parameters and JSON responses are untrusted; validate at the frontend boundary and use existing response parsers, while backend ownership checks remain authoritative. Route UUIDs and cached links are not authorization. Access JWT stays in memory; native refresh credentials remain in SecureStore and web refresh uses existing secure cookies. Provider/API secrets remain server-side. Session changes invalidate pending claims and asynchronous writes; messages use existing sanitized error patterns.\n\n## Success Criteria\n\n| Criterion | Verification |\n| --- | --- |\n| Strict frontend compiles | `npm run typecheck --workspace=frontend` |\n| Contract and UI regressions covered | `npm test --workspace=frontend`, targeted changed-path checks; compare documented baseline failures |\n| Real connection flow works | Expo local run with existing backend, authenticated accounts and seeded/physical MAC readings; record S-19 observations |\n| Backend untouched, existing visual patterns retained | Inspect frontend-only implementation diff and PRD scenarios |\n\n## Dependencies & Risks\n\nNo new dependencies or upgrades. Registry checks on 2026-10-05 report latest Expo 57.0.26, React Native 0.87.1 and Expo Router 57.0.24; this plan retains the installed/declared project versions instead of upgrading. Camera capability already exists. Real verification requires a running authenticated backend, both existing databases and a suitable device MAC; populated-reading verification also requires available telemetry. Scanner is currently simulated, so camera acquisition and accessible manual input are actual implementation work. BFF metadata omission and existing guest/Space demo destinations are explicitly handled above.\n\n## Out of Scope\n\nBackend edits, Prisma/schema work, new external APIs, firmware, Bluetooth discovery, real Space pairing, automatic watering, redesign and dependency upgrades. No delivery budget or scope cuts were supplied. No implementation or Expo end-to-end result is claimed by this planning phase. Do not commit unless the user explicitly asks, per project rules.\n"
+  },
+  "inventory": {
+    "digest": "8679f6f2f636d03905b35488546982a0bc9a8369020a28bdc726cfe28287a136",
+    "projection": "pincer inventory 1\nprd .prd/prd-v3.md\nrequirement R-01 ad468a9c6cc28c058f4c5e238d198476e097129f064c8f812bf19b7e94939548\nrequirement R-02 6560b4033c6715b6cd2665e3681d31e7b99f0429d03b398d165d384e44f3f656\nrequirement R-03 b9237dab37b73671d6d7a310db7850692eaed635e636b832484c2fc9ce13ac92\nrequirement R-04 f364cb4faba6f09cd7964bd9146d0f3cf5cd1a84ad83d210a48df614139396e8\nrequirement R-05 654b239c44a0513126625daed06e1369d8fbcb206df83cef6e929572a40b8fa4\nscenario S-01 R-01 08fa3d113972901898ff96dd057ebb5d7c636d4978d8e91cfdda3ed509c78e56\nscenario S-02 R-01 094eca1892fbe08a641e32f12d7699af34827c74efc15b4fe36e602ad650546f\nscenario S-03 R-01 0e53de386606bb2907cf94ef1366023eb23f805ac26d0e01c1bc12626560e64d\nscenario S-04 R-01 1fdc162a4d6e92fee6fcc749cec55381eaf9cbd2121758c6c59089ddaddd3f5b\nscenario S-05 R-02 dfc922f5dd01f778986fbfaa150da4a50bc22ff068d92166671a37fbbdf8d896\nscenario S-06 R-02 ce9e5f1d46464adf2f33a875c6394895e84718c010acacdcf72d4e4033f9d086\nscenario S-07 R-02 e3854801335a1005654a20ccb84f2e54779c77e86982ca0fd36cf124e32921ab\nscenario S-08 R-03 d630d594d3bab47b2a20416c2b0251faa7047aab105b2595f2320310264f9de2\nscenario S-09 R-03 177b14aeab459b92bfc8159f9a777466a376feaae1e72ef987644e0a8fb88db8\nscenario S-10 R-03 601dff6f55b08ae66bcf22420e264fd9534937a3c2c42c3487849474a3fccb1a\nscenario S-11 R-03 5e67a48742fb2b0d809d8bcbf559b074104287feaa259559aa47f9b349768165\nscenario S-12 R-04 8c215547ef895909b85886ed5dcc49cac85133342f9ff09fa94aeafc70d07aec\nscenario S-13 R-04 4d14932128ffb080a40ff3ddf9210d434c00055ef7ab6b131e3145a923bcab57\nscenario S-14 R-04 4a1111df46b6d8c0948b50211866a46d0e458de99ea319a900561d858c844e6e\nscenario S-15 R-04 905e06cd1c134124dbd9e13798f60f799e817f7564648398ec44feaec9e1ab10\nscenario S-16 R-04 e630600934daf3f044dd5ddc0af35cfbba05f5dc90780466dc942e537d07e713\nscenario S-17 R-04 fe15f68726eb724a1e70fd7d64b26e75bd8d1a10ea3be6bb2160cbcab5de12ac\nscenario S-18 R-05 d880cab0933bdeaad59a2b68d14c6e888d9afb846b37f02d5b96aae38934a828\nscenario S-19 R-05 56718005be73acb1fa97af7dd99d5fc55cbc3152c2baaf1b5d65fad95b3db25a\n",
+    "requirements": {
+      "R-01": {
+        "title": "Authenticated API contracts",
+        "text": "Authenticated API contracts",
+        "digest": "ad468a9c6cc28c058f4c5e238d198476e097129f064c8f812bf19b7e94939548",
+        "line": 35,
+        "end": 40,
+        "scenarios": [
+          "S-01",
+          "S-02",
+          "S-03",
+          "S-04"
+        ]
+      },
+      "R-02": {
+        "title": "Claim and carry a real device",
+        "text": "Claim and carry a real device",
+        "digest": "6560b4033c6715b6cd2665e3681d31e7b99f0429d03b398d165d384e44f3f656",
+        "line": 42,
+        "end": 46,
+        "scenarios": [
+          "S-05",
+          "S-06",
+          "S-07"
+        ]
+      },
+      "R-03": {
+        "title": "Pair to an owned plant",
+        "text": "Pair to an owned plant",
+        "digest": "b9237dab37b73671d6d7a310db7850692eaed635e636b832484c2fc9ce13ac92",
+        "line": 48,
+        "end": 53,
+        "scenarios": [
+          "S-08",
+          "S-09",
+          "S-10",
+          "S-11"
+        ]
+      },
+      "R-04": {
+        "title": "Unified profile telemetry states",
+        "text": "Unified profile telemetry states",
+        "digest": "f364cb4faba6f09cd7964bd9146d0f3cf5cd1a84ad83d210a48df614139396e8",
+        "line": 55,
+        "end": 62,
+        "scenarios": [
+          "S-12",
+          "S-13",
+          "S-14",
+          "S-15",
+          "S-16",
+          "S-17"
+        ]
+      },
+      "R-05": {
+        "title": "Verification and delivery",
+        "text": "Verification and delivery",
+        "digest": "654b239c44a0513126625daed06e1369d8fbcb206df83cef6e929572a40b8fa4",
+        "line": 64,
+        "end": 67,
+        "scenarios": [
+          "S-18",
+          "S-19"
+        ]
+      }
+    },
+    "scenarios": {
+      "S-01": {
+        "requirement": "R-01",
+        "text": "`claimDevice(macAddress, name?)` posts `{ macAddress, name? }` to `/api/devices/claim`, validates the returned Device, and retains its UUID separately from its MAC. LC-A50528 and backend-supported colon/hyphen MAC forms are accepted after trimming and normalization; invalid MAC/name input is rejected visibly.",
+        "digest": "08fa3d113972901898ff96dd057ebb5d7c636d4978d8e91cfdda3ed509c78e56",
+        "line": 37,
+        "end": 37
+      },
+      "S-02": {
+        "requirement": "R-01",
+        "text": "`pairDeviceToPlant(plantId, deviceId)` patches `{ deviceId }` to `/api/plants/:plantId/pair-device`, accepts a UUID or null, and validates the returned Plant. Null is supported by the service without adding an unsolicited unpair UI.",
+        "digest": "094eca1892fbe08a641e32f12d7699af34827c74efc15b4fe36e602ad650546f",
+        "line": 38,
+        "end": 38
+      },
+      "S-03": {
+        "requirement": "R-01",
+        "text": "`fetchPlantTelemetry(plantId)` gets `/api/plants/:plantId/telemetry` and validates the discriminated paired/unpaired contract, including nullable telemetry and the existing nested metric payload. Malformed successful responses become typed validation failures rather than fake defaults.",
+        "digest": "0e53de386606bb2907cf94ef1366023eb23f805ac26d0e01c1bc12626560e64d",
+        "line": 39,
+        "end": 39
+      },
+      "S-04": {
+        "requirement": "R-01",
+        "text": "All three functions reuse Bearer authentication, one-time 401 refresh, timeout/cancellation and status-preserving errors. No access JWT is written to storage and HTTP failures are never converted into successful pairing or unpaired state.",
+        "digest": "1fdc162a4d6e92fee6fcc749cec55381eaf9cbd2121758c6c59089ddaddd3f5b",
+        "line": 40,
+        "end": 40
+      },
+      "S-05": {
+        "requirement": "R-02",
+        "text": "Entering LC-A50528 or scanning that value submits a single claim and advances directly to assignment with the returned device UUID available in global account state. Existing demo timers and mock hardware lookups are absent from this real path.",
+        "digest": "dfc922f5dd01f778986fbfaa150da4a50bc22ff068d92166671a37fbbdf8d896",
+        "line": 44,
+        "end": 44
+      },
+      "S-06": {
+        "requirement": "R-02",
+        "text": "Claim pending state disables duplicate submissions. HTTP 409 displays an alert explaining the device is already claimed by another account, leaves the user on Scanner, and permits correction/retry; other failures have actionable retry messages.",
+        "digest": "ce9e5f1d46464adf2f33a875c6394895e84718c010acacdcf72d4e4033f9d086",
+        "line": 45,
+        "end": 45
+      },
+      "S-07": {
+        "requirement": "R-02",
+        "text": "Camera permission denial allows manual entry. Duplicate scan events do not cause repeated claims. Blur, cancel, unmount or account changes prevent late responses from advancing or leaking a previous account's pending device.",
+        "digest": "e3854801335a1005654a20ccb84f2e54779c77e86982ca0fd36cf124e32921ab",
+        "line": 46,
+        "end": 46
+      },
+      "S-08": {
+        "requirement": "R-03",
+        "text": "Assignment lists existing owned plants, preserves a valid locked contextual plant target, and calls the pairing service with that plant ID and the claimed UUID. Missing claim state, invalid/deleted contextual targets and unsupported Space targets cannot silently select another destination or create a local mock assignment.",
+        "digest": "d630d594d3bab47b2a20416c2b0251faa7047aab105b2595f2320310264f9de2",
+        "line": 50,
+        "end": 50
+      },
+      "S-09": {
+        "requirement": "R-03",
+        "text": "Pairing disables repeat submission, exposes loading and recoverable failure, and reports success only after backend confirmation. The success handoff offers navigation to the paired Plant Profile and requires no mock record.",
+        "digest": "177b14aeab459b92bfc8159f9a777466a376feaae1e72ef987644e0a8fb88db8",
+        "line": 51,
+        "end": 51
+      },
+      "S-10": {
+        "requirement": "R-03",
+        "text": "Reassigning a device already paired to another plant makes only the intended backend pairing mutation. Update/invalidate collection state so the old plant loses its cached link, refresh pairing state on profile focus, and show a successful assignment message; visiting the old plant shows “No sensor paired”. A failed collection refresh after a successful write must not claim the pairing failed or trigger a second mutation automatically.",
+        "digest": "601dff6f55b08ae66bcf22420e264fd9534937a3c2c42c3487849474a3fccb1a",
+        "line": 52,
+        "end": 52
+      },
+      "S-11": {
+        "requirement": "R-03",
+        "text": "Guest access requires sign-in for real claiming/pairing. Existing manual plant care and image scanning remain available; existing local Space/demo records never establish server pairing.",
+        "digest": "5e67a48742fb2b0d809d8bcbf559b074104287feaa259559aa47f9b349768165",
+        "line": 53,
+        "end": 53
+      },
+      "S-12": {
+        "requirement": "R-04",
+        "text": "Profile focus/refresh issues one BFF read for pairing/latest readings, shows a spinner or existing skeleton while pending, and cancels stale responses when the plant or session changes. Profile and PlantTelemetry do not call `fetchPlant`, `useSensorData` or the legacy latest endpoint for this read.",
+        "digest": "8c215547ef895909b85886ed5dcc49cac85133342f9ff09fa94aeafc70d07aec",
+        "line": 57,
+        "end": 57
+      },
+      "S-13": {
+        "requirement": "R-04",
+        "text": "`paired: false` displays a “No sensor paired” card and “Pair a Sensor” action carrying the current plant target into Scanner; local mapping and demo data cannot override this state.",
+        "digest": "4d14932128ffb080a40ff3ddf9210d434c00055ef7ab6b131e3145a923bcab57",
+        "line": 58,
+        "end": 58
+      },
+      "S-14": {
+        "requirement": "R-04",
+        "text": "`paired: true` displays `device.name`. Non-null telemetry shows temperature Celsius, humidity percentage, soil moisture percentage and lux using the nested backend fields; valid zero values remain zero. Null telemetry displays “Waiting for first sensor reading...” without fabricated metrics.",
+        "digest": "4a1111df46b6d8c0948b50211866a46d0e458de99ea319a900561d858c844e6e",
+        "line": 59,
+        "end": 59
+      },
+      "S-15": {
+        "requirement": "R-04",
+        "text": "BFF failure has a visible retry state distinct from unpaired/waiting. Any retained readings must be labelled stale/error; no previous plant's readings appear during navigation.",
+        "digest": "905e06cd1c134124dbd9e13798f60f799e817f7564648398ec44feaec9e1ab10",
+        "line": 60,
+        "end": 60
+      },
+      "S-16": {
+        "requirement": "R-04",
+        "text": "PlantTelemetry accepts the unified payload and callbacks for parent refresh instead of a deviceId-driven latest-fetch prop. Care guidance still receives the real readings or null. History, if retained, loads only through explicit user action using the hardware MAC, never the Device UUID and never an automatic extra profile request.",
+        "digest": "e630600934daf3f044dd5ddc0af35cfbba05f5dc90780466dc942e537d07e713",
+        "line": 61,
+        "end": 61
+      },
+      "S-17": {
+        "requirement": "R-04",
+        "text": "Existing name/image/species/location, edit/delete, thresholds, care guidance and image scanning use AppData metadata. Deep links wait for collection hydration, expose collection retry on failure and handle genuinely missing plants. Demo seeding/local mapping actions no longer influence real pairing/latest state on this screen; existing demo features outside this path remain outside scope.",
+        "digest": "fe15f68726eb724a1e70fd7d64b26e75bd8d1a10ea3be6bb2160cbcab5de12ac",
+        "line": 62,
+        "end": 62
+      },
+      "S-18": {
+        "requirement": "R-05",
+        "text": "Frontend typecheck and meaningful API/flow tests cover claim 409, Bearer headers, UUID versus MAC, pairing failure/reassignment, account cancellation and all BFF states. Update mock-specific flow assertions for the real path; preserve unrelated tests and document baseline failures separately from new regressions.",
+        "digest": "d880cab0933bdeaad59a2b68d14c6e888d9afb846b37f02d5b96aae38934a828",
+        "line": 66,
+        "end": 66
+      },
+      "S-19": {
+        "requirement": "R-05",
+        "text": "Run Expo locally and verify authenticated Scanner → Assignment → Plant Profile against the existing backend: new claim, same-owner reclaim, another-owner conflict, waiting for a first reading, populated readings, reassignment and old-plant unpaired state. Record actual observations and missing credentials/hardware/backend prerequisites; starting Metro alone is not end-to-end verification.",
+        "digest": "56718005be73acb1fa97af7dd99d5fc55cbc3152c2baaf1b5d65fad95b3db25a",
+        "line": 67,
+        "end": 67
+      }
+    }
+  },
+  "coverage": {
+    "path": ".prd/coverage/prd-v3.json",
+    "digest": "652a13c8080644dfd3db953c64cbbb6702c2c7b909d5c8f1b42943e9612fe83f",
+    "text": "{\"change\":\"prd-v3\",\"checks\":{\"C-01\":{\"command\":\"set -euo pipefail\\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-api.test.ts frontend/tests/api.test.ts\\nnpm run typecheck --workspace=frontend\",\"cwd\":null,\"kind\":\"command\",\"note\":\"Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result.\",\"obligation\":null,\"required\":true,\"timeout\":600},\"C-02\":{\"command\":\"set -euo pipefail\\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-claim-flow.test.ts frontend/tests/device-activity.test.ts\\nnpm run typecheck --workspace=frontend\",\"cwd\":null,\"kind\":\"command\",\"note\":\"Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result.\",\"obligation\":null,\"required\":true,\"timeout\":600},\"C-03\":{\"command\":\"set -euo pipefail\\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-pairing-flow.test.ts frontend/tests/device-connection-flow.test.ts frontend/tests/device-connection.test.ts\\nnpm run typecheck --workspace=frontend\",\"cwd\":null,\"kind\":\"command\",\"note\":\"Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result.\",\"obligation\":null,\"required\":true,\"timeout\":600},\"C-04\":{\"command\":\"set -euo pipefail\\nnode --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts frontend/tests/plant-guidance.test.ts frontend/tests/telemetry-series.test.ts\\nnpm run typecheck --workspace=frontend\",\"cwd\":null,\"kind\":\"command\",\"note\":\"Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result.\",\"obligation\":null,\"required\":true,\"timeout\":600},\"C-05\":{\"command\":\"set -euo pipefail\\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-frontend-integration.test.ts frontend/tests/device-connection-accessibility.test.ts\\nnpm test --workspace=frontend\\nnpm run typecheck --workspace=frontend\",\"cwd\":null,\"kind\":\"command\",\"note\":\"Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result.\",\"obligation\":null,\"required\":true,\"timeout\":600},\"C-07\":{\"command\":null,\"cwd\":null,\"kind\":\"review\",\"note\":null,\"obligation\":\"Run Expo locally against the existing authenticated backend and record Scanner -> Assignment -> Plant Profile: new claim, same-owner reclaim, another-owner 409, paired/null waiting, populated real readings, reassignment, and the old plant unpaired on revisit. Review actual results in .prd/frontend-device-verification-v3.md. Missing accounts/backend/hardware/runtime capability is unverified and leaves S-19 incomplete; Metro startup or mocked tests alone cannot pass this review.\",\"required\":true,\"timeout\":null},\"C-08\":{\"command\":null,\"cwd\":null,\"kind\":\"visual\",\"note\":null,\"obligation\":\"Review loading/disabled controls, accessible alert/retry states, unpaired/waiting/metrics cards and contextual pairing navigation against existing frontend styles. Inspect the diff for frontend-only implementation, unchanged backend/firmware/dependencies, no credential leakage, and preserved .env ignore/example conventions.\",\"required\":true,\"timeout\":null}},\"prd\":\".prd/prd-v3.md\",\"scenarios\":{\"S-01\":{\"checks\":[\"C-01\"],\"tickets\":[\"T-08\"]},\"S-02\":{\"checks\":[\"C-01\"],\"tickets\":[\"T-08\"]},\"S-03\":{\"checks\":[\"C-01\"],\"tickets\":[\"T-08\"]},\"S-04\":{\"checks\":[\"C-01\"],\"tickets\":[\"T-08\"]},\"S-05\":{\"checks\":[\"C-02\"],\"tickets\":[\"T-09\"]},\"S-06\":{\"checks\":[\"C-02\"],\"tickets\":[\"T-09\"]},\"S-07\":{\"checks\":[\"C-02\"],\"tickets\":[\"T-09\"]},\"S-08\":{\"checks\":[\"C-03\"],\"tickets\":[\"T-10\"]},\"S-09\":{\"checks\":[\"C-03\"],\"tickets\":[\"T-10\"]},\"S-10\":{\"checks\":[\"C-03\",\"C-04\"],\"tickets\":[\"T-10\",\"T-11\"]},\"S-11\":{\"checks\":[\"C-02\",\"C-03\"],\"tickets\":[\"T-09\",\"T-10\"]},\"S-12\":{\"checks\":[\"C-04\"],\"tickets\":[\"T-11\"]},\"S-13\":{\"checks\":[\"C-04\"],\"tickets\":[\"T-11\"]},\"S-14\":{\"checks\":[\"C-04\"],\"tickets\":[\"T-11\"]},\"S-15\":{\"checks\":[\"C-04\"],\"tickets\":[\"T-11\"]},\"S-16\":{\"checks\":[\"C-04\"],\"tickets\":[\"T-11\"]},\"S-17\":{\"checks\":[\"C-04\"],\"tickets\":[\"T-11\"]},\"S-18\":{\"checks\":[\"C-01\",\"C-02\",\"C-03\",\"C-04\",\"C-05\",\"C-08\"],\"tickets\":[\"T-12\"]},\"S-19\":{\"checks\":[\"C-07\"],\"tickets\":[\"T-12\"]}},\"schema\":1,\"scope\":{},\"tickets\":{\"T-08\":{\"rationale\":null,\"role\":\"implements\"},\"T-09\":{\"rationale\":null,\"role\":\"implements\"},\"T-10\":{\"rationale\":null,\"role\":\"implements\"},\"T-11\":{\"rationale\":null,\"role\":\"implements\"},\"T-12\":{\"rationale\":null,\"role\":\"implements\"}}}\n"
+  },
+  "tickets": {
+    "T-08": {
+      "file": "tickets/T-08-frontend-device-api-contracts.md",
+      "digest": "d8bce873aa1eec8a96dab382c6fd6d2cfcd36afb5f61cc1a46a155b84c9c24c7",
+      "text": "---\nticket: T-08\nsize: M\nprd: .prd/prd-v3.md\ndepends_on: []\ntimeout: 600\n---\n\n## Objective\nAdd authenticated device and telemetry API contracts so the frontend implements the server-authoritative device flow.\n\n## Context\n- Implements: R-01\n- Scenarios: S-01–S-04\n- Relevant files: frontend/services/api.ts, frontend/services/validators.ts, frontend/types/, frontend/tests/api.test.ts\n- Follow existing request/session, Action/Notice, device-screen and test harness patterns; read the relevant source before edits.\n\n## Requirements\n- Add claimDevice(macAddress, name?), pairDeviceToPlant(plantId, deviceId|null), and fetchPlantTelemetry(plantId) to the existing client and named exports; reuse request options including AbortSignal.\n- Validate/normalize LC and conventional MAC formats, optional nonempty names up to 100 characters, and UUID resource identifiers. Invalid input must reject before transport.\n- Parse bare serialized Device, pairing Plant and discriminated BFF payloads. Enforce unpaired null fields and paired valid Device with nested nullable readings; reject malformed success responses.\n- Preserve Bearer headers, 401 refresh, typed HTTP status including 409, timeout and cancellation. Keep UUID and MAC identities distinct.\n\n## Acceptance Criteria\n- [ ] Claim/pair/unpair/BFF route, method, body and parsed-response assertions pass, including zero metrics and null readings.\n- [ ] Invalid input and inconsistent or malformed payloads reject; 409 remains distinguishable and is never a successful claim.\n- [ ] Production client tests demonstrate auth refresh, session cancellation and no transport regression.\n\n## Verification\nProves: Production API tests observe outgoing requests and accepted/rejected responses, identity separation, authentication and cancellation rather than matching source identifiers. New focused test files below are deliverables, not existing evidence; missing files must fail verification.\n```bash\nset -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-api.test.ts frontend/tests/api.test.ts\nnpm run typecheck --workspace=frontend\n```\n\n## Constraints\n- Frontend-only implementation; no backend/database/firmware changes or new dependencies.\n- Strict TypeScript without any; preserve account token handling, existing environment conventions and styling.\n- Run verification from repository root. Do not commit unless explicitly asked by the user.\n- Do not fabricate manual/live results or treat Metro startup as end-to-end success.\n\n"
+    },
+    "T-09": {
+      "file": "tickets/T-09-claim-real-device-from-scanner.md",
+      "digest": "8f07925f66e52e70e8a6879abe22e662cfc61473fb59bae4d054824821a2cc6e",
+      "text": "---\nticket: T-09\nsize: M\nprd: .prd/prd-v3.md\ndepends_on: [T-08]\ntimeout: 600\n---\n\n## Objective\nClaim a real MAC and retain account-scoped device state so the frontend implements the server-authoritative device flow.\n\n## Context\n- Implements: R-02, R-03\n- Scenarios: S-05–S-07; S-11 claim access\n- Relevant files: frontend/app/device-connection/scanner.tsx, frontend/context/app-data.tsx, frontend/app/device-connection/selection.tsx, frontend/types/device-connection.ts\n- Follow existing request/session, Action/Notice, device-screen and test harness patterns; read the relevant source before edits.\n\n## Requirements\n- Replace timed demo discovery with accessible manual MAC input and existing Expo Camera barcode/QR acquisition. Scan the MAC value, without inventing a QR JSON protocol.\n- Use claimDevice; retain the returned Device in ephemeral account-scoped AppData state and navigate directly to assignment with the UUID and contextual target.\n- Guard duplicate scan events/submissions; disable busy actions. 409 shows an accessible alert and stays on Scanner for correction/retry; other errors use existing sanitized patterns.\n- Manual entry remains usable when camera access is denied. Abort on blur/cancel/unmount; session changes clear pending Device and late responses never navigate.\n- Require sign-in for real claim and guard/bypass legacy mock selection routes; do not remove unrelated local demo data.\n\n## Acceptance Criteria\n- [ ] Entered or scanned LC-A50528 yields exactly one claim and a UUID-bearing assignment handoff.\n- [ ] Malformed/empty input is rejected visibly; 409 never advances; retry works after failure.\n- [ ] Camera denial permits manual claiming, and cancellation/account switching prevents stale state or navigation.\n- [ ] Guest claiming requires sign-in while existing manual care/image scanning remains accessible.\n\n## Verification\nProves: A production screen/provider handler harness observes claim count, input/error UI, route parameters, camera denial and late-response behavior across lifecycle/account boundaries. New focused test files below are deliverables, not existing evidence; missing files must fail verification.\n```bash\nset -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-claim-flow.test.ts frontend/tests/device-activity.test.ts\nnpm run typecheck --workspace=frontend\n```\n\n## Constraints\n- Frontend-only implementation; no backend/database/firmware changes or new dependencies.\n- Strict TypeScript without any; preserve account token handling, existing environment conventions and styling.\n- Run verification from repository root. Do not commit unless explicitly asked by the user.\n- Do not fabricate manual/live results or treat Metro startup as end-to-end success.\n\n"
+    },
+    "T-10": {
+      "file": "tickets/T-10-pair-claimed-device-to-plant.md",
+      "digest": "6970fe4a77ead01156dd0642fefd4c355754f123ecb25ca9d7820fb415378770",
+      "text": "---\nticket: T-10\nsize: M\nprd: .prd/prd-v3.md\ndepends_on: [T-09]\ntimeout: 600\n---\n\n## Objective\nPair the claimed UUID and refresh reassigned plants so the frontend implements the server-authoritative device flow.\n\n## Context\n- Implements: R-03\n- Scenarios: S-08–S-11\n- Relevant files: frontend/app/device-connection/assignment.tsx, frontend/app/device-connection/success.tsx, frontend/context/app-data.tsx, frontend/services/device-connection.ts\n- Follow existing request/session, Action/Notice, device-screen and test harness patterns; read the relevant source before edits.\n\n## Requirements\n- Replace mock lookup/delay/local assignment mutation with owned-plant selection and pairDeviceToPlant. Preserve valid locked contextual targets; reject missing pending claims, malformed/deleted targets, mock IDs and Space targets without choosing another destination.\n- Busy state prevents duplicate mutations. Mutation errors remain on Assignment with retry; success appears only after confirmation and offers the paired profile route without requiring a mock connectedDevices record.\n- Use backend auto-reassignment, never an extra unpair request. Replace the destination's cached Plant and clear that device's old cached plant link; refresh/invalidate the collection without confusing refresh failure with pairing failure.\n- Retain account isolation and abort handling. After a confirmed mutation, cancellation cannot imply server rollback. Guest pairing requires sign-in; route params/local data do not authorize pairing.\n- Update compatibility entry/success links needed for the real flow; unrelated mock Space records must never count as server pairing.\n\n## Acceptance Criteria\n- [ ] The selected owned plant is paired using the claimed UUID exactly once and confirmed success navigates to its profile.\n- [ ] Invalid/deleted/unsupported targets and missing claim state cannot issue a mutation or silently fall back.\n- [ ] Pair failure has retry; refresh failure after successful pair still reports successful pair with a refresh warning.\n- [ ] Reassignment clears old cached linkage without an explicit unpair mutation; account changes cannot apply stale state.\n- [ ] Legacy mock-specific assignment tests are updated for real behavior while unrelated local persistence coverage remains.\n\n## Verification\nProves: Production assignment/provider tests observe the actual pairing call, confirmed success, failed mutation/refresh distinction, target rejection and cache reassignment across accounts. New focused test files below are deliverables, not existing evidence; missing files must fail verification.\n```bash\nset -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-pairing-flow.test.ts frontend/tests/device-connection-flow.test.ts frontend/tests/device-connection.test.ts\nnpm run typecheck --workspace=frontend\n```\n\n## Constraints\n- Frontend-only implementation; no backend/database/firmware changes or new dependencies.\n- Strict TypeScript without any; preserve account token handling, existing environment conventions and styling.\n- Run verification from repository root. Do not commit unless explicitly asked by the user.\n- Do not fabricate manual/live results or treat Metro startup as end-to-end success.\n\n"
+    },
+    "T-11": {
+      "file": "tickets/T-11-render-plant-telemetry-bff.md",
+      "digest": "56b5626dd60c4b460049dbe405030f93091e7cfa92d4fcc9ae744f9c9b79a1eb",
+      "text": "---\nticket: T-11\nsize: M\nprd: .prd/prd-v3.md\ndepends_on: [T-08, T-10]\ntimeout: 600\n---\n\n## Objective\nRender Plant Profile from unified BFF sensor state so the frontend implements the server-authoritative device flow.\n\n## Context\n- Implements: R-04\n- Scenarios: S-12–S-17\n- Relevant files: frontend/app/plant-profile.tsx, frontend/components/plant-telemetry.tsx, frontend/components/plant-care-summary.tsx, frontend/components/telemetry-history.tsx\n- Follow existing request/session, Action/Notice, device-screen and test harness patterns; read the relevant source before edits.\n\n## Requirements\n- Use AppData collection metadata for name/image/species/location/thresholds and edit/delete/scan controls; wait for hydration and expose collection retry and genuinely missing-plant behavior. Do not add a profile fetchPlant fallback.\n- Own one BFF latest/pairing read on focus/refresh, with spinner, retry and cancellation of obsolete responses. Remove useSensorData/latest requests from PlantTelemetry and accept unified payload plus parent callbacks.\n- Render unpaired card and Pair a Sensor contextual action; paired Device name with nested metrics including zero; paired/null waiting message. Errors stay distinct from unpaired/waiting and never display another plant's readings.\n- Retain care guidance with telemetry or null, accessible states and existing styles. Local mapping/demo-seed actions must not override real sensor state.\n- If retaining history, load only after an explicit action and address it using Device.macAddress, not UUID. Preserve a useful history feature without an automatic second request.\n- Verify the old plant after reassignment becomes unpaired on focus; handle metadata updates without refetch loops.\n\n## Acceptance Criteria\n- [ ] Loading, unpaired, waiting, populated and failure/retry states render correctly and only the BFF fetches latest readings.\n- [ ] No extra metadata/latest/history call occurs from a ready profile; zero readings are rendered as zero.\n- [ ] Pair action carries the current plant target; old profile responses cannot overwrite a different plant.\n- [ ] Metadata loading/error/missing cases preserve useful edit/delete/scanning/care behavior when metadata is available.\n- [ ] Malformed BFF is surfaced as failure, local mapping cannot turn unpaired into paired, and explicit history uses MAC.\n\n## Verification\nProves: A production profile/component harness observes calls and rendered states, metrics, retries, metadata recovery, history identity and cancellation; existing guidance/history tests protect unrelated behavior. New focused test files below are deliverables, not existing evidence; missing files must fail verification.\n```bash\nset -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts frontend/tests/plant-guidance.test.ts frontend/tests/telemetry-series.test.ts\nnpm run typecheck --workspace=frontend\n```\n\n## Constraints\n- Frontend-only implementation; no backend/database/firmware changes or new dependencies.\n- Strict TypeScript without any; preserve account token handling, existing environment conventions and styling.\n- Run verification from repository root. Do not commit unless explicitly asked by the user.\n- Do not fabricate manual/live results or treat Metro startup as end-to-end success.\n\n"
+    },
+    "T-12": {
+      "file": "tickets/T-12-verify-real-device-frontend-flow.md",
+      "digest": "c64fb3d9e16c44c80dcf8e60910329d6b05762846c80cbc6d750cb6297aa97b5",
+      "text": "---\nticket: T-12\nsize: M\nprd: .prd/prd-v3.md\ndepends_on: [T-09, T-10, T-11]\ntimeout: 600\n---\n\n## Objective\nVerify regression coverage and local Expo device flow so the frontend implements the server-authoritative device flow.\n\n## Context\n- Implements: R-05\n- Scenarios: S-18–S-19\n- Relevant files: frontend/tests/device-connection-accessibility.test.ts, frontend/tests/device-frontend-integration.test.ts, .prd/frontend-device-verification-v3.md\n- Follow existing request/session, Action/Notice, device-screen and test harness patterns; read the relevant source before edits.\n\n## Requirements\n- Add an integration harness executing production Scanner → Assignment → Profile behavior with the real frontend API client and controlled HTTP responses; cover claim conflict, headers, MAC/UUID separation, null/populated/unpaired states, reassignment and account cancellation.\n- Update impacted accessibility/mock assertions without removing unrelated regression coverage. Run full frontend tests and typecheck; investigate previous inconsistent suite results and identify baseline versus introduced failures. Do not suppress failures or silently waive them.\n- Start Expo using existing project scripts and the configured EXPO_PUBLIC_API_URL. Exercise live authenticated new claim/same-owner reclaim/another-owner conflict, waiting/readings/reassignment and old-plant unpaired flow against the existing backend.\n- Record commands, actual observed results, platform and prerequisites in .prd/frontend-device-verification-v3.md without credentials. Missing backend/accounts/hardware/browser capability is explicitly unverified and keeps S-19 unresolved.\n- Review existing visual/accessibility patterns and frontend-only scope. Preserve .env ignore/example conventions and make no backend changes.\n\n## Acceptance Criteria\n- [ ] Integration and updated accessibility tests exercise the real screens/client rather than copies of callbacks.\n- [ ] Full frontend test runner and typecheck pass; any environmental/pre-existing failure is documented and cannot count as a passed check.\n- [ ] Local Expo live-flow results cover every S-19 branch with observable evidence, or are explicitly unverified pending prerequisites.\n- [ ] Visual review confirms existing patterns; no backend, firmware, secrets or new dependency changes appear.\n\n## Verification\nProves: Production frontend integration/accessibility tests and the full runner detect behavioral regressions. The command does not prove live Expo navigation; required C-07 live-flow review and C-08 scope/visual review remain separate delivery obligations. New focused test files below are deliverables, not existing evidence; missing files must fail verification.\n```bash\nset -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-frontend-integration.test.ts frontend/tests/device-connection-accessibility.test.ts\nnpm test --workspace=frontend\nnpm run typecheck --workspace=frontend\n```\n\n## Constraints\n- Frontend-only implementation; no backend/database/firmware changes or new dependencies.\n- Strict TypeScript without any; preserve account token handling, existing environment conventions and styling.\n- Run verification from repository root. Do not commit unless explicitly asked by the user.\n- Do not fabricate manual/live results or treat Metro startup as end-to-end success.\n\n"
+    }
+  },
+  "decisions": {},
+  "recorded": "2026-10-05T09:52:51Z"
+}
