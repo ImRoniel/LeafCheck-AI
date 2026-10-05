@@ -1,0 +1,889 @@
+$ npm test --workspace=backend
+
+--- stdout (2 redaction(s)) ---
+TAP version 13
+# (node:20274) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# [AI] /analyze error: SCAN_AI_CONFIGURATION
+# [AI] /analyze error: SCAN_AI_CONFIGURATION
+# Subtest: legacy analysis route recovers from missing config, rotates keys, and sanitizes upstream rejection
+ok 1 - legacy analysis route recovers from missing config, rotates keys, and sanitizes upstream rejection
+  ---
+  duration_ms: 517.443681
+  type: 'test'
+  ...
+# (node:20280) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: registration normalizes email, hashes exact password, rejects privileged fields and duplicates
+ok 2 - registration normalizes email, hashes exact password, rejects privileged fields and duplicates
+  ---
+  duration_ms: 5977.405746
+  type: 'test'
+  ...
+# Subtest: registration and login accept 8–128 characters and reject out-of-range passwords
+ok 3 - registration and login accept 8–128 characters and reject out-of-range passwords
+  ---
+  duration_ms: 4341.853988
+  type: 'test'
+  ...
+# Subtest: unknown and wrong-password login have the same generic response
+ok 4 - unknown and wrong-password login have the same generic response
+  ---
+  duration_ms: 1707.168374
+  type: 'test'
+  ...
+# Subtest: rotation stores only hashes; replay revokes replacement access and refresh
+ok 5 - rotation stores only hashes; replay revokes replacement access and refresh
+  ---
+  duration_ms: 812.394366
+  type: 'test'
+  ...
+# Subtest: concurrent refresh permits one consume then revokes the session on replay
+ok 6 - concurrent refresh permits one consume then revokes the session on replay
+  ---
+  duration_ms: 650.68221
+  type: 'test'
+  ...
+# Subtest: profile allowlist, logout, logout-all and inactive users
+ok 7 - profile allowlist, logout, logout-all and inactive users
+  ---
+  duration_ms: 1875.931613
+  type: 'test'
+  ...
+# Subtest: JWT issuer, audience, algorithm, expiry and signature are enforced
+ok 8 - JWT issuer, audience, algorithm, expiry and signature are enforced
+  ---
+  duration_ms: 585.778895
+  type: 'test'
+  ...
+# Subtest: browser refresh is cookie-only with secure attributes and explicit origin/CSRF checks
+ok 9 - browser refresh is cookie-only with secure attributes and explicit origin/CSRF checks
+  ---
+  duration_ms: 488.67591
+  type: 'test'
+  ...
+# (node:20281) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: real JWT middleware and ownership stop unauthorized seeding before writes
+ok 10 - real JWT middleware and ownership stop unauthorized seeding before writes
+  ---
+  duration_ms: 1554.297022
+  type: 'test'
+  ...
+# Subtest: deterministic curves have 193 samples, prescribed bounds and one watering jump
+ok 11 - deterministic curves have 193 samples, prescribed bounds and one watering jump
+  ---
+  duration_ms: 36.672127
+  type: 'test'
+  ...
+# Subtest: seeding links one virtual device; repeats and concurrent requests retain only 193 readings
+ok 12 - seeding links one virtual device; repeats and concurrent requests retain only 193 readings
+  ---
+  duration_ms: 124.11884
+  type: 'test'
+  ...
+# Subtest: history and latest are owner-scoped and retrieve the complete demo batch
+ok 13 - history and latest are owner-scoped and retrieve the complete demo batch
+  ---
+  duration_ms: 103.928891
+  type: 'test'
+  ...
+# Subtest: hardware ingestion cannot contaminate demo data; hardware links are preserved
+ok 14 - hardware ingestion cannot contaminate demo data; hardware links are preserved
+  ---
+  duration_ms: 117.978474
+  type: 'test'
+  ...
+# Subtest: demo seeding cannot reuse a device belonging to another owner or plant
+ok 15 - demo seeding cannot reuse a device belonging to another owner or plant
+  ---
+  duration_ms: 45.432484
+  type: 'test'
+  ...
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected invalid telemetry payload.
+# [Telemetry] Rejected telemetry for an unknown device.
+# [Telemetry] POST ingest error: Error: private storage failure
+#     at Object.create (/home/roniel_cuaresma/Leaf-Check-AI/backend/tests/demo-telemetry.test.mjs:81:34)
+#     at <anonymous> (/home/roniel_cuaresma/Leaf-Check-AI/backend/src/routes/telemetry.ts:154:48)
+#     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+# Subtest: hardware ingestion accepts sensor boundaries and rejects invalid input before writes
+ok 16 - hardware ingestion accepts sensor boundaries and rejects invalid input before writes
+  ---
+  duration_ms: 380.527035
+  type: 'test'
+  ...
+# (node:20282) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# [LeafCheck Backend] Listening on http://0.0.0.0:0
+# Subtest: actual server mount requires authentication and rejects malformed bodies without writes
+ok 17 - actual server mount requires authentication and rejects malformed bodies without writes
+  ---
+  duration_ms: 1381.231158
+  type: 'test'
+  ...
+# Subtest: create normalizes supported addresses and exposes exactly the Device contract
+ok 18 - create normalizes supported addresses and exposes exactly the Device contract
+  ---
+  duration_ms: 43.929649
+  type: 'test'
+  ...
+# Subtest: owner reclaim preserves ID/name, trims supplied names, and denies foreign claim without mutation
+ok 19 - owner reclaim preserves ID/name, trims supplied names, and denies foreign claim without mutation
+  ---
+  duration_ms: 59.86417
+  type: 'test'
+  ...
+# Subtest: unique-constraint race re-reads winner and applies same-owner and foreign-owner rules
+ok 20 - unique-constraint race re-reads winner and applies same-owner and foreign-owner rules
+  ---
+  duration_ms: 22.853294
+  type: 'test'
+  ...
+# Subtest: unexpected storage failures are sanitized
+ok 21 - unexpected storage failures are sanitized
+  ---
+  duration_ms: 22.54349
+  type: 'test'
+  ...
+# Subtest: parallel claims yield one creation and an owner-appropriate conflict resolution
+ok 22 - parallel claims yield one creation and an owner-appropriate conflict resolution
+  ---
+  duration_ms: 58.990388
+  type: 'test'
+  ...
+# Subtest: mandatory provider validation rejects malformed credentials without exposing values
+ok 23 - mandatory provider validation rejects malformed credentials without exposing values
+  ---
+  duration_ms: 10.99685
+  type: 'test'
+  ...
+# Subtest: startup validation and both model modes accept legacy and AQ. keys
+ok 24 - startup validation and both model modes accept legacy and AQ. keys
+  ---
+  duration_ms: 1.720468
+  type: 'test'
+  ...
+# Subtest: real SDK uses current trimmed API key, no bearer [redacted], and configured model on each request
+ok 25 - real SDK uses current trimmed API key, no bearer [redacted], and configured model on each request
+  ---
+  duration_ms: 191.34211
+  type: 'test'
+  ...
+# Subtest: real SDK authentication errors are sanitized rather than retried or returned as user 401s
+ok 26 - real SDK authentication errors are sanitized rather than retried or returned as user 401s
+  ---
+  duration_ms: 14.030705
+  type: 'test'
+  ...
+# Subtest: server exits cleanly before listening when mandatory configuration is missing or malformed
+ok 27 - server exits cleanly before listening when mandatory configuration is missing or malformed
+  ---
+  duration_ms: 15291.999647
+  type: 'test'
+  ...
+# (node:20291) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: protected routers reject anonymous callers
+ok 28 - protected routers reject anonymous callers
+  ---
+  duration_ms: 10315.222838
+  type: 'test'
+  ...
+# Subtest: cross-owner reads, updates and analysis stop before costs or writes
+ok 29 - cross-owner reads, updates and analysis stop before costs or writes
+  ---
+  duration_ms: 158.622282
+  type: 'test'
+  ...
+# Subtest: scan requires device association and rejects extra fields
+ok 30 - scan requires device association and rejects extra fields
+  ---
+  duration_ms: 46.538854
+  type: 'test'
+  ...
+# Subtest: owner reads succeed and firmware ingestion still accepts no user JWT
+ok 31 - owner reads succeed and firmware ingestion still accepts no user JWT
+  ---
+  duration_ms: 49.905505
+  type: 'test'
+  ...
+# Subtest: native argon2 0.45.1 fixtures remain compatible, including parameter order and Unicode
+ok 32 - native argon2 0.45.1 fixtures remain compatible, including parameter order and Unicode
+  ---
+  duration_ms: 5840.104144
+  type: 'test'
+  ...
+# Subtest: new hashes have random salts, unchanged work factors, and interoperable encoding
+ok 33 - new hashes have random salts, unchanged work factors, and interoperable encoding
+  ---
+  duration_ms: 4309.571603
+  type: 'test'
+  ...
+# Subtest: missing, malformed, unsupported and excessive-cost hashes fail closed
+ok 34 - missing, malformed, unsupported and excessive-cost hashes fail closed
+  ---
+  duration_ms: 5344.038703
+  type: 'test'
+  ...
+# Subtest: pool bounds concurrency/queue, remains responsive, and recovers after overload
+ok 35 - pool bounds concurrency/queue, remains responsive, and recovers after overload
+  ---
+  duration_ms: 1885.411461
+  type: 'test'
+  ...
+# Subtest: worker failures and timeouts reject active/queued work without hanging
+ok 36 - worker failures and timeouts reject active/queued work without hanging
+  ---
+  duration_ms: 73.0542
+  type: 'test'
+  ...
+# (node:20384) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: rejects invalid input, UUIDs, foreign and missing resources before writes
+ok 37 - rejects invalid input, UUIDs, foreign and missing resources before writes
+  ---
+  duration_ms: 808.640008
+  type: 'test'
+  ...
+# Subtest: auto-unpairs all previous holders, replaces the target association and preserves Plant serialization
+ok 38 - auto-unpairs all previous holders, replaces the target association and preserves Plant serialization
+  ---
+  duration_ms: 22.149866
+  type: 'test'
+  ...
+# Subtest: unpair is repeatable, returns existing omitted-null contract and never checks a device
+ok 39 - unpair is repeatable, returns existing omitted-null contract and never checks a device
+  ---
+  duration_ms: 31.687454
+  type: 'test'
+  ...
+# Subtest: failure after auto-unpair rolls back both plants and sanitizes storage errors
+ok 40 - failure after auto-unpair rolls back both plants and sanitizes storage errors
+  ---
+  duration_ms: 22.059509
+  type: 'test'
+  ...
+# Subtest: serialization conflicts retry fresh ownership checks; exhaustion is a controlled 409
+ok 41 - serialization conflicts retry fresh ownership checks; exhaustion is a controlled 409
+  ---
+  duration_ms: 28.596541
+  type: 'test'
+  ...
+# Subtest: concurrent requests are retried after commit conflict and retain only one holder
+ok 42 - concurrent requests are retried after commit conflict and retain only one holder
+  ---
+  duration_ms: 66.555078
+  type: 'test'
+  ...
+# Subtest: ownership is rechecked inside the transaction when plant disappears
+ok 43 - ownership is rechecked inside the transaction when plant disappears
+  ---
+  duration_ms: 11.037299
+  type: 'test'
+  ...
+# (node:20513) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: unpaired plant returns explicit empty state without device or Mongo queries
+ok 44 - unpaired plant returns explicit empty state without device or Mongo queries
+  ---
+  duration_ms: 476.074792
+  type: 'test'
+  ...
+# Subtest: paired plant joins hardware MAC and returns newest reading in the canonical payload
+ok 45 - paired plant joins hardware MAC and returns newest reading in the canonical payload
+  ---
+  duration_ms: 24.976835
+  type: 'test'
+  ...
+# Subtest: soil classification uses custom plant bounds including both inclusive boundaries
+ok 46 - soil classification uses custom plant bounds including both inclusive boundaries
+  ---
+  duration_ms: 114.094173
+  type: 'test'
+  ...
+# Subtest: nullable sensors retain zero fallback and light thresholds retain inclusive optimal boundaries
+ok 47 - nullable sensors retain zero fallback and light thresholds retain inclusive optimal boundaries
+  ---
+  duration_ms: 133.363809
+  type: 'test'
+  ...
+# Subtest: no MAC reading returns paired device with null telemetry; UUID readings are not a fallback
+ok 48 - no MAC reading returns paired device with null telemetry; UUID readings are not a fallback
+  ---
+  duration_ms: 36.079105
+  type: 'test'
+  ...
+# Subtest: unauthorized, invalid, absent and foreign resources stop before Mongo queries
+ok 49 - unauthorized, invalid, absent and foreign resources stop before Mongo queries
+  ---
+  duration_ms: 85.764682
+  type: 'test'
+  ...
+# Subtest: failures from either database are sanitized and do not leak storage details
+ok 50 - failures from either database are sanitized and do not leak storage details
+  ---
+  duration_ms: 53.067511
+  type: 'test'
+  ...
+# (node:20523) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: new account can create, list, view and delete its first plant
+ok 51 - new account can create, list, view and delete its first plant
+  ---
+  duration_ms: 1070.953897
+  type: 'test'
+  ...
+# Subtest: creation rejects invalid input and caller-controlled ownership without writes
+ok 52 - creation rejects invalid input and caller-controlled ownership without writes
+  ---
+  duration_ms: 418.993089
+  type: 'test'
+  ...
+# Subtest: owner can patch details and boundary moisture values; other accounts see identical 404s
+ok 53 - owner can patch details and boundary moisture values; other accounts see identical 404s
+  ---
+  duration_ms: 145.434733
+  type: 'test'
+  ...
+# Subtest: patch validation rejects invalid fields without writes and handles concurrent disappearance
+ok 54 - patch validation rejects invalid fields without writes and handles concurrent disappearance
+  ---
+  duration_ms: 239.40638
+  type: 'test'
+  ...
+# Subtest: anonymous writes, invalid IDs, optional blanks, and write failures
+ok 55 - anonymous writes, invalid IDs, optional blanks, and write failures
+  ---
+  duration_ms: 86.124973
+  type: 'test'
+  ...
+# Subtest: pinned library ESM parses task title and date; adapter extracts only action bullets
+ok 56 - pinned library ESM parses task title and date; adapter extracts only action bullets
+  ---
+  duration_ms: 818.359516
+  type: 'test'
+  ...
+# Subtest: missing, repeated, empty and unusable sections use a bounded review fallback
+ok 57 - missing, repeated, empty and unusable sections use a bounded review fallback
+  ---
+  duration_ms: 4.257577
+  type: 'test'
+  ...
+# Subtest: bullets, continuation details, deduplication and five-task limit preserve report order
+ok 58 - bullets, continuation details, deduplication and five-task limit preserve report order
+  ---
+  duration_ms: 10.112452
+  type: 'test'
+  ...
+# Subtest: absolute dates and default reminders ignore ambient timezone and relative clock
+ok 59 - absolute dates and default reminders ignore ambient timezone and relative clock
+  ---
+  duration_ms: 44.921986
+  type: 'test'
+  ...
+# Subtest: conditional and negative instructions retain their meaning and cannot control persistence
+ok 60 - conditional and negative instructions retain their meaning and cannot control persistence
+  ---
+  duration_ms: 3.936502
+  type: 'test'
+  ...
+# (node:20616) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache hit for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: cache hit skips Perenual and insertion
+ok 61 - cache hit skips Perenual and insertion
+  ---
+  duration_ms: 8472.297574
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# Subtest: saved task fields match the public response and trusted scan ownership
+ok 62 - saved task fields match the public response and trusted scan ownership
+  ---
+  duration_ms: 596.238994
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# Subtest: report without actions always writes one review task regardless of provider task array
+ok 63 - report without actions always writes one review task regardless of provider task array
+  ---
+  duration_ms: 11.282881
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: failure at plant is sanitized and rolls back all scan writes
+ok 64 - failure at plant is sanitized and rolls back all scan writes
+  ---
+  duration_ms: 16.154364
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: failure at identification is sanitized and rolls back all scan writes
+ok 65 - failure at identification is sanitized and rolls back all scan writes
+  ---
+  duration_ms: 14.669411
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: failure at analysis is sanitized and rolls back all scan writes
+ok 66 - failure at analysis is sanitized and rolls back all scan writes
+  ---
+  duration_ms: 20.975366
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# Subtest: failure at tasks is sanitized and rolls back all scan writes
+ok 67 - failure at tasks is sanitized and rolls back all scan writes
+  ---
+  duration_ms: 14.912996
+  type: 'test'
+  ...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# [Scan] Pipeline error: SCAN_FAILED
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: failure at health is sanitized and rolls back all scan writes
+ok 68 - failure at health is sanitized and rolls back all scan writes
+  ---
+  duration_ms: 14.584827
+  type: 'test'
+  ...
+# Subtest: plant guidance is filtered by the owned plant before limiting history
+ok 69 - plant guidance is filtered by the owned plant before limiting history
+  ---
+  duration_ms: 30.073475
+  type: 'test'
+  ...
+# Subtest: missing, malformed and oversized images are rejected before provider calls or writes
+ok 70 - missing, malformed and oversized images are rejected before provider calls or writes
+  ---
+  duration_ms: 338.492613
+  type: 'test'
+  ...
+# Subtest: foreign plants and linked devices are blocked before providers and telemetry reads
+ok 71 - foreign plants and linked devices are blocked before providers and telemetry reads
+  ---
+  duration_ms: 34.076984
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: Sensor reading is 60 minutes old (STALE — readings may not reflect current conditions. Treat with lower confidence).
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: owned device telemetry and stale context are preserved with diagnostic text
+ok 72 - owned device telemetry and stale context are preserved with diagnostic text
+  ---
+  duration_ms: 10.246523
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_UNAVAILABLE
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_UNAVAILABLE
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_UNAVAILABLE
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_UNAVAILABLE
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_UNAVAILABLE
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_UNAVAILABLE
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_UNAVAILABLE
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# Subtest: malformed AI structures fail safely before creating plants or analyses
+ok 73 - malformed AI structures fail safely before creating plants or analyses
+  ---
+  duration_ms: 51.586384
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: cache miss inserts specifications normally
+ok 74 - cache miss inserts specifications normally
+  ---
+  duration_ms: 7.327872
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Reused concurrently cached specs for Ocimum basilicum.
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: two simultaneous misses reuse the winner without failing either scan
+ok 75 - two simultaneous misses reuse the winner without failing either scan
+  ---
+  duration_ms: 19.032745
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Reused concurrently cached specs for Ocimum basilicum L..
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: recovery reads the Perenual insertion key rather than the identification name
+ok 76 - recovery reads the Perenual insertion key rather than the identification name
+  ---
+  duration_ms: 6.388274
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Reused concurrently cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: write conflict recovers when a persisted record exists
+ok 77 - write conflict recovers when a persisted record exists
+  ---
+  duration_ms: 6.183254
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: P2002 with no winning record preserves the insertion error
+ok 78 - P2002 with no winning record preserves the insertion error
+  ---
+  duration_ms: 8.931013
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: P2034 with no winning record preserves the insertion error
+ok 79 - P2034 with no winning record preserves the insertion error
+  ---
+  duration_ms: 7.706559
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: unrelated insertion failure does not trigger a recovery read
+ok 80 - unrelated insertion failure does not trigger a recovery read
+  ---
+  duration_ms: 18.737299
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Pipeline error: SCAN_FAILED
+# Subtest: recovery read failure reaches the existing error handler
+ok 81 - recovery read failure reaches the existing error handler
+  ---
+  duration_ms: 31.460071
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: missing Perenual specifications retain general-advice behavior
+ok 82 - missing Perenual specifications retain general-advice behavior
+  ---
+  duration_ms: 24.793588
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_CONFIGURATION
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: Gemini authentication failure is sanitized and subsequent scans still work
+ok 83 - Gemini authentication failure is sanitized and subsequent scans still work
+  ---
+  duration_ms: 28.971317
+  type: 'test'
+  ...
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Pipeline error: SCAN_AI_CONFIGURATION
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: provider failure does not create a new plant; a successful scan creates it once
+ok 84 - provider failure does not create a new plant; a successful scan creates it once
+  ---
+  duration_ms: 14.235065
+  type: 'test'
+  ...
+# [Scan] Pipeline error: SCAN_AI_CONFIGURATION
+# [Scan] Step 1: Identifying species via Pl@ntNet...
+# [Scan] Identified: Ocimum basilicum (Basil) — confidence: 99.0%
+# [Scan] Step 4: Fetching specs and telemetry concurrently...
+# [Scan] Cache miss — fetching from Perenual API...
+# [Scan] Cached specs for Ocimum basilicum.
+# [Scan] Freshness: No device associated with this plant. Environmental analysis is based on image only.
+# [Scan] Step 6: Sending to Gemini...
+# [Scan] Gemini did not return valid JSON. Using heuristic fallback.
+# Subtest: invalid runtime credential fails before cache work and recovers after replacement
+ok 85 - invalid runtime credential fails before cache work and recovers after replacement
+  ---
+  duration_ms: 15.404273
+  type: 'test'
+  ...
+# Subtest: invalid task payload fails before the transaction is opened
+ok 86 - invalid task payload fails before the transaction is opened
+  ---
+  duration_ms: 6.228673
+  type: 'test'
+  ...
+# [Perenual] No results found for "Strelitzia nicolai".
+# [Perenual] No results found for "Echeveria colorata".
+# [Perenual] No results found for "Echeveria colorata".
+# [Perenual] No results found for "Echeveria colorata".
+# [Perenual] No results found for "Echeveria colorata".
+# [Perenual] No results found for "Echeveria colorata".
+# [Perenual] No results found for "Echeveria colorata".
+# [Perenual] Lookup failed; continuing without specs.
+# Subtest: Pl@ntNet 404 and empty identification are controlled no-plant outcomes
+ok 87 - Pl@ntNet 404 and empty identification are controlled no-plant outcomes
+  ---
+  duration_ms: 144.544701
+  type: 'test'
+  ...
+# Subtest: Pl@ntNet unexpected provider error objects and network failures remain controlled
+ok 88 - Pl@ntNet unexpected provider error objects and network failures remain controlled
+  ---
+  duration_ms: 4.480291
+  type: 'test'
+  ...
+# Subtest: malformed identification metadata is rejected without returning provider details
+ok 89 - malformed identification metadata is rejected without returning provider details
+  ---
+  duration_ms: 15.263078
+  type: 'test'
+  ...
+# Subtest: Perenual common-name fallback verifies scientific identity
+ok 90 - Perenual common-name fallback verifies scientific identity
+  ---
+  duration_ms: 24.058698
+  type: 'test'
+  ...
+# Subtest: Perenual missing, unrelated, malformed or unavailable data remains optional
+ok 91 - Perenual missing, unrelated, malformed or unavailable data remains optional
+  ---
+  duration_ms: 31.35058
+  type: 'test'
+  ...
+# Subtest: Gemini configuration is read lazily and rejects missing or OAuth credentials
+ok 92 - Gemini configuration is read lazily and rejects missing or OAuth credentials
+  ---
+  duration_ms: 19.880115
+  type: 'test'
+  ...
+# (node:20708) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# [LeafCheck Backend] Listening on http://0.0.0.0:0
+# Subtest: headers, preflight, independent quotas, and rejection before body parsing
+ok 93 - headers, preflight, independent quotas, and rejection before body parsing
+  ---
+  duration_ms: 4131.565843
+  type: 'test'
+  ...
+1..93
+# tests 93
+# suites 0
+# pass 93
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 45872.398814
+--- stderr ---
+npm notice run leaf-check-ai-backend@1.0.0 test
+npm notice run node --import tsx/esm --experimental-test-module-mocks --test tests/*.test.mjs
+--- outcome passed (exit 0) ---

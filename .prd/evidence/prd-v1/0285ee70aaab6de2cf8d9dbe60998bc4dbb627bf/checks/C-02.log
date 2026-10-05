@@ -1,0 +1,60 @@
+$ node --import tsx/esm --experimental-test-module-mocks --test backend/tests/plant-pairing.test.mjs
+
+--- stdout ---
+TAP version 13
+# (node:19852) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: rejects invalid input, UUIDs, foreign and missing resources before writes
+ok 1 - rejects invalid input, UUIDs, foreign and missing resources before writes
+  ---
+  duration_ms: 298.336808
+  type: 'test'
+  ...
+# Subtest: auto-unpairs all previous holders, replaces the target association and preserves Plant serialization
+ok 2 - auto-unpairs all previous holders, replaces the target association and preserves Plant serialization
+  ---
+  duration_ms: 8.419125
+  type: 'test'
+  ...
+# Subtest: unpair is repeatable, returns existing omitted-null contract and never checks a device
+ok 3 - unpair is repeatable, returns existing omitted-null contract and never checks a device
+  ---
+  duration_ms: 13.702508
+  type: 'test'
+  ...
+# Subtest: failure after auto-unpair rolls back both plants and sanitizes storage errors
+ok 4 - failure after auto-unpair rolls back both plants and sanitizes storage errors
+  ---
+  duration_ms: 9.698717
+  type: 'test'
+  ...
+# Subtest: serialization conflicts retry fresh ownership checks; exhaustion is a controlled 409
+ok 5 - serialization conflicts retry fresh ownership checks; exhaustion is a controlled 409
+  ---
+  duration_ms: 11.444823
+  type: 'test'
+  ...
+# Subtest: concurrent requests are retried after commit conflict and retain only one holder
+ok 6 - concurrent requests are retried after commit conflict and retain only one holder
+  ---
+  duration_ms: 15.365313
+  type: 'test'
+  ...
+# Subtest: ownership is rechecked inside the transaction when plant disappears
+ok 7 - ownership is rechecked inside the transaction when plant disappears
+  ---
+  duration_ms: 9.031609
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1045.526654
+--- stderr ---
+
+--- outcome passed (exit 0) ---

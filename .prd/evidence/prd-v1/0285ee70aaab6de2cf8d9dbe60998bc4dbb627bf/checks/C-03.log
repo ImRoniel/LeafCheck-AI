@@ -1,0 +1,60 @@
+$ node --import tsx/esm --experimental-test-module-mocks --test backend/tests/plant-telemetry.test.mjs
+
+--- stdout ---
+TAP version 13
+# (node:19765) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: unpaired plant returns explicit empty state without device or Mongo queries
+ok 1 - unpaired plant returns explicit empty state without device or Mongo queries
+  ---
+  duration_ms: 164.489789
+  type: 'test'
+  ...
+# Subtest: paired plant joins hardware MAC and returns newest reading in the canonical payload
+ok 2 - paired plant joins hardware MAC and returns newest reading in the canonical payload
+  ---
+  duration_ms: 27.525331
+  type: 'test'
+  ...
+# Subtest: soil classification uses custom plant bounds including both inclusive boundaries
+ok 3 - soil classification uses custom plant bounds including both inclusive boundaries
+  ---
+  duration_ms: 32.746028
+  type: 'test'
+  ...
+# Subtest: nullable sensors retain zero fallback and light thresholds retain inclusive optimal boundaries
+ok 4 - nullable sensors retain zero fallback and light thresholds retain inclusive optimal boundaries
+  ---
+  duration_ms: 48.916873
+  type: 'test'
+  ...
+# Subtest: no MAC reading returns paired device with null telemetry; UUID readings are not a fallback
+ok 5 - no MAC reading returns paired device with null telemetry; UUID readings are not a fallback
+  ---
+  duration_ms: 15.279225
+  type: 'test'
+  ...
+# Subtest: unauthorized, invalid, absent and foreign resources stop before Mongo queries
+ok 6 - unauthorized, invalid, absent and foreign resources stop before Mongo queries
+  ---
+  duration_ms: 27.650332
+  type: 'test'
+  ...
+# Subtest: failures from either database are sanitized and do not leak storage details
+ok 7 - failures from either database are sanitized and do not leak storage details
+  ---
+  duration_ms: 20.505617
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 954.114111
+--- stderr ---
+
+--- outcome passed (exit 0) ---

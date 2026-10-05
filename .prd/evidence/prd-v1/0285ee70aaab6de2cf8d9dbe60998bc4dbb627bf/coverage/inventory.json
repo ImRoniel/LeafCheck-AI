@@ -1,0 +1,182 @@
+{
+  "schema": 1,
+  "prd": ".prd/prd-v1.md",
+  "digest": "3e8e29772dc397d086a948f26b6c5b2bfcc19bed798d98e01ed8c93d3aef1251",
+  "projection": "pincer inventory 1\nprd .prd/prd-v1.md\nrequirement R-01 3c9d2a9fd8739903132d1f0b0deac773d67ba0fd82388de4dfafe68a33b54e41\nrequirement R-02 241dce73595b2cc0ddc2e15841656fe787f30b994c3857845a77b0f167071fd8\nrequirement R-03 3b0e25ff552b5c3417dd96399703c4736785604d65a18577e4e3288f6ed413c0\nrequirement R-04 469825ea82c2e72d0c7d3d342a2106e1bb7aa7404c7d3dfa434d5c6d1b64cf33\nscenario S-01 R-01 633eddaff26055905e779f95a5e4b80230e1bded27d753a02d3ebbdd0a0087fa\nscenario S-02 R-01 47dee5d98c377dec0ef73bd9eb2fc3412181f2a30447600339692ea655b8cb31\nscenario S-03 R-01 20bd04f7cced950ecc92e7c1e4a013c3e9ff2b9f106a7f18180ac8c50d4763b7\nscenario S-04 R-01 ac24ec80c88452c46cda3781f5606cf8df26e919079088b21c3dd0b577794ad2\nscenario S-05 R-01 181ac6c3279141a265c1d295b9df324d5b9a6327b174e2e11b753d2e50e04f82\nscenario S-06 R-02 0b446efad4ce7ea5072be9b8940165b074bcf8676e5d0287ad526123ccfb4548\nscenario S-07 R-02 d221e02cc1f637f550701cf7ad373b5f3cecc65db9e07e32c34f493fac974643\nscenario S-08 R-02 fe3bd591e83e13998ae22499e860fd81984ebff4a5877c0c50ac22bb6f2cffb8\nscenario S-09 R-02 6a9b22c03b96fd7ffeb62d7246cbce7cde6468a6aaa81f6fe8b52a1c19c5b9aa\nscenario S-10 R-02 f239f02610aa8119685380329831be625f5062dbb183ea3b0c6a628fe8b427c2\nscenario S-11 R-03 60eaff2093614b4afd6fdd7c6a5d06dff6038d071faa47564617510f6ee897a5\nscenario S-12 R-03 98a460ca6382e6614a07eb2a9ed25842761e030e9646ec753ef253ec38e2550d\nscenario S-13 R-03 a3af4700c9a139046133654bfe391ea09504f6622ec73ee801f1c99c9cce7efb\nscenario S-14 R-03 135fd5a03984e62a1d5403462b4436eb2541151f361ed07833ac27c9f89d8d7c\nscenario S-15 R-03 22264105ac02f32ba2d9be11d342924cd148dacc55813ea58d4adb5dc1bf45f6\nscenario S-16 R-04 b05c47d6f52ca6b00cc36d28aa71b193a074c48e2939b0b9620e82a325ca51bc\nscenario S-17 R-04 ccce01dd84e13fccdfdd7de826374b6487c04af91449f01cfcf68081c45969d6\n",
+  "requirements": {
+    "R-01": {
+      "title": "Claim hardware",
+      "text": "Claim hardware",
+      "digest": "3c9d2a9fd8739903132d1f0b0deac773d67ba0fd82388de4dfafe68a33b54e41",
+      "line": 36,
+      "end": 42,
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04",
+        "S-05"
+      ]
+    },
+    "R-02": {
+      "title": "Pair or unpair a plant",
+      "text": "Pair or unpair a plant",
+      "digest": "241dce73595b2cc0ddc2e15841656fe787f30b994c3857845a77b0f167071fd8",
+      "line": 44,
+      "end": 50,
+      "scenarios": [
+        "S-06",
+        "S-07",
+        "S-08",
+        "S-09",
+        "S-10"
+      ]
+    },
+    "R-03": {
+      "title": "Resolve latest plant telemetry",
+      "text": "Resolve latest plant telemetry",
+      "digest": "3b0e25ff552b5c3417dd96399703c4736785604d65a18577e4e3288f6ed413c0",
+      "line": 52,
+      "end": 58,
+      "scenarios": [
+        "S-11",
+        "S-12",
+        "S-13",
+        "S-14",
+        "S-15"
+      ]
+    },
+    "R-04": {
+      "title": "Integration and verified delivery",
+      "text": "Integration and verified delivery",
+      "digest": "469825ea82c2e72d0c7d3d342a2106e1bb7aa7404c7d3dfa434d5c6d1b64cf33",
+      "line": 60,
+      "end": 63,
+      "scenarios": [
+        "S-16",
+        "S-17"
+      ]
+    }
+  },
+  "scenarios": {
+    "S-01": {
+      "requirement": "R-01",
+      "text": "Authenticated POST /api/devices/claim with a valid unclaimed LC identifier or standard MAC creates a UUID Device owned by the authenticated user and returns 201 with id, name, macAddress, userId, status, createdAt, and updatedAt; characters are uppercase and default status is OFFLINE.",
+      "digest": "633eddaff26055905e779f95a5e4b80230e1bded27d753a02d3ebbdd0a0087fa",
+      "line": 38,
+      "end": 38
+    },
+    "S-02": {
+      "requirement": "R-01",
+      "text": "Claiming one's existing hardware returns 200 and the same Device UUID; a provided valid name updates it, while omission preserves its name.",
+      "digest": "47dee5d98c377dec0ef73bd9eb2fc3412181f2a30447600339692ea655b8cb31",
+      "line": 39,
+      "end": 39
+    },
+    "S-03": {
+      "requirement": "R-01",
+      "text": "Claiming another user's hardware returns 409 with code DEVICE_ALREADY_CLAIMED and performs no ownership or name mutation.",
+      "digest": "20bd04f7cced950ecc92e7c1e4a013c3e9ff2b9f106a7f18180ac8c50d4763b7",
+      "line": 40,
+      "end": 40
+    },
+    "S-04": {
+      "requirement": "R-01",
+      "text": "Invalid hardware identifiers, invalid optional names, malformed bodies, or unexpected fields return the established 400 error contract without writes; anonymous requests return 401.",
+      "digest": "ac24ec80c88452c46cda3781f5606cf8df26e919079088b21c3dd0b577794ad2",
+      "line": 41,
+      "end": 41
+    },
+    "S-05": {
+      "requirement": "R-01",
+      "text": "Concurrent claims of the same normalized key create at most one Device; a unique-key collision is resolved by re-reading ownership and returning the same-owner 200 or foreign-owner 409 result rather than exposing a storage error.",
+      "digest": "181ac6c3279141a265c1d295b9df324d5b9a6327b174e2e11b753d2e50e04f82",
+      "line": 42,
+      "end": 42
+    },
+    "S-06": {
+      "requirement": "R-02",
+      "text": "PATCH /api/plants/:plantId/pair-device validates the plant UUID through ownedPlant and device UUID through ownedDevice; missing or foreign plants/devices return 404 NOT_FOUND without mutation, and anonymous callers return 401.",
+      "digest": "0b446efad4ce7ea5072be9b8940165b074bcf8676e5d0287ad526123ccfb4548",
+      "line": 46,
+      "end": 46
+    },
+    "S-07": {
+      "requirement": "R-02",
+      "text": "A body containing deviceId null clears the owner's Plant.deviceId and returns 200 with the updated existing Plant API representation; repeating unpair succeeds.",
+      "digest": "d221e02cc1f637f550701cf7ad373b5f3cecc65db9e07e32c34f493fac974643",
+      "line": 47,
+      "end": 47
+    },
+    "S-08": {
+      "requirement": "R-02",
+      "text": "Pairing an owned device clears that device from every other plant holding it before assigning it to the target, atomically in prismaPg.$transaction; replacing a target's previous device succeeds and returns the updated Plant representation.",
+      "digest": "fe3bd591e83e13998ae22499e860fd81984ebff4a5877c0c50ac22bb6f2cffb8",
+      "line": 48,
+      "end": 48
+    },
+    "S-09": {
+      "requirement": "R-02",
+      "text": "Concurrent pairing to the same device leaves at most one plant assigned, with bounded retries for serialization conflicts; failures roll back both unpair and assignment. Retry exhaustion returns a controlled 409 PAIRING_CONFLICT; unrelated database failures use the existing sanitized 500 contract.",
+      "digest": "6a9b22c03b96fd7ffeb62d7246cbce7cde6468a6aaa81f6fe8b52a1c19c5b9aa",
+      "line": 49,
+      "end": 49
+    },
+    "S-10": {
+      "requirement": "R-02",
+      "text": "Missing deviceId, non-UUID strings, non-string/non-null values, and extra body fields return 400 without writes. Existing CRUD, health updates, and demo seeding retain their response and ownership behavior.",
+      "digest": "f239f02610aa8119685380329831be625f5062dbb183ea3b0c6a628fe8b427c2",
+      "line": 50,
+      "end": 50
+    },
+    "S-11": {
+      "requirement": "R-03",
+      "text": "Authenticated GET /api/plants/:plantId/telemetry returns 200 with paired false, device null, and telemetry null for an owned unpaired plant, without querying MongoDB.",
+      "digest": "60eaff2093614b4afd6fdd7c6a5d06dff6038d071faa47564617510f6ee897a5",
+      "line": 54,
+      "end": 54
+    },
+    "S-12": {
+      "requirement": "R-03",
+      "text": "For an owned paired plant and owned associated device, lookup uses prisma.sensorReading.findFirst with deviceId equal to Device.macAddress and timestamp descending; return 200 with paired true, the standard Device object, and a TelemetryPayload.",
+      "digest": "98a460ca6382e6614a07eb2a9ed25842761e030e9646ec753ef253ec38e2550d",
+      "line": 55,
+      "end": 55
+    },
+    "S-13": {
+      "requirement": "R-03",
+      "text": "Soil moisture strictly below Plant.minMoisture is dry, strictly above Plant.maxMoisture is overwatered, and both boundaries and intermediate values are optimal. Preserve ISO timestamps, raw/lux null fallback to zero, environment field mapping, and existing light thresholds of 500 and 50,000 lux.",
+      "digest": "a3af4700c9a139046133654bfe391ea09504f6622ec73ee801f1c99c9cce7efb",
+      "line": 56,
+      "end": 56
+    },
+    "S-14": {
+      "requirement": "R-03",
+      "text": "An owned paired device with no matching reading returns 200 with paired true, its Device object, and telemetry null. Invalid plant IDs return 400; absent/foreign plants or foreign associated devices return 404; anonymous requests return 401 before telemetry reads.",
+      "digest": "135fd5a03984e62a1d5403462b4436eb2541151f361ed07833ac27c9f89d8d7c",
+      "line": 57,
+      "end": 57
+    },
+    "S-15": {
+      "requirement": "R-03",
+      "text": "PostgreSQL or MongoDB failures return sanitized errors through the existing handler. Existing UUID-based telemetry endpoints and demo consumers continue to work unchanged; this MAC-only BFF does not promise to retrieve their UUID readings.",
+      "digest": "22264105ac02f32ba2d9be11d342924cd148dacc55813ea58d4adb5dc1bf45f6",
+      "line": 58,
+      "end": 58
+    },
+    "S-16": {
+      "requirement": "R-04",
+      "text": "server.ts mounts devicesRouter at /api/devices; both plant subroutes use existing authenticated route middleware and the error envelope of HttpError, without relying on the nonexistent req.auth.userId.",
+      "digest": "b05c47d6f52ca6b00cc36d28aa71b193a074c48e2939b0b9620e82a325ca51bc",
+      "line": 62,
+      "end": 62
+    },
+    "S-17": {
+      "requirement": "R-04",
+      "text": "Backend Node tests pass and TypeScript reports no errors after each endpoint; meaningful new tests cover claim races, pairing rollback/retry, ownership rejection, and BFF mapping. Commit each verified endpoint with a conventional message, including claim router registration with the claim endpoint.",
+      "digest": "ccce01dd84e13fccdfdd7de826374b6487c04af91449f01cfcf68081c45969d6",
+      "line": 63,
+      "end": 63
+    }
+  }
+}

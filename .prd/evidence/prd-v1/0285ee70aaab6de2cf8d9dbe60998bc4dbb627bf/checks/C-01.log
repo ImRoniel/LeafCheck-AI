@@ -1,0 +1,55 @@
+$ node --import tsx/esm --experimental-test-module-mocks --test backend/tests/devices.test.mjs
+
+--- stdout ---
+TAP version 13
+# (node:19808) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# [LeafCheck Backend] Listening on http://0.0.0.0:0
+# Subtest: actual server mount requires authentication and rejects malformed bodies without writes
+ok 1 - actual server mount requires authentication and rejects malformed bodies without writes
+  ---
+  duration_ms: 379.408025
+  type: 'test'
+  ...
+# Subtest: create normalizes supported addresses and exposes exactly the Device contract
+ok 2 - create normalizes supported addresses and exposes exactly the Device contract
+  ---
+  duration_ms: 24.647919
+  type: 'test'
+  ...
+# Subtest: owner reclaim preserves ID/name, trims supplied names, and denies foreign claim without mutation
+ok 3 - owner reclaim preserves ID/name, trims supplied names, and denies foreign claim without mutation
+  ---
+  duration_ms: 27.533396
+  type: 'test'
+  ...
+# Subtest: unique-constraint race re-reads winner and applies same-owner and foreign-owner rules
+ok 4 - unique-constraint race re-reads winner and applies same-owner and foreign-owner rules
+  ---
+  duration_ms: 19.058011
+  type: 'test'
+  ...
+# Subtest: unexpected storage failures are sanitized
+ok 5 - unexpected storage failures are sanitized
+  ---
+  duration_ms: 8.063062
+  type: 'test'
+  ...
+# Subtest: parallel claims yield one creation and an owner-appropriate conflict resolution
+ok 6 - parallel claims yield one creation and an owner-appropriate conflict resolution
+  ---
+  duration_ms: 23.410371
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1360.846137
+--- stderr ---
+
+--- outcome passed (exit 0) ---

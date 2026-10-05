@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "change": "prd-v1",
+  "evaluations": [
+    {
+      "candidate": "0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf",
+      "base": "f8b7026159a72d2ecb5951ee50bfc069eb815762",
+      "prd": ".prd/prd-v1.md",
+      "prd_revision": "0c8e22a8ddbfd7f89f87aa96be253f4eb6d2f74f0b7a9d3afcb941c0f21b4a7a",
+      "agreement": "0e313f288113f601e3320411fc7436d504e1368bcf4b3a5bdb661d3df0830660",
+      "manifest": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/manifest.json",
+      "recorded": "2026-10-05T08:12:09Z"
+    }
+  ]
+}

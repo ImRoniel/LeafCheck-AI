@@ -1,0 +1,681 @@
+{
+  "schema": 3,
+  "prd": ".prd/prd-v1.md",
+  "base": "f8b7026159a72d2ecb5951ee50bfc069eb815762",
+  "candidate": "0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf",
+  "created": "2026-10-05T08:12:09Z",
+  "environment": {
+    "os": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "node": "v22.23.3",
+    "tools": [
+      "Node v22.23.3",
+      "npm 12.2.0",
+      "Installed Prisma 6 generated clients",
+      "Docker 29.1.3 with postgres:16-alpine",
+      "TypeScript compiler and Node native test runner"
+    ],
+    "limitations": [
+      "No standalone secret scanner: redacted assignment heuristic plus manual history review only.",
+      "No live Atlas/Vercel integration; upstream uppercase MAC keys are assumed as specified.",
+      "Pre-existing dependency audit findings: workspace 22 high, backend 3 high, no critical; dependency upgrades are out of scope.",
+      "Node test module mocking is experimental."
+    ]
+  },
+  "coverage_review": "Reviewed every R-01–R-04 and S-01–S-17 against PRD, ticket acceptance, source and declared checks. Focused HTTP tests cover validation, owner isolation, claim contention, transactional reassignment/unpair, conflict retry/rollback, newest MAC-keyed telemetry, null states and exact sensor boundaries. Full backend tests protect legacy routes/demo behavior; TypeScript proves compilation. Commit-order review and a real PostgreSQL concurrency/rollback rerun supplement mocked tests. All 17 scenarios delivered; no authorized scope cuts.",
+  "requirements": [
+    {
+      "id": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ],
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04",
+        "S-05"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04",
+        "C-07"
+      ],
+      "scenarios": [
+        "S-06",
+        "S-07",
+        "S-08",
+        "S-09",
+        "S-10"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "scenarios": [
+        "S-11",
+        "S-12",
+        "S-13",
+        "S-14",
+        "S-15"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06"
+      ],
+      "scenarios": [
+        "S-16",
+        "S-17"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    }
+  ],
+  "checks": [
+    {
+      "id": "C-01",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "node --import tsx/esm --experimental-test-module-mocks --test backend/tests/devices.test.mjs",
+      "timestamp": "2026-10-05T08:06:23Z",
+      "artifacts": [
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-01.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000062-20261005T080622Z-dd5cee",
+        "sequence": 62,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T08:06:22Z",
+        "finished": "2026-10-05T08:06:23Z",
+        "source_before": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "source_after": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "check_digest": "98f5149e06a86051bca0130169db00071fc7ff63f741260e0c6dffd904dd5d77",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "99369d759572850a6739a188a99d54ab569fe3c379760b6cfcacb07a221547d0",
+        "truncated": false
+      },
+      "declared": "98f5149e06a86051bca0130169db00071fc7ff63f741260e0c6dffd904dd5d77"
+    },
+    {
+      "id": "C-02",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "node --import tsx/esm --experimental-test-module-mocks --test backend/tests/plant-pairing.test.mjs",
+      "timestamp": "2026-10-05T08:06:23Z",
+      "artifacts": [
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-02.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000063-20261005T080622Z-779175",
+        "sequence": 63,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T08:06:22Z",
+        "finished": "2026-10-05T08:06:23Z",
+        "source_before": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "source_after": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "check_digest": "c3e08daa17c8bfaa3d91eb97e6eeb0db9f6a90a135a07228d95ce99a5f419c2e",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "ce3e92c11a7762e904191c8b93787e909ebec24c25ca89582061eb02beb2ed36",
+        "truncated": false
+      },
+      "declared": "c3e08daa17c8bfaa3d91eb97e6eeb0db9f6a90a135a07228d95ce99a5f419c2e"
+    },
+    {
+      "id": "C-03",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "node --import tsx/esm --experimental-test-module-mocks --test backend/tests/plant-telemetry.test.mjs",
+      "timestamp": "2026-10-05T08:06:22Z",
+      "artifacts": [
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-03.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000061-20261005T080621Z-0849f3",
+        "sequence": 61,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T08:06:21Z",
+        "finished": "2026-10-05T08:06:22Z",
+        "source_before": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "source_after": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "check_digest": "02c2b30ff594fb8a7ef376ccde0a616897d4d5f60989143abf1b611845b0afba",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "d4bc35df076acde87c2f19a9066799d24f8236f180e56052aeaa9825a1f4f041",
+        "truncated": false
+      },
+      "declared": "02c2b30ff594fb8a7ef376ccde0a616897d4d5f60989143abf1b611845b0afba"
+    },
+    {
+      "id": "C-04",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "npm test --workspace=backend",
+      "timestamp": "2026-10-05T08:08:03Z",
+      "artifacts": [
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-04.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000065-20261005T080717Z-b7a8c9",
+        "sequence": 65,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T08:07:17Z",
+        "finished": "2026-10-05T08:08:03Z",
+        "source_before": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "source_after": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "check_digest": "619686aa749ac2b7e9715309d5fb2fa420cdb584fc175c00c0067f7efb4092c2",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "80423d73d7d8822aa164e6503906484f88a7cf038cc532fa20fe961a72de8c9b",
+        "truncated": false
+      },
+      "declared": "619686aa749ac2b7e9715309d5fb2fa420cdb584fc175c00c0067f7efb4092c2"
+    },
+    {
+      "id": "C-05",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "npx tsc --noEmit -p backend/tsconfig.json",
+      "timestamp": "2026-10-05T08:07:32Z",
+      "artifacts": [
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-05.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000064-20261005T080717Z-4c456e",
+        "sequence": 64,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T08:07:17Z",
+        "finished": "2026-10-05T08:07:32Z",
+        "source_before": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "source_after": "8520489a08359609e5add8a9dc5e35fd458355bb0a8aa53a84712e8a618239cc",
+        "check_digest": "f35f91458b1d303f71340f88107b3879f15fba123307b2988fea6a15baabede3",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "a87f7ff26db95fc6f1bc835e1f70f140973bbb9579af56869bced1ec9625e4d8",
+        "truncated": false
+      },
+      "declared": "f35f91458b1d303f71340f88107b3879f15fba123307b2988fea6a15baabede3"
+    },
+    {
+      "id": "C-06",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-05T08:12:08Z",
+      "artifacts": [
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/code-quality.md",
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/commit-verification.md",
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/security-audit.md",
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/secret-history.json",
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/dependency-audit.json",
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/invalid-input-smoke.log"
+      ],
+      "note": "Separate endpoint commits followed successful verification; independent code-quality and supplementary security artifacts attached. Dependency audit failed for pre-existing packages and is not represented as passed.",
+      "provenance": "authored",
+      "declared": "4eb1359002409c7400c52b6cea4cc8f834c88c55046ffeec8e9cb02b1494eed3"
+    },
+    {
+      "id": "C-07",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-05T08:12:08Z",
+      "artifacts": [
+        ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/pairing-concurrency.md"
+      ],
+      "note": "Serializable boundaries reviewed against installed Prisma 6; disposable live PostgreSQL concurrency and rollback tests passed on this candidate.",
+      "provenance": "authored",
+      "declared": "ffea246de3dde456849792d73da1c04413c9e1eb77ce15ef7924f198fec2251f"
+    }
+  ],
+  "visual_review": {
+    "applicable": false,
+    "reason": "Backend-only endpoints; no UI changes or visual requirements in the selected PRD."
+  },
+  "artifacts": [
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-01.log",
+      "sha256": "99369d759572850a6739a188a99d54ab569fe3c379760b6cfcacb07a221547d0"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-02.log",
+      "sha256": "ce3e92c11a7762e904191c8b93787e909ebec24c25ca89582061eb02beb2ed36"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-03.log",
+      "sha256": "d4bc35df076acde87c2f19a9066799d24f8236f180e56052aeaa9825a1f4f041"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-04.log",
+      "sha256": "80423d73d7d8822aa164e6503906484f88a7cf038cc532fa20fe961a72de8c9b"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/C-05.log",
+      "sha256": "a87f7ff26db95fc6f1bc835e1f70f140973bbb9579af56869bced1ec9625e4d8"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/checks/invalid-input-smoke.log",
+      "sha256": "8e7840c33283692da0f2c4c9fe0d063d44335f8f12d08c38961590741a71154b"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/coverage/inventory.json",
+      "sha256": "16a8f0e9118f7102d4e7d28647321cd2ff13132ad8ea6f6675ceff02a608cb60"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/coverage/map.json",
+      "sha256": "855856fbfb00a4c14ed80f6835cf98f467fc2469589db7603218ce383b279d0e"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/code-quality.md",
+      "sha256": "32c41d1d46b0fa6d00a36fa32f947693b99e537083ce032a857e129abb8e7541"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/commit-verification.md",
+      "sha256": "66151054016840942ccc37753cb3117e7a8e644ee25281bd4f51043096d32717"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/dependency-audit.json",
+      "sha256": "4d7ac19b6bad893b9c321d649e44c430db5e4f873d828a73b562202ae9d42f8f"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/pairing-concurrency.md",
+      "sha256": "7c8957e6c24b06be11ebce7f8847116fe49daf483691fe88d0de2c9718375912"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/secret-history.json",
+      "sha256": "b61eeecb132ed8b6e10a77032421e8891fc96d99600313b05949ee331717a4a2"
+    },
+    {
+      "path": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/review/security-audit.md",
+      "sha256": "6c3f8b798ebc7a413aa1b26134d9dccb07bb6112e1c2c5540b9b046eb8713043"
+    }
+  ],
+  "change": {
+    "id": "prd-v1",
+    "prd_revision": "0c8e22a8ddbfd7f89f87aa96be253f4eb6d2f74f0b7a9d3afcb941c0f21b4a7a",
+    "base": "f8b7026159a72d2ecb5951ee50bfc069eb815762"
+  },
+  "coverage": {
+    "agreement": "0e313f288113f601e3320411fc7436d504e1368bcf4b3a5bdb661d3df0830660",
+    "authorization": "A-02",
+    "inventory": "3e8e29772dc397d086a948f26b6c5b2bfcc19bed798d98e01ed8c93d3aef1251",
+    "map": "e414b74ca8e417e23a380187d90becdba42cac56992ce718f7673961fdaab16f",
+    "snapshots": {
+      "inventory": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/coverage/inventory.json",
+      "map": ".prd/evidence/prd-v1/0285ee70aaab6de2cf8d9dbe60998bc4dbb627bf/coverage/map.json"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "S-01",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-02",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-03",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-04",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-05",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-06",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-07",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-08",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-09",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04",
+        "C-07"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-10",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-11",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-12",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-13",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-14",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-15",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-16",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-17",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    }
+  ],
+  "adequacy": {
+    "verdict": "adequate",
+    "note": "Declared checks establish the observable PRD behaviors and regression protections; C-07 includes real PostgreSQL isolation evidence rather than relying solely on simulated interleavings. Dependency audit concerns are unchanged repository dependencies, outside requirements, and explicitly recorded as failing supplementary audit outcomes."
+  },
+  "delivery": {
+    "original": true,
+    "agreed": true
+  }
+}
