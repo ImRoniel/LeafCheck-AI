@@ -5,10 +5,10 @@
   "prd": ".prd/prd-v1.md",
   "base": "f8b7026159a72d2ecb5951ee50bfc069eb815762",
   "registered": "2026-10-05T07:44:18Z",
-  "sequence": 5,
+  "sequence": 6,
   "lifecycle": {
-    "state": "active",
-    "since": "2026-10-05T07:47:34Z",
+    "state": "completed",
+    "since": "2026-10-05T08:05:17Z",
     "reason": null,
     "note": null,
     "superseded_by": null
@@ -135,6 +135,19 @@
       "from": "planned",
       "to": "active",
       "at": "2026-10-05T07:47:34Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 6,
+      "kind": "complete",
+      "from": "active",
+      "to": "completed",
+      "at": "2026-10-05T08:05:17Z",
       "reason": null,
       "agreement": "G-02",
       "authorization": "A-02",
