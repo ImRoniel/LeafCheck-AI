@@ -24,7 +24,7 @@ function activityHarness(platform = "ios", initialState = "active") {
     removeEventListener: (_event: string, listener: () => void) =>
       visibilityListeners.delete(listener),
   };
-  const source = readFileSync("hooks/use-device-activity.ts", "utf8");
+  const source = readFileSync(new URL("../hooks/use-device-activity.ts", import.meta.url), "utf8");
   runInNewContext(
     ts.transpileModule(source, {
       compilerOptions: { module: ts.ModuleKind.CommonJS },

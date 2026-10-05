@@ -1,10 +1,12 @@
 ---
 ticket: T-08
-status: open
+status: done
 size: M
 prd: .prd/prd-v3.md
 depends_on: []
 timeout: 600
+started: 2026-10-05T12:59:38Z
+finished: 2026-10-05T13:03:10Z
 ---
 
 ## Objective
@@ -23,9 +25,9 @@ Add authenticated device and telemetry API contracts so the frontend implements 
 - Preserve Bearer headers, 401 refresh, typed HTTP status including 409, timeout and cancellation. Keep UUID and MAC identities distinct.
 
 ## Acceptance Criteria
-- [ ] Claim/pair/unpair/BFF route, method, body and parsed-response assertions pass, including zero metrics and null readings.
-- [ ] Invalid input and inconsistent or malformed payloads reject; 409 remains distinguishable and is never a successful claim.
-- [ ] Production client tests demonstrate auth refresh, session cancellation and no transport regression.
+- [x] Claim/pair/unpair/BFF route, method, body and parsed-response assertions pass, including zero metrics and null readings.
+- [x] Invalid input and inconsistent or malformed payloads reject; 409 remains distinguishable and is never a successful claim.
+- [x] Production client tests demonstrate auth refresh, session cancellation and no transport regression.
 
 ## Verification
 Proves: Production API tests observe outgoing requests and accepted/rejected responses, identity separation, authentication and cancellation rather than matching source identifiers. New focused test files below are deliverables, not existing evidence; missing files must fail verification.

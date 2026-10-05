@@ -1,10 +1,12 @@
 ---
 ticket: T-09
-status: open
+status: done
 size: M
 prd: .prd/prd-v3.md
 depends_on: [T-08]
 timeout: 600
+started: 2026-10-05T13:03:11Z
+finished: 2026-10-05T13:21:48Z
 ---
 
 ## Objective
@@ -24,10 +26,10 @@ Claim a real MAC and retain account-scoped device state so the frontend implemen
 - Require sign-in for real claim and guard/bypass legacy mock selection routes; do not remove unrelated local demo data.
 
 ## Acceptance Criteria
-- [ ] Entered or scanned LC-A50528 yields exactly one claim and a UUID-bearing assignment handoff.
-- [ ] Malformed/empty input is rejected visibly; 409 never advances; retry works after failure.
-- [ ] Camera denial permits manual claiming, and cancellation/account switching prevents stale state or navigation.
-- [ ] Guest claiming requires sign-in while existing manual care/image scanning remains accessible.
+- [x] Entered or scanned LC-A50528 yields exactly one claim and a UUID-bearing assignment handoff.
+- [x] Malformed/empty input is rejected visibly; 409 never advances; retry works after failure.
+- [x] Camera denial permits manual claiming, and cancellation/account switching prevents stale state or navigation.
+- [x] Guest claiming requires sign-in while existing manual care/image scanning remains accessible.
 
 ## Verification
 Proves: A production screen/provider handler harness observes claim count, input/error UI, route parameters, camera denial and late-response behavior across lifecycle/account boundaries. New focused test files below are deliverables, not existing evidence; missing files must fail verification.

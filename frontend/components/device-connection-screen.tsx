@@ -9,10 +9,12 @@ export function DeviceConnectionScreen({
   step,
   children,
   onCancel,
+  description = "Mock setup only. No physical hardware is discovered or connected, and no live readings are enabled.",
 }: PropsWithChildren<{
   title: string;
   step: number;
   onCancel?: () => void;
+  description?: string;
 }>) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -28,8 +30,7 @@ export function DeviceConnectionScreen({
         {title}
       </Text>
       <Text style={styles.disclaimer}>
-        Mock setup only. No physical hardware is discovered or connected, and no
-        live readings are enabled.
+        {description}
       </Text>
       <View style={styles.body}>{children}</View>
       {step !== 4 && (

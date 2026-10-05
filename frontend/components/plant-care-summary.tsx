@@ -6,10 +6,11 @@ import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 import { Action, Notice, ui } from "./screen";
 
-export function PlantCareSummary({ plant, telemetry, telemetryError = false }: {
+export function PlantCareSummary({ plant, telemetry, telemetryError = false, linked }: {
   plant: Plant;
   telemetry: TelemetryPayload | null;
   telemetryError?: boolean;
+  linked?: boolean;
 }) {
   const router = useRouter();
   const resource = usePollingResource(`plant-guidance:${plant.id}`, async (signal) => {
@@ -21,8 +22,8 @@ export function PlantCareSummary({ plant, telemetry, telemetryError = false }: {
   }, { pollIntervalMs: 60_000 });
   const context = telemetryGuidance(telemetry?.timestamp, {
     failed: telemetryError,
-    linked: Boolean(plant.deviceId),
-    simulated: plant.simulated,
+    linked: linked ?? Boolean(plant.deviceId),
+    simulated: linked === undefined && plant.simulated,
   });
   const latest = resource.data?.latest;
   const tasks = resource.data?.pending ?? [];

@@ -1,10 +1,11 @@
 ---
 ticket: T-12
-status: open
+status: in_progress
 size: M
 prd: .prd/prd-v3.md
 depends_on: [T-09, T-10, T-11]
 timeout: 600
+started: 2026-10-05T13:54:09Z
 ---
 
 ## Objective
@@ -24,8 +25,8 @@ Verify regression coverage and local Expo device flow so the frontend implements
 - Review existing visual/accessibility patterns and frontend-only scope. Preserve .env ignore/example conventions and make no backend changes.
 
 ## Acceptance Criteria
-- [ ] Integration and updated accessibility tests exercise the real screens/client rather than copies of callbacks.
-- [ ] Full frontend test runner and typecheck pass; any environmental/pre-existing failure is documented and cannot count as a passed check.
+- [x] Integration and updated accessibility tests exercise the real screens/client rather than copies of callbacks.
+- [x] Full frontend test runner and typecheck pass; any environmental/pre-existing failure is documented and cannot count as a passed check.
 - [ ] Local Expo live-flow results cover every S-19 branch with observable evidence, or are explicitly unverified pending prerequisites.
 - [ ] Visual review confirms existing patterns; no backend, firmware, secrets or new dependency changes appear.
 

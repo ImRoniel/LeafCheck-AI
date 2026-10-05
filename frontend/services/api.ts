@@ -197,7 +197,7 @@ export function createApiClient(
             if (response.status === 401) session.reject();
           }
           if (controller.signal.aborted) throw abortError;
-          if (response.ok && response.status === 204) return undefined as T;
+          if (response.ok && response.status === 204) return parser(undefined);
           if (allow404 && response.status === 404) return null as T;
           let payload: unknown;
           try {
@@ -280,6 +280,25 @@ export function createApiClient(
       ),
     fetchUserPlants: (options?: RequestOptions) =>
       request("/api/plants", v.parsePlants, options),
+    claimDevice: (macAddress: string, name?: string, options?: RequestOptions) => {
+      const mac = v.normalizeMac(macAddress);
+      if (name !== undefined) {
+        v.nonempty(name, "name");
+        if (name.trim().length > 100) throw new ApiError("validation", "Name must be at most 100 characters");
+      }
+      return request("/api/devices/claim", v.parseDevice, options, "POST", {
+        macAddress: mac, ...(name === undefined ? {} : { name: name.trim() }),
+      });
+    },
+    pairDeviceToPlant: (plantId: string, deviceId: string | null, options?: RequestOptions) => {
+      v.uuid(plantId, "plantId");
+      if (deviceId !== null) v.uuid(deviceId, "deviceId");
+      return request(`/api/plants/${id(plantId)}/pair-device`, v.parsePairedPlant, options, "PATCH", { deviceId });
+    },
+    fetchPlantTelemetry: (plantId: string, options?: RequestOptions) => {
+      v.uuid(plantId, "plantId");
+      return request(`/api/plants/${id(plantId)}/telemetry`, v.parsePlantTelemetry, options);
+    },
     fetchPlant: (plantId: string, options?: RequestOptions) =>
       request(`/api/plants/${id(plantId)}`, v.parsePlant, options),
     seedTelemetry: (plantId: string, options?: RequestOptions) =>
@@ -410,6 +429,9 @@ export function createApiClient(
 export type ApiClient = ReturnType<typeof createApiClient>;
 export const api = createApiClient();
 export const {
+  claimDevice,
+  pairDeviceToPlant,
+  fetchPlantTelemetry,
   fetchUserPlants,
   fetchPlant,
   seedTelemetry,
@@ -425,4 +447,3 @@ export const {
   fetchTasks,
   updateTaskStatus,
 } = api;
-

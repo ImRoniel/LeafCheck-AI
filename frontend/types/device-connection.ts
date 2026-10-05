@@ -11,7 +11,7 @@ export type DeviceConnectionStackParamList = {
   DeviceScanner: { preselectedTarget?: PreselectedTarget };
   DeviceSelection: undefined;
   DeviceAssignment: { deviceId: string; preselectedTarget?: PreselectedTarget };
-  DeviceSuccess: { deviceId: string; targetName: string };
+  DeviceSuccess: { deviceId: string };
 };
 
 export type DeviceConnectionRouteParams = {

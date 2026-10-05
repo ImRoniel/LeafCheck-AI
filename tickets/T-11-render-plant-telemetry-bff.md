@@ -1,10 +1,12 @@
 ---
 ticket: T-11
-status: open
+status: done
 size: M
 prd: .prd/prd-v3.md
 depends_on: [T-08, T-10]
 timeout: 600
+started: 2026-10-05T13:43:18Z
+finished: 2026-10-05T13:53:49Z
 ---
 
 ## Objective
@@ -25,11 +27,11 @@ Render Plant Profile from unified BFF sensor state so the frontend implements th
 - Verify the old plant after reassignment becomes unpaired on focus; handle metadata updates without refetch loops.
 
 ## Acceptance Criteria
-- [ ] Loading, unpaired, waiting, populated and failure/retry states render correctly and only the BFF fetches latest readings.
-- [ ] No extra metadata/latest/history call occurs from a ready profile; zero readings are rendered as zero.
-- [ ] Pair action carries the current plant target; old profile responses cannot overwrite a different plant.
-- [ ] Metadata loading/error/missing cases preserve useful edit/delete/scanning/care behavior when metadata is available.
-- [ ] Malformed BFF is surfaced as failure, local mapping cannot turn unpaired into paired, and explicit history uses MAC.
+- [x] Loading, unpaired, waiting, populated and failure/retry states render correctly and only the BFF fetches latest readings.
+- [x] No extra metadata/latest/history call occurs from a ready profile; zero readings are rendered as zero.
+- [x] Pair action carries the current plant target; old profile responses cannot overwrite a different plant.
+- [x] Metadata loading/error/missing cases preserve useful edit/delete/scanning/care behavior when metadata is available.
+- [x] Malformed BFF is surfaced as failure, local mapping cannot turn unpaired into paired, and explicit history uses MAC.
 
 ## Verification
 Proves: A production profile/component harness observes calls and rendered states, metrics, retries, metadata recovery, history identity and cancellation; existing guidance/history tests protect unrelated behavior. New focused test files below are deliverables, not existing evidence; missing files must fail verification.

@@ -6,9 +6,10 @@ import { runInNewContext } from "node:vm";
 import * as React from "react";
 import ts from "typescript";
 import * as devices from "../services/device-connection";
-import { initialLocalState } from "../types/local-state";
+import { claimedDevice, frontendRoot, plantId } from "./helpers/device-flow-harness";
+import { ownedPlant } from "./helpers/device-pairing-harness";
 
-const loadModule = createRequire(`${process.cwd()}/package.json`);
+const loadModule = createRequire(import.meta.url);
 const { renderToStaticMarkup } = loadModule("react-dom/server") as {
   renderToStaticMarkup(node: React.ReactNode): string;
 };
@@ -20,10 +21,9 @@ for (const locked of [false, true]) {
   for (const selected of [false, true]) {
     for (const busy of [false, true]) {
       test(`web assignment buttons announce selected=${selected} and disabled=${busy}, contextual=${locked}`, () => {
-        const state = initialLocalState();
         const exports = {} as { default: React.ComponentType };
         const source = readFileSync(
-          "app/device-connection/assignment.tsx",
+          `${frontendRoot}app/device-connection/assignment.tsx`,
           "utf8",
         );
         let stateIndex = 0;
@@ -46,7 +46,7 @@ for (const locked of [false, true]) {
                       return React.useState(
                         index === 0
                           ? selected
-                            ? { kind: "space", id: "Bedroom", name: "Bedroom" }
+                            ? { kind: "plant", id: plantId, name: ownedPlant.name }
                             : null
                           : index === 1
                             ? busy
@@ -76,13 +76,12 @@ for (const locked of [false, true]) {
                     useAppData: () => ({
                       loaded: true,
                       loading: false,
-                      plants: [],
+                      plants: [ownedPlant],
+                      guest: false,
+                      pendingDevice: claimedDevice,
+                      confirmedPairing: null,
                     }),
                   };
-                case "@/context/local-state":
-                  return { useLocalState: () => ({ data: state }) };
-                case "@/context/spaces":
-                  return { useSpaces: () => ({ spaces: ["Bedroom"] }) };
                 case "@/hooks/use-device-activity":
                   return { useDeviceActivity: () => true };
                 case "@/services/device-connection":
@@ -90,9 +89,9 @@ for (const locked of [false, true]) {
                 case "expo-router":
                   return {
                     useLocalSearchParams: () => ({
-                      deviceId: devices.mockHardwareNodes[0].id,
+                      deviceId: claimedDevice.id,
                       ...(locked
-                        ? { targetType: "space", targetId: "Bedroom" }
+                        ? { targetType: "plant", targetId: plantId }
                         : {}),
                     }),
                     useRouter: () => ({}),
@@ -107,6 +106,7 @@ for (const locked of [false, true]) {
           React.createElement(exports.default),
         );
         assert.match(markup, /role="button"/);
+        assert.match(markup, /aria-label="Plant: Fern"/);
         assert.match(
           markup,
           new RegExp(`aria-pressed="${selected || locked}"`),

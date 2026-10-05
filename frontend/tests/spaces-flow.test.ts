@@ -9,6 +9,7 @@ import ts from "typescript";
 import { createLocalStateStore, localStateKey } from "../services/local-state-storage";
 import * as spaces from "../services/spaces";
 import * as profilePhoto from "../services/profile-photo";
+import * as validators from "../services/validators";
 
 const requireModule = createRequire(`${process.cwd()}/package.json`);
 type Props = {
@@ -73,6 +74,7 @@ function load(path: string, overrides: Record<string, unknown>) {
     exports, Error, AbortController, setTimeout, clearTimeout,
     require(name: string) {
       if (name in overrides) return overrides[name];
+      if (name === "@/services/validators") return validators;
       if (name === "react/jsx-runtime") return requireModule(name);
       if (name === "expo-font") return { useFonts: () => [true] };
       if (name === "../assets/fonts/Inter-SemiBold.ttf") return 1;

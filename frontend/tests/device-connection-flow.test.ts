@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { frontendRoot } from "./helpers/device-flow-harness";
 import { createRequire } from "node:module";
 import test from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
@@ -97,7 +98,7 @@ async function harness(screen = "assignment") {
   }
   runInNewContext(
     ts.transpileModule(
-      readFileSync(`app/device-connection/${screen}.tsx`, "utf8"),
+      readFileSync(`${frontendRoot}app/device-connection/${screen}.tsx`, "utf8"),
       {
         compilerOptions: {
           module: ts.ModuleKind.CommonJS,
@@ -221,90 +222,6 @@ async function harness(screen = "assignment") {
   };
 }
 
-test("actual assignment handler coalesces double taps and saves the locked target", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
-  const flow = await harness();
-  t.after(flow.dispose);
-  const node = flow.render();
-  const connect = action(node, "Connect to selected destination");
-  assert.equal(connect.disabled, false);
-  connect.onPress?.();
-  connect.onPress?.();
-  t.mock.timers.tick(1400);
-  await nextTurn();
-  assert.equal(flow.writes(), 1);
-  assert.equal(
-    flow.store.snapshot().data.connectedDevices[0].assignedId,
-    "Bedroom",
-  );
-  assert.equal(flow.navigations.length, 1);
-});
-
-for (const boundary of [
-  "cancel",
-  "blur",
-  "unmount",
-  "deleted target",
-  "changed target",
-]) {
-  test(`actual assignment rejects queued work after ${boundary}`, async (t) => {
-    t.mock.timers.enable({ apis: ["setTimeout"] });
-    const flow = await harness();
-    t.after(flow.dispose);
-    const node = flow.render();
-    const gate = flow.blockWrite();
-    const earlier = flow.store.update((state) => ({
-      ...state,
-      experience: "beginner",
-    }));
-    await nextTurn();
-    action(node, "Connect to selected destination").onPress?.();
-    t.mock.timers.tick(1400);
-    await nextTurn();
-    if (boundary === "cancel") node.props.onCancel?.();
-    if (boundary === "blur") {
-      flow.active(false);
-      flow.render();
-    }
-    if (boundary === "unmount") flow.dispose();
-    if (boundary === "deleted target") {
-      flow.spaces(["Patio"]);
-      flow.render();
-    }
-    if (boundary === "changed target") {
-      flow.params({
-        deviceId: devices.mockHardwareNodes[0].id,
-        targetType: "space",
-        targetId: "Patio",
-      });
-      flow.render();
-    }
-    gate.resolve();
-    await earlier;
-    await nextTurn();
-    assert.equal(flow.writes(), 1);
-    assert.deepEqual(flow.store.snapshot().data.connectedDevices, []);
-    assert.equal(flow.navigations.length, 0);
-  });
-}
-
-test("cancel after the storage commit starts permits that save but suppresses navigation", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
-  const flow = await harness();
-  t.after(flow.dispose);
-  const node = flow.render();
-  const gate = flow.blockWrite();
-  action(node, "Connect to selected destination").onPress?.();
-  t.mock.timers.tick(1400);
-  await nextTurn();
-  assert.equal(flow.writes(), 1);
-  node.props.onCancel?.();
-  gate.resolve();
-  await nextTurn();
-  assert.equal(flow.store.snapshot().data.connectedDevices.length, 1);
-  assert.equal(flow.navigations.length, 0);
-});
-
 test("management removal preserves all devices on failure and removes only its ID on retry", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const flow = await harness("manage");
@@ -330,31 +247,6 @@ test("management removal preserves all devices on failure and removes only its I
   action(flow.render(), "Remove Leaf Node 01").onPress?.();
   await nextTurn();
   assert.deepEqual(flow.store.snapshot().data.connectedDevices, [connected[1]]);
-});
-
-test("success uses persisted identity and destination, not a forged targetName", async (t) => {
-  const flow = await harness("success");
-  t.after(flow.dispose);
-  const targets = devices.deviceTargets(["Bedroom"], []);
-  const saved = devices.connectedDeviceFromMock(
-    devices.createMockConnection(
-      devices.mockHardwareNodes[0].id,
-      targets[0],
-      targets,
-    ),
-  );
-  await flow.store.update(() => ({
-    ...initialLocalState(),
-    connectedDevices: [saved],
-  }));
-  flow.params({ deviceId: saved.id, targetName: "Forged destination" });
-  const output = JSON.stringify(flow.render());
-  assert.match(output, /Bedroom/);
-  assert.doesNotMatch(output, /Forged destination/);
-  for (const deviceId of [undefined, "unknown", [saved.id]]) {
-    flow.params({ deviceId });
-    assert.equal(flow.render().props.href, "/device-connection/scanner");
-  }
 });
 
 for (const boundary of ["queued", "commit started"]) {
@@ -389,7 +281,7 @@ for (const boundary of ["queued", "commit started"]) {
       }>;
     };
     runInNewContext(
-      ts.transpileModule(readFileSync("context/local-state.tsx", "utf8"), {
+      ts.transpileModule(readFileSync(`${frontendRoot}context/local-state.tsx`, "utf8"), {
         compilerOptions: {
           module: ts.ModuleKind.CommonJS,
           jsx: ts.JsxEmit.ReactJSX,

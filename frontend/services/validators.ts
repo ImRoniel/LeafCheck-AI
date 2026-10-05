@@ -7,6 +7,8 @@ import type {
   ScanResponse,
   TelemetryHistory,
   TelemetryPayload,
+  Device,
+  PlantTelemetry,
 } from "../types";
 import { ApiError } from "./errors";
 type Check = (value: unknown, path: string) => void;
@@ -20,6 +22,16 @@ export const nonempty: Check = (v, p) => {
   text(v, p);
   if (!(v as string).trim()) fail(p);
 };
+export const uuid: Check = (v, p) => {
+  text(v, p);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v as string)) fail(p);
+};
+export function normalizeMac(value: string): string {
+  text(value, "macAddress");
+  const normalized = value.trim().toUpperCase();
+  if (!/^(?:LC-[0-9A-F]{6}|[0-9A-F]{2}(?::[0-9A-F]{2}){5}|[0-9A-F]{2}(?:-[0-9A-F]{2}){5})$/.test(normalized)) fail("macAddress");
+  return normalized;
+}
 const number: Check = (v, p) => {
   if (typeof v !== "number" || !Number.isFinite(v)) fail(p);
 };
@@ -161,6 +173,30 @@ const plantWithMoisture: Check = (value, path) => {
 export const parsePlant = parse<Plant>(plantWithMoisture);
 export const parsePlants = parse<Plant[]>(array(plantWithMoisture));
 export const parseTelemetry = parse<TelemetryPayload>(telemetryCheck);
+export const parseDevice = parse<Device>(object({
+  id: uuid, name: nonempty, macAddress: (value, path) => {
+    text(value, path);
+    normalizeMac(value as string);
+  }, userId: uuid, status: enumeration("ONLINE", "OFFLINE"), createdAt: date, updatedAt: date,
+}));
+export function parsePlantTelemetry(value: unknown): PlantTelemetry {
+  object({ paired: boolean })(value, "response");
+  const payload = value as Record<string, unknown>;
+  if (payload.paired === false) {
+    if (payload.device !== null || payload.telemetry !== null) fail("response.unpaired");
+    return { paired: false, device: null, telemetry: null };
+  }
+  const device = parseDevice(payload.device);
+  const telemetry = payload.telemetry === null ? null : parseTelemetry(payload.telemetry);
+  if (telemetry && telemetry.deviceId !== device.macAddress) fail("response.telemetry.deviceId");
+  return { paired: true, device, telemetry };
+}
+export function parsePairedPlant(value: unknown): Plant {
+  const result = parsePlant(value);
+  uuid(result.id, "response.id");
+  if (result.deviceId !== undefined) uuid(result.deviceId, "response.deviceId");
+  return result;
+}
 export const parseHistory = (v: unknown): TelemetryHistory => {
   const value = parse<TelemetryHistory>(history)(v);
   const { total, limit, offset, hasMore } = value.pagination;

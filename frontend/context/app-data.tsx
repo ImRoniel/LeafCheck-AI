@@ -1,12 +1,14 @@
 import {
   fetchUserPlants,
+  pairDeviceToPlant,
   updatePlant as patchPlant,
   createPlant as postPlant,
   deletePlant as removePlant,
   type CreatePlantInput,
   type UpdatePlantInput,
 } from "@/services/api";
-import type { Plant } from "@/types";
+import { uuid } from "@/services/validators";
+import type { Device, Plant } from "@/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createContext,
@@ -19,6 +21,8 @@ import {
 } from "react";
 import { session, useAuth } from "./auth";
 import { useLocalState } from "./local-state";
+
+export type ConfirmedPairing = { device: Device; plant: Plant; refreshWarning: string | null };
 
 const Context = createContext<{
   guest: boolean;
@@ -35,6 +39,11 @@ const Context = createContext<{
   devices: Record<string, string>;
   saveDevice: (id: string, device: string) => Promise<void>;
   storageError: string | null;
+  pendingDevice: Device | null;
+  confirmedPairing: ConfirmedPairing | null;
+  pairClaimedDevice: (plantId: string, signal?: AbortSignal) => Promise<ConfirmedPairing>;
+  rememberClaimedDevice: (device: Device) => void;
+  clearPendingDevice: () => void;
 } | null>(null);
 export function AppDataProvider({ children }: PropsWithChildren) {
   const auth = useAuth();
@@ -59,6 +68,12 @@ function AccountDataProvider({ children }: PropsWithChildren) {
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<Record<string, string>>({});
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [pendingDevice, setPendingDevice] = useState<Device | null>(null);
+  const pendingDeviceRef = useRef<Device | null>(null);
+  const [confirmedPairing, setConfirmedPairing] = useState<ConfirmedPairing | null>(null);
+  const pairing = useRef(false);
+  const plantsRef = useRef(plants);
+  plantsRef.current = plants;
   const controller = useRef<AbortController | null>(null);
   const deviceRef = useRef<Record<string, string>>({});
   const storageReady = useRef(false);
@@ -80,6 +95,18 @@ function AccountDataProvider({ children }: PropsWithChildren) {
       current.user?.id !== auth.user?.id
     )
       throw new Error("Session changed. Sign in to manage plants.");
+  };
+  const rememberClaimedDevice = (device: Device) => {
+    assertSession();
+    if (device.userId !== auth.user?.id)
+      throw new Error("Sign in to claim this device.");
+    pendingDeviceRef.current = device;
+    setPendingDevice(device);
+    setConfirmedPairing(null);
+  };
+  const clearPendingDevice = () => {
+    pendingDeviceRef.current = null;
+    if (active.current) setPendingDevice(null);
   };
   useEffect(() => {
     let active = true;
@@ -110,8 +137,8 @@ function AccountDataProvider({ children }: PropsWithChildren) {
       controller.current?.abort();
     };
   }, [storageKey]);
-  const refresh = useCallback(async () => {
-    if (!authenticated) return;
+  const refreshCollection = useCallback(async () => {
+    if (!authenticated) return false;
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
@@ -119,17 +146,63 @@ function AccountDataProvider({ children }: PropsWithChildren) {
     setError(null);
     try {
       const result = await fetchUserPlants({ signal: abort.signal });
+      assertSession();
       if (!abort.signal.aborted) {
+        plantsRef.current = result;
         setPlants(result);
         setLoaded(true);
+        return true;
       }
     } catch (e) {
-      if (!abort.signal.aborted)
+      try { assertSession(); } catch { return false; }
+      if (!abort.signal.aborted && active.current)
         setError(e instanceof Error ? e.message : "Unable to load plants");
     } finally {
-      if (!abort.signal.aborted) setLoading(false);
+      const current = session.snapshot();
+      if (!abort.signal.aborted && active.current && current.generation === auth.generation && current.user?.id === auth.user?.id) setLoading(false);
     }
+    return false;
   }, [authenticated]);
+  const refresh = useCallback(async () => { await refreshCollection(); }, [refreshCollection]);
+  const pairClaimedDevice = async (plantId: string, signal?: AbortSignal) => {
+    assertSession();
+    uuid(plantId, "plantId");
+    const device = pendingDeviceRef.current;
+    if (!device || device.userId !== auth.user?.id)
+      throw new Error("Claim a sensor before pairing it.");
+    uuid(device.id, "deviceId");
+    if (!loaded || loading || error || !plantsRef.current.some((plant) => plant.id === plantId))
+      throw new Error("Select an available owned plant before pairing.");
+    if (pairing.current) throw new Error("Pairing is already in progress.");
+    if (signal?.aborted) throw new Error("Pairing cancelled before submission.");
+    pairing.current = true;
+    try {
+      const plant = await pairDeviceToPlant(plantId, device.id, { signal });
+      assertSession();
+      if (plant.id !== plantId || plant.deviceId !== device.id)
+        throw new Error("The server did not confirm the selected pairing.");
+      // Confirmation is a committed server write, even if the screen was cancelled.
+      controller.current?.abort();
+      const next = plantsRef.current.map((cached) => {
+        if (cached.id === plant.id) return plant;
+        if (cached.deviceId !== device.id) return cached;
+        const { deviceId: previousDevice, ...unpaired } = cached;
+        return unpaired;
+      });
+      plantsRef.current = next;
+      setPlants(next);
+      setLoading(false);
+      setError(null);
+      const confirmation: ConfirmedPairing = { device, plant, refreshWarning: null };
+      setConfirmedPairing(confirmation);
+      clearPendingDevice();
+      const refreshed = await refreshCollection();
+      assertSession();
+      const completed = { ...confirmation, refreshWarning: refreshed ? null : "Sensor paired successfully. The collection could not be refreshed; retry loading your plants." };
+      setConfirmedPairing(completed);
+      return completed;
+    } finally { pairing.current = false; }
+  };
   useEffect(() => {
     const timer = setTimeout(() => {
       if (authenticated) void refresh();
@@ -220,6 +293,11 @@ function AccountDataProvider({ children }: PropsWithChildren) {
         devices,
         saveDevice,
         storageError,
+        pendingDevice,
+        confirmedPairing,
+        pairClaimedDevice,
+        rememberClaimedDevice,
+        clearPendingDevice,
       }}
     >
       {children}

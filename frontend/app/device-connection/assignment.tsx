@@ -4,19 +4,8 @@ import {
 } from "@/components/device-connection-screen";
 import { Action, ui } from "@/components/screen";
 import { useAppData } from "@/context/app-data";
-import { useLocalState } from "@/context/local-state";
-import { useSpaces } from "@/context/spaces";
 import { useDeviceActivity } from "@/hooks/use-device-activity";
-import {
-  connectedDeviceFromMock,
-  createMockConnection,
-  deviceTargets,
-  findMockDevice,
-  mockDeviceDelay,
-  parsePreselectedTarget,
-  resolveDeviceTarget,
-  upsertConnectedDevice,
-} from "@/services/device-connection";
+import { parsePreselectedTarget, resolveDeviceTarget } from "@/services/device-connection";
 import type {
   DeviceConnectionRouteParams,
   DeviceTarget,
@@ -30,103 +19,54 @@ export default function DeviceAssignment() {
     useLocalSearchParams<DeviceConnectionRouteParams>();
   const preselected = parsePreselectedTarget(targetType, targetId);
   const locked = preselected !== undefined;
-  const device = findMockDevice(deviceId);
   const data = useAppData();
-  const local = useLocalState();
-  const { spaces } = useSpaces();
+  const device = data.pendingDevice;
+  const validClaim = !!device && device.id === deviceId && !data.guest;
   const active = useDeviceActivity();
   const router = useRouter();
   const [manualSelection, setSelected] = useState<DeviceTarget | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const work = useRef<AbortController | null>(null);
-  // "Unassigned" is a collection bucket, not an existing Space.
-  const targets = deviceTargets(
-    (data.loaded && !data.error
-      ? spaces
-      : local.data.spaces.map((space) => space.name)
-    ).filter(
-      (name) =>
-        name !== "Unassigned" ||
-        local.data.spaces.some((space) => space.name === name),
-    ),
-    data.loaded && !data.error ? data.plants : [],
-  );
+  const targets: DeviceTarget[] = data.loaded && !data.error && !data.guest
+    ? data.plants.filter((plant) => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(plant.id)).map((plant) => ({ kind: "plant", id: plant.id, name: plant.name }))
+    : [];
   const selected = resolveDeviceTarget(preselected, manualSelection, targets);
-  const latest = useRef({ targets, local, loading: data.loading, preselected });
-  useLayoutEffect(() => {
-    latest.current = { targets, local, loading: data.loading, preselected };
-  });
+  const latest = useRef({ targets, loading: data.loading, preselected, validClaim });
+  useLayoutEffect(() => { latest.current = { targets, loading: data.loading, preselected, validClaim }; });
   const cancel = () => {
     work.current?.abort();
     work.current = null;
   };
   useEffect(() => {
-    const reset = active ? setTimeout(() => setBusy(false), 0) : undefined;
+    if (active && !work.current) setBusy(false);
     if (!active) {
       work.current?.abort();
       work.current = null;
     }
     return () => {
-      clearTimeout(reset);
       work.current?.abort();
       work.current = null;
     };
   }, [active]);
 
   const connect = async () => {
-    if (!device || !selected || !active || work.current || data.loading) return;
+    if (!validClaim || !selected || !active || work.current || data.loading) return;
+    const current = resolveDeviceTarget(latest.current.preselected, selected, latest.current.targets);
+    if (!current || current.kind !== "plant" || !latest.current.validClaim || latest.current.loading) return;
     const abort = new AbortController();
     work.current = abort;
     setBusy(true);
     setError(null);
     try {
-      await mockDeviceDelay(1400, abort.signal);
-      if (abort.signal.aborted) return;
-      if (latest.current.loading) throw new Error("Collection updating");
-      const connection = createMockConnection(
-        device.id,
-        selected,
-        latest.current.targets,
-      );
-      await latest.current.local.update((state) => {
-        if (abort.signal.aborted) throw new Error("Cancelled");
-        // Revalidate after waiting for the persistence queue.
-        const current = resolveDeviceTarget(
-          latest.current.preselected,
-          selected,
-          latest.current.targets,
-        );
-        if (
-          latest.current.loading ||
-          !current ||
-          current.kind !== selected.kind ||
-          current.id !== selected.id
-        )
-          throw new Error("Assignment changed");
-        const validated = createMockConnection(
-          device.id,
-          current,
-          latest.current.targets,
-        );
-        return {
-          ...state,
-          connectedDevices: upsertConnectedDevice(
-            state.connectedDevices,
-            connectedDeviceFromMock(validated),
-          ),
-        };
-      });
-      if (!abort.signal.aborted)
-        router.replace({
-          pathname: "/device-connection/success",
-          params: { deviceId: device.id, targetName: connection.target.name },
-        });
+      const submittedDeviceId = device!.id;
+      await data.pairClaimedDevice(current.id, abort.signal);
+      const sameContext = latest.current.preselected?.id === preselected?.id && latest.current.preselected?.type === preselected?.type;
+      if (!abort.signal.aborted && sameContext)
+        router.replace({ pathname: "/device-connection/success", params: { deviceId: submittedDeviceId } });
     } catch {
       if (!abort.signal.aborted)
-        setError(
-          "The demo assignment could not be saved. Check your selection and retry. No physical device was connected.",
-        );
+        setError("The sensor could not be paired. Check your connection and selected plant, then retry.");
     } finally {
       if (work.current === abort) {
         work.current = null;
@@ -135,19 +75,14 @@ export default function DeviceAssignment() {
     }
   };
 
-  if (!device)
-    return (
-      <Redirect
-        href={{
-          pathname: "/device-connection/scanner",
-          params: { targetType, targetId },
-        }}
-      />
-    );
+  const completedRouteClaim = data.confirmedPairing?.device.id === deviceId;
+  if (!validClaim && !busy && !completedRouteClaim)
+    return <Redirect href={{ pathname: "/device-connection/scanner", params: { targetType, targetId } }} />;
   return (
     <DeviceConnectionScreen
       title="Assign your sensor"
       step={3}
+      description="Pair your claimed sensor with an owned plant."
       onCancel={cancel}
     >
       <FlatList
@@ -157,13 +92,12 @@ export default function DeviceAssignment() {
         contentContainerStyle={s.content}
         ListHeaderComponent={
           <View style={{ gap: 12 }}>
-            <Text style={ui.heading}>{device.name}</Text>
+            <Text style={ui.heading}>{device?.name ?? data.confirmedPairing?.device.name ?? "Sensor"}</Text>
             <Text style={s.text}>
               {locked
                 ? "Your destination is preselected and locked. "
-                : "Choose an existing Space or Plant. "}
-              This assignment is saved only on this device for the current
-              account or guest profile.
+                : "Choose an existing Plant. "}
+              Pairing is confirmed by the server for your account.
             </Text>
             {locked && !selected && !data.loading && (
               <Text accessibilityRole="alert" style={s.status}>
@@ -180,8 +114,7 @@ export default function DeviceAssignment() {
             {data.error && (
               <>
                 <Text accessibilityLiveRegion="polite" style={s.status}>
-                  Plants could not be loaded. Retry, or choose an existing local
-                  Space.
+                  Plants could not be loaded. Retry before pairing.
                 </Text>
                 <Action
                   label="Retry loading plants"
@@ -196,7 +129,7 @@ export default function DeviceAssignment() {
           <Text style={s.status}>
             {data.loading
               ? "Please wait for your collection."
-              : "No Spaces or Plants are available. Return to the dashboard and add one in My Spaces, then connect again."}
+              : "No owned Plants are available. Add a plant to your collection, then connect again."}
           </Text>
         }
         renderItem={({ item }) => {
@@ -214,7 +147,7 @@ export default function DeviceAssignment() {
               accessibilityHint={
                 locked
                   ? "Preselected destination; cannot be changed in this flow"
-                  : "Select this destination for the mock sensor"
+                  : "Select this plant for your sensor"
               }
               disabled={busy || locked}
               onPress={() => setSelected(item)}
@@ -237,15 +170,17 @@ export default function DeviceAssignment() {
                 {error}
               </Text>
             )}
+            {completedRouteClaim && <Text accessibilityLiveRegion="polite" style={s.status}>Sensor pairing confirmed.</Text>}
             {busy && (
               <Text accessibilityLiveRegion="polite" style={s.text}>
-                Saving mock connection…
+                Pairing your sensor…
               </Text>
             )}
             <Action
               label={busy ? "Connecting…" : "Connect to selected destination"}
               disabled={
                 busy ||
+                !validClaim ||
                 data.loading ||
                 !selected ||
                 !targets.some(
@@ -260,7 +195,7 @@ export default function DeviceAssignment() {
               disabled={busy}
               onPress={() =>
                 router.replace({
-                  pathname: "/device-connection/selection",
+                  pathname: "/device-connection/scanner",
                   params: { targetType, targetId },
                 })
               }

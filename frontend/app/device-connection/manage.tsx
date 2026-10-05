@@ -65,7 +65,7 @@ export default function ManageDevices() {
       {error && <Notice>{error}</Notice>}
       {!local.data.connectedDevices.length && (
         <Notice>
-          No paired demo sensors. Add a sensor to choose a plant or space.
+          No saved demo sensors. Add a sensor to pair with an owned plant.
         </Notice>
       )}
       {local.data.connectedDevices.map((device) => (
@@ -81,8 +81,7 @@ export default function ManageDevices() {
             disabled={busy}
             onPress={() =>
               router.push({
-                pathname: "/device-connection/assignment",
-                params: { deviceId: device.id },
+                pathname: "/device-connection/scanner",
               })
             }
           />

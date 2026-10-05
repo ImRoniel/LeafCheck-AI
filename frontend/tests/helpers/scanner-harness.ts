@@ -156,6 +156,9 @@ export function scannerHarness() {
         if (name === "react") return hooks;
         if (name === "react/jsx-runtime") return requireModule(name);
         if (name === "react-native") return native;
+        // Animation behavior has separate press-feedback coverage; this harness
+        // observes the native press boundary of production scanner actions.
+        if (name === "./animated-pressable") return { AnimatedPressable: native.Pressable };
         if (name === "expo-router") return { useRouter: () => router, usePathname: () => pathname, useLocalSearchParams: () => params };
         if (name.endsWith("context/auth")) return { useAuth: () => ({ status }) };
         if (name.endsWith("context/app-data")) return { useAppData: () => ({ refresh }) };
@@ -173,7 +176,7 @@ export function scannerHarness() {
         if (name === "@expo/vector-icons") return { Ionicons: "Ionicons" };
         if (name === "react-native-safe-area-context") return { SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
         if (name.endsWith("components/telemetry-history")) return { measurement: (value: unknown) => String(value) };
-        if (name.startsWith("@/")) return load(`${name.slice(2)}.${name.includes("hooks/") ? "ts" : "tsx"}`);
+        if (name.startsWith("@/")) return load(`${name.slice(2)}.${name.includes("hooks/") || name.includes("services/") ? "ts" : "tsx"}`);
         throw new Error(`Unexpected scanner import: ${name}`);
       },
     });

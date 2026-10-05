@@ -1,4 +1,5 @@
 // Canonical type barrel for the frontend package
+export type { Device, PlantTelemetry } from "./device";
 export type {
   EnvironmentalReadings, LightLevel,
   SensorReading, SoilMoisture, TelemetryHistory, TelemetryPayload
