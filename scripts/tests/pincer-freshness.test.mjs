@@ -98,6 +98,9 @@ function rejected(f, pattern) {
   const report = f.report();
   assert.equal(report.json.candidate.notes, 'stale');
   assert.match(report.json.candidate.reason, pattern);
+  if (f.mode === 'changes') {
+    assert.notEqual(status.notesCurrent(f.root, prd, { changesMode: true }).state, 'current');
+  }
   const r = f.ready();
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /CANDIDATE_STALE/);
@@ -172,4 +175,31 @@ for (const [name, mutate, pattern] of [
   ['unavailable ancestry metadata', f => f.put('NOTES.md', `---\nprd: ${prd}\ncandidate: ${f.candidate}\nbase: ${'f'.repeat(40)}\nevidence: ${f.manifest}\n---\n`), /ancestry unavailable/],
 ]) test(`characterization: legacy Notes rejects ${name}`, t => {
   const f = fixture(t, 'legacy'); mutate(f); rejected(f, pattern);
+});
+
+test('changes mode: valid locator evidence commit keeps Notes, Evaluation and Evidence current', t => {
+  const f = fixture(t);
+  const report = f.report();
+  assert.match(report.text, /^Notes    NOTES\.md: current \(.*\) \(compatibility summary; the evaluation locator decides\)$/m);
+  assert.match(report.text, /^Evaluation .*: current \(/m);
+  assert.match(report.text, /^Evidence .* · ok$/m);
+  assert.equal(f.ready().status, 0);
+  assert.equal(f.git('status', '--porcelain', '--untracked-files=all'), '');
+});
+
+test('changes mode: another structurally valid locator follows the same existing policy', t => {
+  const f = fixture(t);
+  f.json(locator.file('other'), { schema: 1, change: 'other', evaluations: [] });
+  f.commit();
+  assert.equal(status.notesCurrent(f.root, prd, { changesMode: true }).state, 'current');
+  assert.match(f.report().text, /^Notes    NOTES\.md: current /m);
+  assert.equal(f.ready().status, 0);
+});
+
+test('changes mode: dirty Notes cannot satisfy the separate clean-tree release condition', t => {
+  const f = fixture(t);
+  f.put('NOTES.md', `${readFileSync(join(f.root, 'NOTES.md'), 'utf8')}Uncommitted handover edit.\n`);
+  assert.equal(f.report().json.candidate.notes, 'current');
+  assert.equal(f.ready().status, 0); // Readiness permits evidence followers; release also requires a clean tree.
+  assert.notEqual(f.git('status', '--porcelain', '--untracked-files=all'), '');
 });

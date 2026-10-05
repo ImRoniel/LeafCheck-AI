@@ -63,7 +63,7 @@ const usablePrd = prdResult => ['ticketed', 'built'].includes(prdResult.fields.s
 
 // --- Candidate (NOTES.md + evidence) ------------------------------------------
 // Port of notes_current: exact wording, same checks, one pass.
-function notesCurrent(root, prd) {
+function notesCurrent(root, prd, { changesMode = false } = {}) {
   const notesPath = path.join(root, 'NOTES.md');
   if (!fs.existsSync(notesPath)) return { text: 'missing', state: 'missing' };
   const meta = parse.validateMetadata(fs.readFileSync(notesPath, 'utf8'));
@@ -88,6 +88,9 @@ function notesCurrent(root, prd) {
     if (tracked.error || !tracked.out.trim()) return { text: `stale: evidence not tracked: ${file}`, state: 'stale', fields: f, manifest };
     for (const line of tracked.out.split('\n')) if (line) canonical.add(line);
   }
+  // Changes-mode Notes is a compatibility summary of the locator's candidate.
+  // Reuse its validated follower policy; legacy/migrated Notes stays unchanged.
+  if (changesMode) for (const file of locator.followers(root, candidate)) canonical.add(file);
   const diff = tryGit(root, ['diff', '--name-only', '--relative', candidate, 'HEAD', '--', '.', ':(exclude)NOTES.md']);
   if (diff.error) return { text: 'stale: evaluation commits or ancestry unavailable', state: 'stale', fields: f, manifest };
   const offending = diff.out.split('\n').filter(l => l && !canonical.has(l))[0];
@@ -318,7 +321,7 @@ function gatherBody(root, out, ctx) {
   // locator in changes mode (NOTES.md is then a compatibility summary).
   const notes = ctx.notes ? ctx.notes() : prd ? notesCurrent(root, prd) : { text: 'missing', state: 'missing' };
   if (ctx.notes) {
-    const compat = prd && fs.existsSync(path.join(root, 'NOTES.md')) ? notesCurrent(root, prd).text : 'missing';
+    const compat = prd && fs.existsSync(path.join(root, 'NOTES.md')) ? notesCurrent(root, prd, { changesMode: true }).text : 'missing';
     line(`Notes    NOTES.md: ${compat} (compatibility summary; the evaluation locator decides)`);
     line(`Evaluation ${ctx.locatorFile}: ${notes.text}`);
   } else line(`Notes    NOTES.md: ${notes.text}`);

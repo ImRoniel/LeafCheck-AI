@@ -1,10 +1,12 @@
 ---
 ticket: T-05
-status: open
+status: done
 size: M
 prd: .prd/prd-v2.md
 depends_on: [T-04]
 timeout: 600
+started: 2026-10-05T08:38:56Z
+finished: 2026-10-05T08:43:49Z
 ---
 
 ## Objective
@@ -23,10 +25,10 @@ Make changes-mode Notes compatibility freshness accept the existing validated ev
 - Run full backend regression tests and strict compilation; preserve PRD v1 records, artifacts and endpoint code.
 
 ## Acceptance Criteria
-- [ ] A valid evidence-only locator commit produces consistent current status and passes readiness.
-- [ ] Malformed input, genuine committed/dirty changes and invalid evidence remain rejected.
-- [ ] The positive test fails against the original defect and passes with the correction; legacy/migrated regressions remain green.
-- [ ] Backend tests and TypeScript checks pass without endpoint changes.
+- [x] A valid evidence-only locator commit produces consistent current status and passes readiness.
+- [x] Malformed input, genuine committed/dirty changes and invalid evidence remain rejected.
+- [x] The positive test fails against the original defect and passes with the correction; legacy/migrated regressions remain green.
+- [x] Backend tests and TypeScript checks pass without endpoint changes.
 
 ## Verification
 Proves: Valid evidence-only freshness and all rejection/mode regressions, plus unchanged backend behavior and strict compilation.
