@@ -1,11 +1,11 @@
 {
-  "schema": 2,
-  "runtime": 2,
+  "schema": 3,
+  "runtime": 3,
   "change": "prd-v2",
   "prd": ".prd/prd-v2.md",
   "base": "c442e0cd94f3503f7851787a84b0fff0086a03a0",
   "registered": "2026-10-05T08:26:10Z",
-  "sequence": 2,
+  "sequence": 4,
   "lifecycle": {
     "state": "planned",
     "since": "2026-10-05T08:26:10Z",
@@ -19,6 +19,8 @@
       "digest": "16f0ec8e787d0f7b467254e34858a21c4d82fc295ddd4f8039d1732c9cc4dc3a",
       "prd_revision": "f480b66118d750198895fc3264974cd1c76556f266670157f7e622d52df4289d",
       "breakdown": "134a6043bfe4e074050d3e9b2597421a9f9bc0d08c6f5321e1dc6013fa260a84",
+      "inventory": null,
+      "coverage": null,
       "tickets": [
         "T-04",
         "T-05",
@@ -27,6 +29,22 @@
       "decisions": [],
       "snapshot": ".prd/changes/prd-v2/agreements/G-01.json",
       "recorded": "2026-10-05T08:26:57Z"
+    },
+    {
+      "id": "G-02",
+      "digest": "e0f8fd826d27ac838346da79209ea4b793f65408a387b4f3e4215005c00c33dd",
+      "prd_revision": "f480b66118d750198895fc3264974cd1c76556f266670157f7e622d52df4289d",
+      "breakdown": "134a6043bfe4e074050d3e9b2597421a9f9bc0d08c6f5321e1dc6013fa260a84",
+      "inventory": "500623c9b19d872fab1fa59e835cac4f9563f0a949cb8b95114fcdc3d18a8f47",
+      "coverage": "4c7a0839883a53ce65858379f937e7a46d598880863424d8f380ecd61c41cd88",
+      "tickets": [
+        "T-04",
+        "T-05",
+        "T-06"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v2/agreements/G-02.json",
+      "recorded": "2026-10-05T08:28:02Z"
     }
   ],
   "authorizations": [
@@ -42,6 +60,19 @@
       "explanation": null,
       "decisions": [],
       "recorded": "2026-10-05T08:26:57Z"
+    },
+    {
+      "id": "A-02",
+      "agreement": "G-02",
+      "digest": "e0f8fd826d27ac838346da79209ea4b793f65408a387b4f3e4215005c00c33dd",
+      "disposition": "user",
+      "reference": "User invoked pincer-narrow after PRD v2 handover; supplied skill authorizes the complete same-scope breakdown and coverage adoption without another approval.",
+      "excerpt": "$pincer-narrow",
+      "constraints": null,
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-05T08:28:02Z"
     }
   ],
   "decisions": [],
@@ -71,6 +102,32 @@
       "decision": null,
       "replacement": null,
       "note": null
+    },
+    {
+      "sequence": 3,
+      "kind": "adopt",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-05T08:28:02Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 4,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-05T08:28:02Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
     }
   ],
   "evaluations": [],
@@ -79,5 +136,10 @@
     "authorization_text": null,
     "migrated_from": null,
     "migrated": null
+  },
+  "coverage": {
+    "map": ".prd/coverage/prd-v2.json",
+    "adopted": "2026-10-05T08:28:02Z",
+    "agreement": "G-02"
   }
 }
