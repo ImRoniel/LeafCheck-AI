@@ -1,9 +1,7 @@
 ---
-mode: agent
 description: "Audit the repo against the workflow checklist — pass/fail per item, no fixes"
+argument-hint: "Stage to check (optional: plan | narrow | code | evaluate — defaults to all completed stages)"
 ---
-<!-- Generated from .claude/commands/pincer-release.md by scripts/sync-prompts.sh — edit the source, not this file -->
-
 
 # /pincer-release — Workflow Audit
 
@@ -14,7 +12,7 @@ the candidate invalidates the audit: if `git status --short` is not empty afterw
 the verdict is FAIL and names the mutation. The verdict is reported to the user; a
 durable runtime-owned release record is later work.
 
-**Requested stage:** ${input:request:Task brief or arguments (optional)}
+**Requested stage:** $ARGUMENTS
 
 ## Steps
 
@@ -22,7 +20,7 @@ durable runtime-owned release record is later work.
    readiness. `docs/dry-run-checklist.md` is a separate manual platform trial and must
    not impose toy-project or Pincer-kit assumptions on this audit.
 2. Run `scripts/pincer-status.sh` to determine the selected PRD and which stages have run
-   (it reads `.prd/`, associated `tickets/`, `NOTES.md`; add `git log`). If `${input:request:Task brief or arguments (optional)}`
+   (it reads `.prd/`, associated `tickets/`, `NOTES.md`; add `git log`). If `$ARGUMENTS`
    names a stage, check only up
    to that stage.
 3. Check every applicable item mechanically where possible:

@@ -1,10 +1,12 @@
 ---
 ticket: T-06
-status: open
+status: done
 size: M
 prd: .prd/prd-v2.md
 depends_on: [T-05]
 timeout: 600
+started: 2026-10-05T08:43:56Z
+finished: 2026-10-05T08:49:56Z
 ---
 
 ## Objective
@@ -23,10 +25,10 @@ Make durable release instructions agree with mode-specific freshness authority a
 - Deliver scoped commits and preserve v1 history; subsequent evaluation and read-only release audit must record actual freshness, not rewrite historical results.
 
 ## Acceptance Criteria
-- [ ] Checklist and playbook express the correct authority in each mode and retain every release obligation.
-- [ ] Canonical guidance and both generated adapters are tracked and byte-consistent; no unrelated generated drift is committed.
-- [ ] Static-contract tests reject adapter drift or missing mode-specific/clean-tree obligations.
-- [ ] Freshness, Bash-runner, backend and compilation checks pass; v1 artifacts remain unchanged.
+- [x] Checklist and playbook express the correct authority in each mode and retain every release obligation.
+- [x] Canonical guidance and both generated adapters are tracked and byte-consistent; no unrelated generated drift is committed.
+- [x] Static-contract tests reject adapter drift or missing mode-specific/clean-tree obligations.
+- [x] Freshness, Bash-runner, backend and compilation checks pass; v1 artifacts remain unchanged.
 
 ## Verification
 Proves: Static documentation/generation contracts through isolated regeneration and tracked-file checks, plus behavioral regressions and backend preservation; semantic review is recorded separately at evaluation.
