@@ -1,6 +1,6 @@
 ---
 version: 2
-status: draft
+status: ticketed
 date: 2026-10-05
 ---
 
