@@ -1,10 +1,12 @@
 ---
 ticket: T-01
-status: open
+status: done
 size: M
 prd: .prd/prd-v1.md
 depends_on: []
 timeout: 600
+started: 2026-10-05T07:47:35Z
+finished: 2026-10-05T07:52:48Z
 ---
 
 ## Objective
@@ -24,12 +26,12 @@ Claim devices through an authenticated router and mount it in the server.
 - Mount devicesRouter at /api/devices and exercise the actual server mount in a test using the existing security/startup harness pattern; verify authentication, unexpected-field rejection, and sanitized storage failures.
 
 ## Acceptance Criteria
-- [ ] Accept only macAddress and optional name; validate LC-hex or consistent colon/hyphen standard MAC formats, uppercase characters while preserving separators. Reject invalid bodies and names with 400; anonymous requests get 401.
-- [ ] Create an owner-linked UUID Device with OFFLINE default; omitted name defaults to normalized macAddress. Return exactly the specified Device fields with ISO dates and 201.
-- [ ] Reclaim by owner returns 200 and preserves UUID/name unless a valid trimmed name is provided; another owner receives 409 DEVICE_ALREADY_CLAIMED with no mutation.
-- [ ] Handle P2002 contention by re-reading the winning row and applying the same ownership rules; test same-owner and foreign-owner concurrent claims.
-- [ ] Mount devicesRouter at /api/devices and exercise the actual server mount in a test using the existing security/startup harness pattern; verify authentication, unexpected-field rejection, and sanitized storage failures.
-- [ ] Run the verification block successfully and commit this endpoint with a conventional message after verification; include its code and tests, and preserve unrelated work.
+- [x] Accept only macAddress and optional name; validate LC-hex or consistent colon/hyphen standard MAC formats, uppercase characters while preserving separators. Reject invalid bodies and names with 400; anonymous requests get 401.
+- [x] Create an owner-linked UUID Device with OFFLINE default; omitted name defaults to normalized macAddress. Return exactly the specified Device fields with ISO dates and 201.
+- [x] Reclaim by owner returns 200 and preserves UUID/name unless a valid trimmed name is provided; another owner receives 409 DEVICE_ALREADY_CLAIMED with no mutation.
+- [x] Handle P2002 contention by re-reading the winning row and applying the same ownership rules; test same-owner and foreign-owner concurrent claims.
+- [x] Mount devicesRouter at /api/devices and exercise the actual server mount in a test using the existing security/startup harness pattern; verify authentication, unexpected-field rejection, and sanitized storage failures.
+- [x] Run the verification block successfully and commit this endpoint with a conventional message after verification; include its code and tests, and preserve unrelated work.
 
 ## Verification
 Proves: HTTP tests exercise this endpoint's accepted and rejected inputs, owner isolation, response contracts and failure paths; the full backend suite detects regressions and TypeScript checks strict compilation. New focused tests must be implemented, so this block cannot pass before delivery.

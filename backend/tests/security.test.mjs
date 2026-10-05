@@ -21,7 +21,7 @@ before(async () => {
   process.env.AUTH_JWT_AUDIENCE = "test";
   process.env.AUTH_ALLOWED_ORIGINS = "https://example.test";
   process.env.PORT = "0";
-  for (const name of ["telemetry", "plants", "ai", "scan", "auth", "users"]) {
+  for (const name of ["telemetry", "plants", "devices", "ai", "scan", "auth", "users"]) {
     const router = express.Router();
     if (name === "scan") {
       router.post("/", (_req, res) => {

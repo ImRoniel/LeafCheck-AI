@@ -8,6 +8,7 @@ import "./lib/provider-startup.js";
 import { ensureTTLIndex } from "./lib/ttl.js";
 import { aiRouter } from "./routes/ai.js";
 import { authRouter } from "./routes/auth.js";
+import { devicesRouter } from "./routes/devices.js";
 import { plantsRouter } from "./routes/plants.js";
 import { scanRouter } from "./routes/scan.js";
 import { telemetryRouter } from "./routes/telemetry.js";
@@ -89,6 +90,7 @@ app.get("/health", (_req, res) => {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use("/api/telemetry", telemetryRouter);
 app.use("/api/plants", plantsRouter);
+app.use("/api/devices", devicesRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/scan", scanRouter);
 app.use("/api/auth", authRouter);
