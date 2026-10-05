@@ -1,0 +1,109 @@
+$ set -euo pipefail
+node --import tsx --test --test-concurrency=1 frontend/tests/device-claim-flow.test.ts frontend/tests/device-activity.test.ts
+npm run typecheck --workspace=frontend
+
+--- stdout ---
+TAP version 13
+# Subtest: device activity uses Router focus without a standalone navigation provider
+ok 1 - device activity uses Router focus without a standalone navigation provider
+  ---
+  duration_ms: 59.312348
+  type: 'test'
+  ...
+# Subtest: device activity stays paused in background or inactive and resumes only when focused
+ok 2 - device activity stays paused in background or inactive and resumes only when focused
+  ---
+  duration_ms: 9.434009
+  type: 'test'
+  ...
+# Subtest: web visibility gates device work and both listeners are removed
+ok 3 - web visibility gates device work and both listeners are removed
+  ---
+  duration_ms: 8.153275
+  type: 'test'
+  ...
+# Subtest: production scanner coalesces scan/submission and hands off server UUID and target
+ok 4 - production scanner coalesces scan/submission and hands off server UUID and target
+  ---
+  duration_ms: 114.010178
+  type: 'test'
+  ...
+# Subtest: manual input validates visibly, ownership conflict stays and retry succeeds with camera denied
+ok 5 - manual input validates visibly, ownership conflict stays and retry succeeds with camera denied
+  ---
+  duration_ms: 41.525385
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after blur
+ok 6 - production scanner suppresses pending state and navigation after blur
+  ---
+  duration_ms: 30.869987
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after cancel
+ok 7 - production scanner suppresses pending state and navigation after cancel
+  ---
+  duration_ms: 34.428768
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after dispose
+ok 8 - production scanner suppresses pending state and navigation after dispose
+  ---
+  duration_ms: 27.305967
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after auth
+ok 9 - production scanner suppresses pending state and navigation after auth
+  ---
+  duration_ms: 20.605962
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after snapshotOnly
+ok 10 - production scanner suppresses pending state and navigation after snapshotOnly
+  ---
+  duration_ms: 20.328512
+  type: 'test'
+  ...
+# Subtest: guest scanner offers sign-in without claim or camera access
+ok 11 - guest scanner offers sign-in without claim or camera access
+  ---
+  duration_ms: 22.972942
+  type: 'test'
+  ...
+# Subtest: legacy selection bypasses mock nodes and retains contextual target
+ok 12 - legacy selection bypasses mock nodes and retains contextual target
+  ---
+  duration_ms: 9.719616
+  type: 'test'
+  ...
+# Subtest: production AppData fences old claim closure and clears ephemeral Device on account remount
+ok 13 - production AppData fences old claim closure and clears ephemeral Device on account remount
+  ---
+  duration_ms: 66.552422
+  type: 'test'
+  ...
+# Subtest: permission rejection after unmount never writes screen state
+ok 14 - permission rejection after unmount never writes screen state
+  ---
+  duration_ms: 19.3977
+  type: 'test'
+  ...
+# Subtest: nonconflict claim error is sanitized and scanned retry remains usable
+ok 15 - nonconflict claim error is sanitized and scanned retry remains usable
+  ---
+  duration_ms: 22.316833
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1615.635649
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

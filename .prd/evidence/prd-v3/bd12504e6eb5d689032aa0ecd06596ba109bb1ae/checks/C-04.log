@@ -1,0 +1,121 @@
+$ set -euo pipefail
+node --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts frontend/tests/plant-guidance.test.ts frontend/tests/telemetry-series.test.ts
+npm run typecheck --workspace=frontend
+
+--- stdout ---
+TAP version 13
+# Subtest: telemetry guidance distinguishes fresh, stale, missing, failed, simulated and unverified data
+ok 1 - telemetry guidance distinguishes fresh, stale, missing, failed, simulated and unverified data
+  ---
+  duration_ms: 1.509338
+  type: 'test'
+  ...
+# Subtest: guidance selects the latest diagnosis and pending tasks only for the requested plant
+ok 2 - guidance selects the latest diagnosis and pending tasks only for the requested plant
+  ---
+  duration_ms: 0.944078
+  type: 'test'
+  ...
+# Subtest: guidance API includes an encoded plant filter and preserves unfiltered history
+ok 3 - guidance API includes an encoded plant filter and preserves unfiltered history
+  ---
+  duration_ms: 26.776862
+  type: 'test'
+  ...
+# Subtest: profile sibling identity remains unique while editing and changes with the plant
+ok 4 - profile sibling identity remains unique while editing and changes with the plant
+  ---
+  duration_ms: 141.728048
+  type: 'test'
+  ...
+# Subtest: production profile renders unpaired from one BFF
+ok 5 - production profile renders unpaired from one BFF
+  ---
+  duration_ms: 67.091445
+  type: 'test'
+  ...
+# Subtest: production profile renders waiting from one BFF
+ok 6 - production profile renders waiting from one BFF
+  ---
+  duration_ms: 48.182469
+  type: 'test'
+  ...
+# Subtest: production profile renders zero metrics from one BFF
+ok 7 - production profile renders zero metrics from one BFF
+  ---
+  duration_ms: 61.55854
+  type: 'test'
+  ...
+# Subtest: production profile reports malformed BFF distinctly and retry recovers
+ok 8 - production profile reports malformed BFF distinctly and retry recovers
+  ---
+  duration_ms: 41.836592
+  type: 'test'
+  ...
+# Subtest: production profile aborts obsolete plant/session responses and refocus observes reassignment
+ok 9 - production profile aborts obsolete plant/session responses and refocus observes reassignment
+  ---
+  duration_ms: 33.134775
+  type: 'test'
+  ...
+# Subtest: collection hydration, retry, missing metadata and controls use AppData
+ok 10 - collection hydration, retry, missing metadata and controls use AppData
+  ---
+  duration_ms: 42.400579
+  type: 'test'
+  ...
+# Subtest: malformed profile target undefined is safe
+ok 11 - malformed profile target undefined is safe
+  ---
+  duration_ms: 36.536763
+  type: 'test'
+  ...
+# Subtest: malformed profile target "" is safe
+ok 12 - malformed profile target "" is safe
+  ---
+  duration_ms: 22.005697
+  type: 'test'
+  ...
+# Subtest: malformed profile target "bad-id" is safe
+ok 13 - malformed profile target "bad-id" is safe
+  ---
+  duration_ms: 25.67998
+  type: 'test'
+  ...
+# Subtest: malformed profile target ["11111111-1111-4111-8111-111111111111"] is safe
+ok 14 - malformed profile target ["11111111-1111-4111-8111-111111111111"] is safe
+  ---
+  duration_ms: 37.488436
+  type: 'test'
+  ...
+# Subtest: guest metadata retains scanning and care without BFF reads
+ok 15 - guest metadata retains scanning and care without BFF reads
+  ---
+  duration_ms: 25.530671
+  type: 'test'
+  ...
+# Subtest: all 193 samples are chronological without mutating API order or losing null/zero light
+ok 16 - all 193 samples are chronological without mutating API order or losing null/zero light
+  ---
+  duration_ms: 1.971569
+  type: 'test'
+  ...
+# Subtest: seed client posts and preserves server device linkage and simulation marker
+ok 17 - seed client posts and preserves server device linkage and simulation marker
+  ---
+  duration_ms: 24.076429
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1601.247509
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

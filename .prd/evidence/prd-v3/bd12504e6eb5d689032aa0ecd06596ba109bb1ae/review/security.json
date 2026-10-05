@@ -1,0 +1,267 @@
+{
+  "candidate": "bd12504e6eb5d689032aa0ecd06596ba109bb1ae",
+  "timestamp": "2026-10-05T15:18:39Z",
+  "history_scan": {
+    "candidate": "bd12504e6eb5d689032aa0ecd06596ba109bb1ae",
+    "method": "Redacting fallback scan of every changed-file snapshot at each reviewed commit for private keys, Google/AWS keys and common live token prefixes, supplemented with source assignment review. No values retained. Not a comprehensive entropy scanner.",
+    "commits": 7,
+    "findings": []
+  },
+  "environment_files": {
+    "result": "passed",
+    "note": ".env and .env.* ignored except .env.example. Only frontend/.env.example is tracked credential-style configuration; other env-named files are source/docs."
+  },
+  "dependency_audit": {
+    "command": "npm audit --omit=dev --json > /tmp/leafcheck-v3-final-audit.json",
+    "exit_code": 1,
+    "counts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 11,
+      "high": 22,
+      "critical": 0,
+      "total": 33
+    },
+    "high_critical": [
+      {
+        "name": "@expo/cli",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@expo/cli"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@expo/code-signing-certificates",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@expo/code-signing-certificates"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@expo/metro",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@expo/metro"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@expo/metro-config",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@expo/metro-config"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@expo/metro-file-map",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@expo/metro-file-map"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@prisma/config",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@prisma/config"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@react-native/community-cli-plugin",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@react-native/community-cli-plugin"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@react-native/metro-config",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@react-native/metro-config"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "@react-native/virtualized-lists",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@react-native/virtualized-lists"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "braces",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/braces"
+        ],
+        "advisories": [
+          {
+            "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+            "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+          }
+        ]
+      },
+      {
+        "name": "deepmerge-ts",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/deepmerge-ts"
+        ],
+        "advisories": [
+          {
+            "title": "DeepmergeTS has stack exhaustion when merging recursive object graphs",
+            "url": "https://github.com/advisories/GHSA-ggr8-5vv4-36mx"
+          }
+        ]
+      },
+      {
+        "name": "expo",
+        "severity": "high",
+        "direct": true,
+        "nodes": [
+          "node_modules/expo"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "metro",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/metro",
+          "node_modules/metro-config/node_modules/metro"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "metro-config",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/@expo/metro/node_modules/metro-config",
+          "node_modules/metro-config",
+          "node_modules/metro/node_modules/metro-config"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "metro-file-map",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/metro-config/node_modules/metro-file-map",
+          "node_modules/metro-file-map"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "metro-transform-worker",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/metro-config/node_modules/metro-transform-worker",
+          "node_modules/metro-transform-worker"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "micromatch",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/micromatch"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "node-forge",
+        "severity": "high",
+        "direct": false,
+        "nodes": [
+          "node_modules/node-forge"
+        ],
+        "advisories": [
+          {
+            "title": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+            "url": "https://github.com/advisories/GHSA-86w9-cpqp-85rv"
+          }
+        ]
+      },
+      {
+        "name": "prisma",
+        "severity": "high",
+        "direct": true,
+        "nodes": [
+          "node_modules/prisma"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "react-native",
+        "severity": "high",
+        "direct": true,
+        "nodes": [
+          "node_modules/react-native"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "react-native-reanimated",
+        "severity": "high",
+        "direct": true,
+        "nodes": [
+          "node_modules/react-native-reanimated"
+        ],
+        "advisories": []
+      },
+      {
+        "name": "react-native-worklets",
+        "severity": "high",
+        "direct": true,
+        "nodes": [
+          "node_modules/react-native-worklets"
+        ],
+        "advisories": []
+      }
+    ],
+    "disposition": "Known baseline issue; manifests/lockfile unchanged from base. Separate remediation scope."
+  },
+  "http_invalid_input": {
+    "command": "node /tmp/leafcheck-v3-http.mjs",
+    "result": {
+      "timestamp": "2026-10-05T15:14:25.077Z",
+      "observations": [
+        {
+          "input": "empty JSON",
+          "status": 403,
+          "body": "{\"error\":\"Origin or CSRF protection rejected.\",\"code\":\"ORIGIN_REJECTED\"}",
+          "clean4xx": true
+        },
+        {
+          "input": "oversized JSON",
+          "status": 413,
+          "body": "{\"error\":\"Request body too large.\",\"code\":\"BODY_TOO_LARGE\"}",
+          "clean4xx": true
+        }
+      ]
+    }
+  }
+}

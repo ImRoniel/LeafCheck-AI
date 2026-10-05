@@ -1,0 +1,820 @@
+{
+  "schema": 3,
+  "prd": ".prd/prd-v3.md",
+  "base": "f0469715f8ccb9ad76f8a9901341b3d7629f2190",
+  "candidate": "bd12504e6eb5d689032aa0ecd06596ba109bb1ae",
+  "created": "2026-10-05T15:19:33Z",
+  "environment": {
+    "os": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "node": "v22.23.3",
+    "tools": [
+      "node: 22.23.3",
+      "frontend: Expo 57 existing dependencies, Node native test runner, tsc",
+      "browser: Playwright 1.51.1 / Chromium 134.0.6998.35 external temporary cache",
+      "security: npm registry audit; redacting fallback pattern/source history scan"
+    ],
+    "limitations": [
+      "Live authenticated/hardware flow explicitly user-attested complete T-12; no independent agent live mutation, platform or per-branch live logs.",
+      "Browser uses controlled API fixtures and web 430x932; native camera not independently exercised.",
+      "Dedicated secret-scanner unavailable; bounded redacting history/source review used.",
+      "22 high dependency audit records remain known baseline issues outside dependency-upgrade scope; zero critical."
+    ]
+  },
+  "coverage_review": "Reviewed R-01–R-05 and all S-01–S-19 against six tickets and full base-to-candidate diff. C-01 proves boundary/identity/auth; C-02 claim/lifecycle; C-03 mutation/targets/reassignment; C-04 BFF/metadata/history; C-05 production integration/accessibility/full suite; C-09 component identity regression. C-07 accurately attributes explicit full T-12 live-flow user attestation with unchanged connection semantics after T-13. C-08 combines fresh actual-browser fixture rendering, independent review, scope/security artifacts. Complete map and adequate behavioral checks; no scope cuts/deferred scenarios. Dependency findings separately retained, not presented as clean security.",
+  "requirements": [
+    {
+      "id": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-08"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-09"
+      ],
+      "checks": [
+        "C-02"
+      ],
+      "scenarios": [
+        "S-05",
+        "S-06",
+        "S-07"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-09",
+        "T-10",
+        "T-11"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04"
+      ],
+      "scenarios": [
+        "S-08",
+        "S-09",
+        "S-10",
+        "S-11"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-11",
+        "T-13"
+      ],
+      "checks": [
+        "C-04",
+        "C-09"
+      ],
+      "scenarios": [
+        "S-12",
+        "S-13",
+        "S-14",
+        "S-15",
+        "S-16",
+        "S-17"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-05",
+      "disposition": "delivered",
+      "tickets": [
+        "T-12",
+        "T-13"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-07",
+        "C-08",
+        "C-09"
+      ],
+      "scenarios": [
+        "S-18",
+        "S-19"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    }
+  ],
+  "checks": [
+    {
+      "id": "C-01",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-api.test.ts frontend/tests/api.test.ts\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-05T15:12:14Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-01.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000115-20261005T151206Z-f7f9cc",
+        "sequence": 115,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T15:12:06Z",
+        "finished": "2026-10-05T15:12:14Z",
+        "source_before": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "source_after": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "check_digest": "2329fdf0c7a842f659edf94d467a9d7959654feb9c09aa259870858e7b8d6f69",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "a22bf3116782883df5b0ffb969aed1aed06eff4f5b16f203b4a08ea309eaa6da",
+        "truncated": false
+      },
+      "declared": "2329fdf0c7a842f659edf94d467a9d7959654feb9c09aa259870858e7b8d6f69"
+    },
+    {
+      "id": "C-02",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-claim-flow.test.ts frontend/tests/device-activity.test.ts\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-05T15:12:30Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-02.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000116-20261005T151214Z-a20762",
+        "sequence": 116,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T15:12:14Z",
+        "finished": "2026-10-05T15:12:30Z",
+        "source_before": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "source_after": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "check_digest": "4a0ef8bb5ccbfc0b395d2c0dd8e671c63f02e242d17783e5b3138f4a04a79767",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "7d21736645b420d02db353f4c49928d8ffb6b2b0a4fa11b46329ba9346236bb1",
+        "truncated": false
+      },
+      "declared": "4a0ef8bb5ccbfc0b395d2c0dd8e671c63f02e242d17783e5b3138f4a04a79767"
+    },
+    {
+      "id": "C-03",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-pairing-flow.test.ts frontend/tests/device-connection-flow.test.ts frontend/tests/device-connection.test.ts\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-05T15:12:44Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-03.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000117-20261005T151231Z-4f17b7",
+        "sequence": 117,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T15:12:31Z",
+        "finished": "2026-10-05T15:12:44Z",
+        "source_before": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "source_after": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "check_digest": "61851c712f20c7be43a2c55d768ebb50f08f7341ad198c6165a3735aab262775",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "9f757bae27ccc6ddfc2e7329ce036ea327294a158c977ad8cdfaefebb599c0a6",
+        "truncated": false
+      },
+      "declared": "61851c712f20c7be43a2c55d768ebb50f08f7341ad198c6165a3735aab262775"
+    },
+    {
+      "id": "C-04",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts frontend/tests/plant-guidance.test.ts frontend/tests/telemetry-series.test.ts\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-05T15:12:56Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-04.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000118-20261005T151245Z-d97e80",
+        "sequence": 118,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T15:12:45Z",
+        "finished": "2026-10-05T15:12:56Z",
+        "source_before": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "source_after": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "check_digest": "fea56c2c2e4c9446d56147e0b47fc1dab5833e0a582500d358c66e8e502d616e",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "47acc69b4cbfee4585c22d2e6aeecbe10213eb0f38ac3a8ece8335bbc36b6723",
+        "truncated": false
+      },
+      "declared": "fea56c2c2e4c9446d56147e0b47fc1dab5833e0a582500d358c66e8e502d616e"
+    },
+    {
+      "id": "C-05",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-frontend-integration.test.ts frontend/tests/device-connection-accessibility.test.ts\nnpm test --workspace=frontend\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-05T15:13:23Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-05.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000119-20261005T151257Z-fe6f37",
+        "sequence": 119,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T15:12:57Z",
+        "finished": "2026-10-05T15:13:23Z",
+        "source_before": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "source_after": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "check_digest": "de51d5501e16573477fe71d1ae1d45928acad792b4696bc49b6df89f31c9302a",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "23ad45630162c21fc5111c8af3a1ad228afb6c62a736676877796fde1992d6a5",
+        "truncated": false
+      },
+      "declared": "de51d5501e16573477fe71d1ae1d45928acad792b4696bc49b6df89f31c9302a"
+    },
+    {
+      "id": "C-09",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-05T15:13:35Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-09.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000120-20261005T151324Z-1059c4",
+        "sequence": 120,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-05T15:13:24Z",
+        "finished": "2026-10-05T15:13:35Z",
+        "source_before": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "source_after": "256cac2920559f04fdf756d44e608ad1bd6faeba6d1d2c58986379c1e2c3c86c",
+        "check_digest": "fa2527c1a923a1936c3ae5d991cbc63245762c418266afa8bc95f92cdf04f74c",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "bfa76f7874cebb761fb25337b6f2f69c184cbc4ce3655c2130a551bb931238f2",
+        "truncated": false
+      },
+      "declared": "fa2527c1a923a1936c3ae5d991cbc63245762c418266afa8bc95f92cdf04f74c"
+    },
+    {
+      "id": "C-07",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-05T15:18:39Z",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/manual-flow.md"
+      ],
+      "note": "User-attested complete live-flow verification; exact provenance/limits in artifact.",
+      "provenance": "authored",
+      "declared": "002a30d676faa0fcf443a2d5f239cb9670f93c617489ce57934b444fe61ba8d9"
+    },
+    {
+      "id": "C-08",
+      "kind": "visual",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-05T15:18:39Z",
+      "scenario": "Claim/pair busy/conflict/locked/success and profile loading/unpaired/waiting/metrics/error/editing/contextual navigation",
+      "viewport": "430x932 web Chromium, reduced motion",
+      "observed": "Existing styles and distinct states retained. T-13 duplicate-key banner absent in fresh captures. Controlled fixtures, not live sensor measurements.",
+      "artifacts": [
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/assignment-locked.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/capture.cjs",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/claim-busy.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/claim-conflict.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/contextual-profile.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/editing-profile.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/error.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/loading.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/metrics.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/observations.json",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/pair-busy.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/review.md",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/success.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/unpaired.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/waiting.png",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/code-quality.md",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/security.md",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/security.json",
+        ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/http-probe.mjs"
+      ],
+      "note": "Independent review and mechanical security attached; existing dependency advisories remain known issues.",
+      "provenance": "authored",
+      "declared": "371772f7426d0eae4f16092b08ae14397a7d3daa9cfcc49b213e25a60e17ad9d"
+    }
+  ],
+  "visual_review": {
+    "applicable": true
+  },
+  "artifacts": [
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-01.log",
+      "sha256": "a22bf3116782883df5b0ffb969aed1aed06eff4f5b16f203b4a08ea309eaa6da"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-02.log",
+      "sha256": "7d21736645b420d02db353f4c49928d8ffb6b2b0a4fa11b46329ba9346236bb1"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-03.log",
+      "sha256": "9f757bae27ccc6ddfc2e7329ce036ea327294a158c977ad8cdfaefebb599c0a6"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-04.log",
+      "sha256": "47acc69b4cbfee4585c22d2e6aeecbe10213eb0f38ac3a8ece8335bbc36b6723"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-05.log",
+      "sha256": "23ad45630162c21fc5111c8af3a1ad228afb6c62a736676877796fde1992d6a5"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/checks/C-09.log",
+      "sha256": "bfa76f7874cebb761fb25337b6f2f69c184cbc4ce3655c2130a551bb931238f2"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/coverage/inventory.json",
+      "sha256": "032a50dc1ca1531110fdb20e049fc6c7a003d00479bcca96b05aabcb9db5b0e3"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/coverage/map.json",
+      "sha256": "38f0c0a16691812528be86c1d3827c6bd0344eb67ff116a555ca8baa04918acc"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/code-quality.md",
+      "sha256": "8be3484e2bda9e7e3a0f268681d26f4464a02a942a421793af27603fb3bfaa44"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/http-probe.mjs",
+      "sha256": "f4cfb5f0d7a5761a6b720de7cf5d6f9b9af54a49cbbdba8449c73d14e62cc337"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/manual-flow.md",
+      "sha256": "8a33a5e8d1d22dcceb3b438937647020bd0c8e63fa667a267aa93bb191fc4080"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/security.json",
+      "sha256": "744161e85b1fe1994a45cfdcb78b6c38a31842ec45dc00a198ef15b2e3051b2b"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/review/security.md",
+      "sha256": "6174ea235e9a7e9ba3a0b75876d0c1c9e0d5853ab1f9ecc8e76b362724e91c09"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/assignment-locked.png",
+      "sha256": "db85f1f994b9501be1138dd09bc85546a628286c69d53d6b1d1e771b9cb64431"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/capture.cjs",
+      "sha256": "a74d4846fe1ef4971c4ffa9513e3b7e7ab65eee24436b86e3a9241089f40b6f9"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/claim-busy.png",
+      "sha256": "6141c5b27d75cc3a6bb07d13059c249ef9c47347d8ca25e1b950ff11f1678562"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/claim-conflict.png",
+      "sha256": "5d2e4aaec11cf157aa05b058f56e9249bac9cac9a02c42d63cfa445410a9d7f9"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/contextual-profile.png",
+      "sha256": "0151095847cbff5eb0fd3c8b825b5fb0934a7c967a7de486dc6db73292e1c54f"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/editing-profile.png",
+      "sha256": "5fff35d8ebf0b413de8b5e5a683773c6d26e6a7fdd15d027f9661b802e193168"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/error.png",
+      "sha256": "49d33e4e5644e42a429230a8fb16deb213c91ed5acb1b4dd4b58f9ef3131d476"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/loading.png",
+      "sha256": "cc3f0b83fef9f24ecca2cabed11ac717921cb2a806b101697d9880692feba3ae"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/metrics.png",
+      "sha256": "7a49ec3550a857691e163c2fd84d4e983c55e61537a043fb8a2a13eacd43a03b"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/observations.json",
+      "sha256": "f11e59a134ae05a07b185a1c5f569e20c9d46723448d429de8578cc53376d824"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/pair-busy.png",
+      "sha256": "8fe8fde0de55ac86adf827e4c3f8fe435053e9cbd0f1ce2d8fbdd9b6385d2ea1"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/review.md",
+      "sha256": "3efd98450cb776f02b3e82ca0b9d22923191e8e63c470b96190316da9f0a9993"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/success.png",
+      "sha256": "1c318575b0a1595d43b1c6c26cba3bf109179d789d6b93d5b12e2e0b4dfce453"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/unpaired.png",
+      "sha256": "a9a2a1890a5cd8e64e00b22b4f976c6fe99fc9a27265c7b3a175433f3f4ffd04"
+    },
+    {
+      "path": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/visual/waiting.png",
+      "sha256": "0151095847cbff5eb0fd3c8b825b5fb0934a7c967a7de486dc6db73292e1c54f"
+    }
+  ],
+  "change": {
+    "id": "prd-v3",
+    "prd_revision": "dce8d4d064c9a0d46302d730991ed1f55a8ac9d9f8894197281194d93b33df0a",
+    "base": "f0469715f8ccb9ad76f8a9901341b3d7629f2190"
+  },
+  "coverage": {
+    "agreement": "ecb2a8da3ffd7583cd42fd9156e4d0b397022bffaca2afd1b86b7ea1073aaeaa",
+    "authorization": "A-03",
+    "inventory": "8679f6f2f636d03905b35488546982a0bc9a8369020a28bdc726cfe28287a136",
+    "map": "938e73024308ddb0de9f8ec63057a6e1a69eb3ba0c74c961fd3761b3c1d2b8d5",
+    "snapshots": {
+      "inventory": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/coverage/inventory.json",
+      "map": ".prd/evidence/prd-v3/bd12504e6eb5d689032aa0ecd06596ba109bb1ae/coverage/map.json"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "S-01",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-08"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-02",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-08"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-03",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-08"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-04",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-08"
+      ],
+      "checks": [
+        "C-01"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-05",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-09"
+      ],
+      "checks": [
+        "C-02"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-06",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-09"
+      ],
+      "checks": [
+        "C-02"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-07",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-09"
+      ],
+      "checks": [
+        "C-02"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-08",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-10"
+      ],
+      "checks": [
+        "C-03"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-09",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-10"
+      ],
+      "checks": [
+        "C-03"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-10",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-10",
+        "T-11"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-11",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-09",
+        "T-10"
+      ],
+      "checks": [
+        "C-02",
+        "C-03"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-12",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-11"
+      ],
+      "checks": [
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-13",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-11"
+      ],
+      "checks": [
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-14",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-11"
+      ],
+      "checks": [
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-15",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-11"
+      ],
+      "checks": [
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-16",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-11"
+      ],
+      "checks": [
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-17",
+      "requirement": "R-04",
+      "disposition": "delivered",
+      "tickets": [
+        "T-11",
+        "T-13"
+      ],
+      "checks": [
+        "C-04",
+        "C-09"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-18",
+      "requirement": "R-05",
+      "disposition": "delivered",
+      "tickets": [
+        "T-12",
+        "T-13"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-08",
+        "C-09"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-19",
+      "requirement": "R-05",
+      "disposition": "delivered",
+      "tickets": [
+        "T-12"
+      ],
+      "checks": [
+        "C-07"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    }
+  ],
+  "adequacy": {
+    "verdict": "adequate",
+    "note": "Production client/screen/provider tests establish boundary and failure behavior; full suite/typecheck and 12 final-candidate browser captures corroborate rendering. User explicitly attested complete T-12 live flow. Later production change only repairs sibling identity with fresh regression/visual proof. Evidence limitations/provenance explicit; no required agreed behavior left unverified."
+  },
+  "delivery": {
+    "original": true,
+    "agreed": true
+  }
+}

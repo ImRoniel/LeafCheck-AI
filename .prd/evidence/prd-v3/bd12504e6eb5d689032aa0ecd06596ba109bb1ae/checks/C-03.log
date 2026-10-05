@@ -1,0 +1,209 @@
+$ set -euo pipefail
+node --import tsx --test --test-concurrency=1 frontend/tests/device-pairing-flow.test.ts frontend/tests/device-connection-flow.test.ts frontend/tests/device-connection.test.ts
+npm run typecheck --workspace=frontend
+
+--- stdout ---
+TAP version 13
+# (node:26325) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: management removal preserves all devices on failure and removes only its ID on retry
+ok 1 - management removal preserves all devices on failure and removes only its ID on retry
+  ---
+  duration_ms: 177.837451
+  type: 'test'
+  ...
+# Subtest: actual local provider fences a session change when queued
+ok 2 - actual local provider fences a session change when queued
+  ---
+  duration_ms: 33.540017
+  type: 'test'
+  ...
+# Subtest: actual local provider fences a session change when commit started
+ok 3 - actual local provider fences a session change when commit started
+  ---
+  duration_ms: 23.743681
+  type: 'test'
+  ...
+# (node:26332) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: discovery contains only uniquely identified mock nodes and rejects invalid route parameters
+ok 4 - discovery contains only uniquely identified mock nodes and rejects invalid route parameters
+  ---
+  duration_ms: 2.754343
+  type: 'test'
+  ...
+# Subtest: assignment supports existing spaces and plants without mutating sensor links
+ok 5 - assignment supports existing spaces and plants without mutating sensor links
+  ---
+  duration_ms: 2.163733
+  type: 'test'
+  ...
+# Subtest: existing v1 state stays valid; malformed mock assignments fail closed
+ok 6 - existing v1 state stays valid; malformed mock assignments fail closed
+  ---
+  duration_ms: 1.279
+  type: 'test'
+  ...
+# Subtest: completed assignments survive reload and remain isolated from other accounts and guests
+ok 7 - completed assignments survive reload and remain isolated from other accounts and guests
+  ---
+  duration_ms: 2.232287
+  type: 'test'
+  ...
+# Subtest: failed persistence does not publish a successful connection and retry succeeds
+ok 8 - failed persistence does not publish a successful connection and retry succeeds
+  ---
+  duration_ms: 1.557072
+  type: 'test'
+  ...
+# Subtest: mock delays finish only after their timeout
+ok 9 - mock delays finish only after their timeout
+  ---
+  duration_ms: 1.769055
+  type: 'test'
+  ...
+# Subtest: cancelled and already-aborted mock work never completes
+ok 10 - cancelled and already-aborted mock work never completes
+  ---
+  duration_ms: 1.156191
+  type: 'test'
+  ...
+# Subtest: a cancelled queued assignment never writes and the queue remains usable
+ok 11 - a cancelled queued assignment never writes and the queue remains usable
+  ---
+  duration_ms: 2.935426
+  type: 'test'
+  ...
+# Subtest: invalid persisted mock assignment blocks loading and preserves stored data
+ok 12 - invalid persisted mock assignment blocks loading and preserves stored data
+  ---
+  duration_ms: 1.453971
+  type: 'test'
+  ...
+# Subtest: legacy single connection migrates once without resurrecting removed devices
+ok 13 - legacy single connection migrates once without resurrecting removed devices
+  ---
+  duration_ms: 1.687897
+  type: 'test'
+  ...
+# Subtest: multiple sensors append, reassignment replaces only the matching identity
+ok 14 - multiple sensors append, reassignment replaces only the matching identity
+  ---
+  duration_ms: 1.056227
+  type: 'test'
+  ...
+# Subtest: device collections fail closed on corrupt, duplicate, or spoofed live entries
+ok 15 - device collections fail closed on corrupt, duplicate, or spoofed live entries
+  ---
+  duration_ms: 1.701733
+  type: 'test'
+  ...
+# Subtest: contextual targets lock selection and invalid or deleted destinations never fall back
+ok 16 - contextual targets lock selection and invalid or deleted destinations never fall back
+  ---
+  duration_ms: 0.957635
+  type: 'test'
+  ...
+# Subtest: concurrent pairing preserves multiple sensors across reload and removal
+ok 17 - concurrent pairing preserves multiple sensors across reload and removal
+  ---
+  duration_ms: 3.978188
+  type: 'test'
+  ...
+# Subtest: production assignment pairs claimed UUID once, updates reassignment and offers confirmed profile
+ok 18 - production assignment pairs claimed UUID once, updates reassignment and offers confirmed profile
+  ---
+  duration_ms: 281.359921
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":"space","targetId":"Bedroom"}
+ok 19 - production assignment rejects unsupported or missing contextual target {"targetType":"space","targetId":"Bedroom"}
+  ---
+  duration_ms: 143.015739
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"missing"}
+ok 20 - production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"missing"}
+  ---
+  duration_ms: 88.078809
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"mock-leaf-node-01"}
+ok 21 - production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"mock-leaf-node-01"}
+  ---
+  duration_ms: 69.524121
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":["plant"],"targetId":"44444444-4444-4444-8444-444444444444"}
+ok 22 - production assignment rejects unsupported or missing contextual target {"targetType":["plant"],"targetId":"44444444-4444-4444-8444-444444444444"}
+  ---
+  duration_ms: 99.120629
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetId":"44444444-4444-4444-8444-444444444444"}
+ok 23 - production assignment rejects unsupported or missing contextual target {"targetId":"44444444-4444-4444-8444-444444444444"}
+  ---
+  duration_ms: 66.939199
+  type: 'test'
+  ...
+# Subtest: missing claim, forged UUID and guests cannot mutate
+ok 24 - missing claim, forged UUID and guests cannot mutate
+  ---
+  duration_ms: 88.537022
+  type: 'test'
+  ...
+# Subtest: pair mutation failure remains retryable and refresh failure preserves successful cache and warning
+ok 25 - pair mutation failure remains retryable and refresh failure preserves successful cache and warning
+  ---
+  duration_ms: 56.315392
+  type: 'test'
+  ...
+# Subtest: production pairing handles account without implying a confirmed write rolled back
+ok 26 - production pairing handles account without implying a confirmed write rolled back
+  ---
+  duration_ms: 37.611965
+  type: 'test'
+  ...
+# Subtest: production pairing handles unmount without implying a confirmed write rolled back
+ok 27 - production pairing handles unmount without implying a confirmed write rolled back
+  ---
+  duration_ms: 38.591122
+  type: 'test'
+  ...
+# Subtest: production pairing handles cancel without implying a confirmed write rolled back
+ok 28 - production pairing handles cancel without implying a confirmed write rolled back
+  ---
+  duration_ms: 38.060688
+  type: 'test'
+  ...
+# Subtest: provider rejects unavailable plants and mismatched server confirmation
+ok 29 - provider rejects unavailable plants and mismatched server confirmation
+  ---
+  duration_ms: 16.436013
+  type: 'test'
+  ...
+# Subtest: confirmed mutation stays on assignment while refresh is pending, then success survives failed refresh
+ok 30 - confirmed mutation stays on assignment while refresh is pending, then success survives failed refresh
+  ---
+  duration_ms: 66.680707
+  type: 'test'
+  ...
+# Subtest: changing route while mutation runs suppresses the old target handoff
+ok 31 - changing route while mutation runs suppresses the old target handoff
+  ---
+  duration_ms: 69.976727
+  type: 'test'
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 31
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3285.760483
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

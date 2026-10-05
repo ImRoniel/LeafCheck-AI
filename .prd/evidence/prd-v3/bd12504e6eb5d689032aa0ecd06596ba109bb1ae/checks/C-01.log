@@ -1,0 +1,103 @@
+$ set -euo pipefail
+node --import tsx --test --test-concurrency=1 frontend/tests/device-api.test.ts frontend/tests/api.test.ts
+npm run typecheck --workspace=frontend
+
+--- stdout (4 redaction(s)) ---
+TAP version 13
+# Subtest: plant creation and deletion use normalized payloads, parsed responses and empty 204
+ok 1 - plant creation and deletion use normalized payloads, parsed responses and empty 204
+  ---
+  duration_ms: 24.911494
+  type: 'test'
+  ...
+# Subtest: plant mutations validate inputs and preserve API errors
+ok 2 - plant mutations validate inputs and preserve API errors
+  ---
+  duration_ms: 3.888792
+  type: 'test'
+  ...
+# Subtest: URL environment precedence and platform defaults
+ok 3 - URL environment precedence and platform defaults
+  ---
+  duration_ms: 0.389568
+  type: 'test'
+  ...
+# Subtest: plant updates trim fields, preserve clearing and moisture bounds, and attach bearer [redacted]
+ok 4 - plant updates trim fields, preserve clearing and moisture bounds, and attach bearer [redacted]
+  ---
+  duration_ms: 2.17801
+  type: 'test'
+  ...
+# Subtest: plant updates reject invalid fields and propagate missing plants
+ok 5 - plant updates reject invalid fields and propagate missing plants
+  ---
+  duration_ms: 2.247266
+  type: 'test'
+  ...
+# Subtest: all seven operations use correct routes and bodies
+ok 6 - all seven operations use correct routes and bodies
+  ---
+  duration_ms: 6.612968
+  type: 'test'
+  ...
+# Subtest: only latest 404 becomes null
+ok 7 - only latest 404 becomes null
+  ---
+  duration_ms: 0.906375
+  type: 'test'
+  ...
+# Subtest: nested validation rejects invalid data instead of manufacturing defaults
+ok 8 - nested validation rejects invalid data instead of manufacturing defaults
+  ---
+  duration_ms: 2.587418
+  type: 'test'
+  ...
+# Subtest: network, invalid JSON, timeout and external cancellation are typed
+ok 9 - network, invalid JSON, timeout and external cancellation are typed
+  ---
+  duration_ms: 16.273485
+  type: 'test'
+  ...
+# Subtest: empty successful responses reject when contracts require a payload
+ok 10 - empty successful responses reject when contracts require a payload
+  ---
+  duration_ms: 22.952611
+  type: 'test'
+  ...
+# Subtest: device routes preserve UUID/MAC, bodies, bearer [redacted] all BFF states
+ok 11 - device routes preserve UUID/MAC, bodies, bearer [redacted] all BFF states
+  ---
+  duration_ms: 6.267213
+  type: 'test'
+  ...
+# Subtest: invalid inputs reject before transport and conventional MACs normalize
+ok 12 - invalid inputs reject before transport and conventional MACs normalize
+  ---
+  duration_ms: 1.324148
+  type: 'test'
+  ...
+# Subtest: conflicts and malformed successful responses never become success
+ok 13 - conflicts and malformed successful responses never become success
+  ---
+  duration_ms: 6.418006
+  type: 'test'
+  ...
+# Subtest: new routes refresh once and respect cancellation and timeout
+ok 14 - new routes refresh once and respect cancellation and timeout
+  ---
+  duration_ms: 13.076905
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 483.423889
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

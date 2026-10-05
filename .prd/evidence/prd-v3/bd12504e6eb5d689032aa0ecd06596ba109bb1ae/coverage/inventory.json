@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "prd": ".prd/prd-v3.md",
+  "digest": "8679f6f2f636d03905b35488546982a0bc9a8369020a28bdc726cfe28287a136",
+  "projection": "pincer inventory 1\nprd .prd/prd-v3.md\nrequirement R-01 ad468a9c6cc28c058f4c5e238d198476e097129f064c8f812bf19b7e94939548\nrequirement R-02 6560b4033c6715b6cd2665e3681d31e7b99f0429d03b398d165d384e44f3f656\nrequirement R-03 b9237dab37b73671d6d7a310db7850692eaed635e636b832484c2fc9ce13ac92\nrequirement R-04 f364cb4faba6f09cd7964bd9146d0f3cf5cd1a84ad83d210a48df614139396e8\nrequirement R-05 654b239c44a0513126625daed06e1369d8fbcb206df83cef6e929572a40b8fa4\nscenario S-01 R-01 08fa3d113972901898ff96dd057ebb5d7c636d4978d8e91cfdda3ed509c78e56\nscenario S-02 R-01 094eca1892fbe08a641e32f12d7699af34827c74efc15b4fe36e602ad650546f\nscenario S-03 R-01 0e53de386606bb2907cf94ef1366023eb23f805ac26d0e01c1bc12626560e64d\nscenario S-04 R-01 1fdc162a4d6e92fee6fcc749cec55381eaf9cbd2121758c6c59089ddaddd3f5b\nscenario S-05 R-02 dfc922f5dd01f778986fbfaa150da4a50bc22ff068d92166671a37fbbdf8d896\nscenario S-06 R-02 ce9e5f1d46464adf2f33a875c6394895e84718c010acacdcf72d4e4033f9d086\nscenario S-07 R-02 e3854801335a1005654a20ccb84f2e54779c77e86982ca0fd36cf124e32921ab\nscenario S-08 R-03 d630d594d3bab47b2a20416c2b0251faa7047aab105b2595f2320310264f9de2\nscenario S-09 R-03 177b14aeab459b92bfc8159f9a777466a376feaae1e72ef987644e0a8fb88db8\nscenario S-10 R-03 601dff6f55b08ae66bcf22420e264fd9534937a3c2c42c3487849474a3fccb1a\nscenario S-11 R-03 5e67a48742fb2b0d809d8bcbf559b074104287feaa259559aa47f9b349768165\nscenario S-12 R-04 8c215547ef895909b85886ed5dcc49cac85133342f9ff09fa94aeafc70d07aec\nscenario S-13 R-04 4d14932128ffb080a40ff3ddf9210d434c00055ef7ab6b131e3145a923bcab57\nscenario S-14 R-04 4a1111df46b6d8c0948b50211866a46d0e458de99ea319a900561d858c844e6e\nscenario S-15 R-04 905e06cd1c134124dbd9e13798f60f799e817f7564648398ec44feaec9e1ab10\nscenario S-16 R-04 e630600934daf3f044dd5ddc0af35cfbba05f5dc90780466dc942e537d07e713\nscenario S-17 R-04 fe15f68726eb724a1e70fd7d64b26e75bd8d1a10ea3be6bb2160cbcab5de12ac\nscenario S-18 R-05 d880cab0933bdeaad59a2b68d14c6e888d9afb846b37f02d5b96aae38934a828\nscenario S-19 R-05 56718005be73acb1fa97af7dd99d5fc55cbc3152c2baaf1b5d65fad95b3db25a\n",
+  "requirements": {
+    "R-01": {
+      "title": "Authenticated API contracts",
+      "text": "Authenticated API contracts",
+      "digest": "ad468a9c6cc28c058f4c5e238d198476e097129f064c8f812bf19b7e94939548",
+      "line": 35,
+      "end": 40,
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04"
+      ]
+    },
+    "R-02": {
+      "title": "Claim and carry a real device",
+      "text": "Claim and carry a real device",
+      "digest": "6560b4033c6715b6cd2665e3681d31e7b99f0429d03b398d165d384e44f3f656",
+      "line": 42,
+      "end": 46,
+      "scenarios": [
+        "S-05",
+        "S-06",
+        "S-07"
+      ]
+    },
+    "R-03": {
+      "title": "Pair to an owned plant",
+      "text": "Pair to an owned plant",
+      "digest": "b9237dab37b73671d6d7a310db7850692eaed635e636b832484c2fc9ce13ac92",
+      "line": 48,
+      "end": 53,
+      "scenarios": [
+        "S-08",
+        "S-09",
+        "S-10",
+        "S-11"
+      ]
+    },
+    "R-04": {
+      "title": "Unified profile telemetry states",
+      "text": "Unified profile telemetry states",
+      "digest": "f364cb4faba6f09cd7964bd9146d0f3cf5cd1a84ad83d210a48df614139396e8",
+      "line": 55,
+      "end": 62,
+      "scenarios": [
+        "S-12",
+        "S-13",
+        "S-14",
+        "S-15",
+        "S-16",
+        "S-17"
+      ]
+    },
+    "R-05": {
+      "title": "Verification and delivery",
+      "text": "Verification and delivery",
+      "digest": "654b239c44a0513126625daed06e1369d8fbcb206df83cef6e929572a40b8fa4",
+      "line": 64,
+      "end": 67,
+      "scenarios": [
+        "S-18",
+        "S-19"
+      ]
+    }
+  },
+  "scenarios": {
+    "S-01": {
+      "requirement": "R-01",
+      "text": "`claimDevice(macAddress, name?)` posts `{ macAddress, name? }` to `/api/devices/claim`, validates the returned Device, and retains its UUID separately from its MAC. LC-A50528 and backend-supported colon/hyphen MAC forms are accepted after trimming and normalization; invalid MAC/name input is rejected visibly.",
+      "digest": "08fa3d113972901898ff96dd057ebb5d7c636d4978d8e91cfdda3ed509c78e56",
+      "line": 37,
+      "end": 37
+    },
+    "S-02": {
+      "requirement": "R-01",
+      "text": "`pairDeviceToPlant(plantId, deviceId)` patches `{ deviceId }` to `/api/plants/:plantId/pair-device`, accepts a UUID or null, and validates the returned Plant. Null is supported by the service without adding an unsolicited unpair UI.",
+      "digest": "094eca1892fbe08a641e32f12d7699af34827c74efc15b4fe36e602ad650546f",
+      "line": 38,
+      "end": 38
+    },
+    "S-03": {
+      "requirement": "R-01",
+      "text": "`fetchPlantTelemetry(plantId)` gets `/api/plants/:plantId/telemetry` and validates the discriminated paired/unpaired contract, including nullable telemetry and the existing nested metric payload. Malformed successful responses become typed validation failures rather than fake defaults.",
+      "digest": "0e53de386606bb2907cf94ef1366023eb23f805ac26d0e01c1bc12626560e64d",
+      "line": 39,
+      "end": 39
+    },
+    "S-04": {
+      "requirement": "R-01",
+      "text": "All three functions reuse Bearer authentication, one-time 401 refresh, timeout/cancellation and status-preserving errors. No access JWT is written to storage and HTTP failures are never converted into successful pairing or unpaired state.",
+      "digest": "1fdc162a4d6e92fee6fcc749cec55381eaf9cbd2121758c6c59089ddaddd3f5b",
+      "line": 40,
+      "end": 40
+    },
+    "S-05": {
+      "requirement": "R-02",
+      "text": "Entering LC-A50528 or scanning that value submits a single claim and advances directly to assignment with the returned device UUID available in global account state. Existing demo timers and mock hardware lookups are absent from this real path.",
+      "digest": "dfc922f5dd01f778986fbfaa150da4a50bc22ff068d92166671a37fbbdf8d896",
+      "line": 44,
+      "end": 44
+    },
+    "S-06": {
+      "requirement": "R-02",
+      "text": "Claim pending state disables duplicate submissions. HTTP 409 displays an alert explaining the device is already claimed by another account, leaves the user on Scanner, and permits correction/retry; other failures have actionable retry messages.",
+      "digest": "ce9e5f1d46464adf2f33a875c6394895e84718c010acacdcf72d4e4033f9d086",
+      "line": 45,
+      "end": 45
+    },
+    "S-07": {
+      "requirement": "R-02",
+      "text": "Camera permission denial allows manual entry. Duplicate scan events do not cause repeated claims. Blur, cancel, unmount or account changes prevent late responses from advancing or leaking a previous account's pending device.",
+      "digest": "e3854801335a1005654a20ccb84f2e54779c77e86982ca0fd36cf124e32921ab",
+      "line": 46,
+      "end": 46
+    },
+    "S-08": {
+      "requirement": "R-03",
+      "text": "Assignment lists existing owned plants, preserves a valid locked contextual plant target, and calls the pairing service with that plant ID and the claimed UUID. Missing claim state, invalid/deleted contextual targets and unsupported Space targets cannot silently select another destination or create a local mock assignment.",
+      "digest": "d630d594d3bab47b2a20416c2b0251faa7047aab105b2595f2320310264f9de2",
+      "line": 50,
+      "end": 50
+    },
+    "S-09": {
+      "requirement": "R-03",
+      "text": "Pairing disables repeat submission, exposes loading and recoverable failure, and reports success only after backend confirmation. The success handoff offers navigation to the paired Plant Profile and requires no mock record.",
+      "digest": "177b14aeab459b92bfc8159f9a777466a376feaae1e72ef987644e0a8fb88db8",
+      "line": 51,
+      "end": 51
+    },
+    "S-10": {
+      "requirement": "R-03",
+      "text": "Reassigning a device already paired to another plant makes only the intended backend pairing mutation. Update/invalidate collection state so the old plant loses its cached link, refresh pairing state on profile focus, and show a successful assignment message; visiting the old plant shows “No sensor paired”. A failed collection refresh after a successful write must not claim the pairing failed or trigger a second mutation automatically.",
+      "digest": "601dff6f55b08ae66bcf22420e264fd9534937a3c2c42c3487849474a3fccb1a",
+      "line": 52,
+      "end": 52
+    },
+    "S-11": {
+      "requirement": "R-03",
+      "text": "Guest access requires sign-in for real claiming/pairing. Existing manual plant care and image scanning remain available; existing local Space/demo records never establish server pairing.",
+      "digest": "5e67a48742fb2b0d809d8bcbf559b074104287feaa259559aa47f9b349768165",
+      "line": 53,
+      "end": 53
+    },
+    "S-12": {
+      "requirement": "R-04",
+      "text": "Profile focus/refresh issues one BFF read for pairing/latest readings, shows a spinner or existing skeleton while pending, and cancels stale responses when the plant or session changes. Profile and PlantTelemetry do not call `fetchPlant`, `useSensorData` or the legacy latest endpoint for this read.",
+      "digest": "8c215547ef895909b85886ed5dcc49cac85133342f9ff09fa94aeafc70d07aec",
+      "line": 57,
+      "end": 57
+    },
+    "S-13": {
+      "requirement": "R-04",
+      "text": "`paired: false` displays a “No sensor paired” card and “Pair a Sensor” action carrying the current plant target into Scanner; local mapping and demo data cannot override this state.",
+      "digest": "4d14932128ffb080a40ff3ddf9210d434c00055ef7ab6b131e3145a923bcab57",
+      "line": 58,
+      "end": 58
+    },
+    "S-14": {
+      "requirement": "R-04",
+      "text": "`paired: true` displays `device.name`. Non-null telemetry shows temperature Celsius, humidity percentage, soil moisture percentage and lux using the nested backend fields; valid zero values remain zero. Null telemetry displays “Waiting for first sensor reading...” without fabricated metrics.",
+      "digest": "4a1111df46b6d8c0948b50211866a46d0e458de99ea319a900561d858c844e6e",
+      "line": 59,
+      "end": 59
+    },
+    "S-15": {
+      "requirement": "R-04",
+      "text": "BFF failure has a visible retry state distinct from unpaired/waiting. Any retained readings must be labelled stale/error; no previous plant's readings appear during navigation.",
+      "digest": "905e06cd1c134124dbd9e13798f60f799e817f7564648398ec44feaec9e1ab10",
+      "line": 60,
+      "end": 60
+    },
+    "S-16": {
+      "requirement": "R-04",
+      "text": "PlantTelemetry accepts the unified payload and callbacks for parent refresh instead of a deviceId-driven latest-fetch prop. Care guidance still receives the real readings or null. History, if retained, loads only through explicit user action using the hardware MAC, never the Device UUID and never an automatic extra profile request.",
+      "digest": "e630600934daf3f044dd5ddc0af35cfbba05f5dc90780466dc942e537d07e713",
+      "line": 61,
+      "end": 61
+    },
+    "S-17": {
+      "requirement": "R-04",
+      "text": "Existing name/image/species/location, edit/delete, thresholds, care guidance and image scanning use AppData metadata. Deep links wait for collection hydration, expose collection retry on failure and handle genuinely missing plants. Demo seeding/local mapping actions no longer influence real pairing/latest state on this screen; existing demo features outside this path remain outside scope.",
+      "digest": "fe15f68726eb724a1e70fd7d64b26e75bd8d1a10ea3be6bb2160cbcab5de12ac",
+      "line": 62,
+      "end": 62
+    },
+    "S-18": {
+      "requirement": "R-05",
+      "text": "Frontend typecheck and meaningful API/flow tests cover claim 409, Bearer headers, UUID versus MAC, pairing failure/reassignment, account cancellation and all BFF states. Update mock-specific flow assertions for the real path; preserve unrelated tests and document baseline failures separately from new regressions.",
+      "digest": "d880cab0933bdeaad59a2b68d14c6e888d9afb846b37f02d5b96aae38934a828",
+      "line": 66,
+      "end": 66
+    },
+    "S-19": {
+      "requirement": "R-05",
+      "text": "Run Expo locally and verify authenticated Scanner → Assignment → Plant Profile against the existing backend: new claim, same-owner reclaim, another-owner conflict, waiting for a first reading, populated readings, reassignment and old-plant unpaired state. Record actual observations and missing credentials/hardware/backend prerequisites; starting Metro alone is not end-to-end verification.",
+      "digest": "56718005be73acb1fa97af7dd99d5fc55cbc3152c2baaf1b5d65fad95b3db25a",
+      "line": 67,
+      "end": 67
+    }
+  }
+}

@@ -1,0 +1,278 @@
+{
+  "schema": 1,
+  "path": ".prd/coverage/prd-v3.json",
+  "digest": "938e73024308ddb0de9f8ec63057a6e1a69eb3ba0c74c961fd3761b3c1d2b8d5",
+  "map": {
+    "schema": 1,
+    "change": "prd-v3",
+    "prd": ".prd/prd-v3.md",
+    "scenarios": {
+      "S-01": {
+        "tickets": [
+          "T-08"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-02": {
+        "tickets": [
+          "T-08"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-03": {
+        "tickets": [
+          "T-08"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-04": {
+        "tickets": [
+          "T-08"
+        ],
+        "checks": [
+          "C-01"
+        ]
+      },
+      "S-05": {
+        "tickets": [
+          "T-09"
+        ],
+        "checks": [
+          "C-02"
+        ]
+      },
+      "S-06": {
+        "tickets": [
+          "T-09"
+        ],
+        "checks": [
+          "C-02"
+        ]
+      },
+      "S-07": {
+        "tickets": [
+          "T-09"
+        ],
+        "checks": [
+          "C-02"
+        ]
+      },
+      "S-08": {
+        "tickets": [
+          "T-10"
+        ],
+        "checks": [
+          "C-03"
+        ]
+      },
+      "S-09": {
+        "tickets": [
+          "T-10"
+        ],
+        "checks": [
+          "C-03"
+        ]
+      },
+      "S-10": {
+        "tickets": [
+          "T-10",
+          "T-11"
+        ],
+        "checks": [
+          "C-03",
+          "C-04"
+        ]
+      },
+      "S-11": {
+        "tickets": [
+          "T-09",
+          "T-10"
+        ],
+        "checks": [
+          "C-02",
+          "C-03"
+        ]
+      },
+      "S-12": {
+        "tickets": [
+          "T-11"
+        ],
+        "checks": [
+          "C-04"
+        ]
+      },
+      "S-13": {
+        "tickets": [
+          "T-11"
+        ],
+        "checks": [
+          "C-04"
+        ]
+      },
+      "S-14": {
+        "tickets": [
+          "T-11"
+        ],
+        "checks": [
+          "C-04"
+        ]
+      },
+      "S-15": {
+        "tickets": [
+          "T-11"
+        ],
+        "checks": [
+          "C-04"
+        ]
+      },
+      "S-16": {
+        "tickets": [
+          "T-11"
+        ],
+        "checks": [
+          "C-04"
+        ]
+      },
+      "S-17": {
+        "tickets": [
+          "T-11",
+          "T-13"
+        ],
+        "checks": [
+          "C-04",
+          "C-09"
+        ]
+      },
+      "S-18": {
+        "tickets": [
+          "T-12",
+          "T-13"
+        ],
+        "checks": [
+          "C-01",
+          "C-02",
+          "C-03",
+          "C-04",
+          "C-05",
+          "C-08",
+          "C-09"
+        ]
+      },
+      "S-19": {
+        "tickets": [
+          "T-12"
+        ],
+        "checks": [
+          "C-07"
+        ]
+      }
+    },
+    "scope": {},
+    "tickets": {
+      "T-08": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-09": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-10": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-11": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-12": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-13": {
+        "role": "implements",
+        "rationale": null
+      }
+    },
+    "checks": {
+      "C-01": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-api.test.ts frontend/tests/api.test.ts\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result."
+      },
+      "C-02": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-claim-flow.test.ts frontend/tests/device-activity.test.ts\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result."
+      },
+      "C-03": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-pairing-flow.test.ts frontend/tests/device-connection-flow.test.ts frontend/tests/device-connection.test.ts\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result."
+      },
+      "C-04": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts frontend/tests/plant-guidance.test.ts frontend/tests/telemetry-series.test.ts\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result."
+      },
+      "C-05": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/device-frontend-integration.test.ts frontend/tests/device-connection-accessibility.test.ts\nnpm test --workspace=frontend\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Focused new test files must be implemented by the owning ticket. This declaration records planned proof, not a passed result."
+      },
+      "C-07": {
+        "kind": "review",
+        "required": true,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "Run Expo locally against the existing authenticated backend and record Scanner -> Assignment -> Plant Profile: new claim, same-owner reclaim, another-owner 409, paired/null waiting, populated real readings, reassignment, and the old plant unpaired on revisit. Review actual results in .prd/frontend-device-verification-v3.md. Missing accounts/backend/hardware/runtime capability is unverified and leaves S-19 incomplete; Metro startup or mocked tests alone cannot pass this review.",
+        "note": null
+      },
+      "C-08": {
+        "kind": "visual",
+        "required": true,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "Review loading/disabled controls, accessible alert/retry states, unpaired/waiting/metrics cards and contextual pairing navigation against existing frontend styles. Inspect the diff for frontend-only implementation, unchanged backend/firmware/dependencies, no credential leakage, and preserved .env ignore/example conventions.",
+        "note": null
+      },
+      "C-09": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\nnode --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Regression proof for browser-confirmed duplicate React sibling identity in normal and editing profile states."
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "scenario": "loading",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "Back\nFern\n\nBoston fern\nLiving room · healthy\nLast scanned: Not recorded\nEdit plant details\nMoisture thresholds: 30% – 80%\nScan this plant\nHealth and care\nNo verified sensor link. Saved advice is based on the scan; check soil and growing conditions before acting.\nNo saved diagnosis yet. Scan this plant to get care guidance.\nNo pending saved care actions.\nView scan history\nView care tasks\nGrowing conditions\nUpdating sensor readings...\nRefresh latest reading\nDelete plant"
+  },
+  {
+    "scenario": "unpaired",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "Back\nFern\n\nBoston fern\nLiving room · healthy\nLast scanned: Not recorded\nEdit plant details\nMoisture thresholds: 30% – 80%\nScan this plant\nHealth and care\nNo verified sensor link. Saved advice is based on the scan; check soil and growing conditions before acting.\nNo saved diagnosis yet. Scan this plant to get care guidance.\nNo pending saved care actions.\nView scan history\nView care tasks\nGrowing conditions\nNo sensor paired\nPair a Sensor\nRefresh latest reading\nDelete plant"
+  },
+  {
+    "scenario": "waiting",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "Back\nFern\n\nBoston fern\nLiving room · healthy\nLast scanned: Not recorded\nEdit plant details\nMoisture thresholds: 30% – 80%\nScan this plant\nHealth and care\nNo current sensor readings are available. Check the plant before following saved care advice.\nNo saved diagnosis yet. Scan this plant to get care guidance.\nNo pending saved care actions.\nView scan history\nView care tasks\nGrowing conditions\nLiving room sensor\nWaiting for first sensor reading...\nShow reading history\nRefresh latest reading\nDelete plant"
+  },
+  {
+    "scenario": "metrics",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "Back\nFern\n\nBoston fern\nLiving room · healthy\nLast scanned: Not recorded\nEdit plant details\nMoisture thresholds: 30% – 80%\nScan this plant\nHealth and care\nSensor readings are stale (over 30 minutes old). Refresh readings or check the plant before acting on saved advice.\nNo saved diagnosis yet. Scan this plant to get care guidance.\nNo pending saved care actions.\nView scan history\nView care tasks\nGrowing conditions\nLiving room sensor\nLast sample: 10/5/2026, 8:00:00 AM\nTemperature\n24\n°C\nHumidity\n62\n%\nSoil moisture\n45\n%\nLight\n350\nlux\nShow reading history\nRefresh latest reading\nDelete plant"
+  },
+  {
+    "scenario": "editing-profile",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "Back\nFern\n\nBoston fern\nLiving room · healthy\nLast scanned: Not recorded\nEdit plant details\nPlant name\nSpecies\nLocation\nImage URL\nMinimum moisture (%)\nMaximum moisture (%)\nSave changes\nCancel editing\nMoisture thresholds: 30% – 80%\nScan this plant\nHealth and care\nSensor readings are stale (over 30 minutes old). Refresh readings or check the plant before acting on saved advice.\nNo saved diagnosis yet. Scan this plant to get care guidance.\nNo pending saved care actions.\nView scan history\nView care tasks\nGrowing conditions\nLiving room sensor\nLast sample: 10/5/2026, 8:00:00 AM\nTemperature\n24\n°C\nHumidity\n62\n%\nSoil moisture\n45\n%\nLight\n350\nlux\nShow reading history\nRefresh latest reading"
+  },
+  {
+    "scenario": "error",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "Back\nFern\n\nBoston fern\nLiving room · healthy\nLast scanned: Not recorded\nEdit plant details\nMoisture thresholds: 30% – 80%\nScan this plant\nHealth and care\nCurrent readings could not be refreshed. Check the plant before following saved care advice.\nNo saved diagnosis yet. Scan this plant to get care guidance.\nNo pending saved care actions.\nView scan history\nView care tasks\nGrowing conditions\nSensor service unavailable. Please retry.\nRetry sensor readings\nRefresh latest reading\nDelete plant"
+  },
+  {
+    "scenario": "claim-busy",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "CONNECT DEVICE · 1 OF 4\nClaim your device\nClaim your physical sensor using its printed MAC. Pair it to a plant next; live readings require incoming telemetry.\nEnter the MAC printed on your sensor, or scan a barcode or QR code containing that MAC.\nClaiming…\nCamera access is optional. You can enter the device MAC manually.\nAllow camera scanning\nCancel"
+  },
+  {
+    "scenario": "claim-conflict",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "CONNECT DEVICE · 1 OF 4\nClaim your device\nClaim your physical sensor using its printed MAC. Pair it to a plant next; live readings require incoming telemetry.\nEnter the MAC printed on your sensor, or scan a barcode or QR code containing that MAC.\nThis device belongs to another account. Check the MAC and try again.\nClaim device\nCamera access is optional. You can enter the device MAC manually.\nAllow camera scanning\nCancel"
+  },
+  {
+    "scenario": "assignment-locked",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "CONNECT DEVICE · 3 OF 4\nAssign your sensor\nPair your claimed sensor with an owned plant.\nLiving room sensor\nYour destination is preselected and locked. Pairing is confirmed by the server for your account.\n✓ Fern\nPlant\nConnect to selected destination\nChoose another device\nCancel"
+  },
+  {
+    "scenario": "pair-busy",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "CONNECT DEVICE · 3 OF 4\nAssign your sensor\nPair your claimed sensor with an owned plant.\nLiving room sensor\nYour destination is preselected and locked. Pairing is confirmed by the server for your account.\n✓ Fern\nPlant\nPairing your sensor…\nConnecting…\nChoose another device\nCancel"
+  },
+  {
+    "scenario": "success",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "CONNECT DEVICE · 4 OF 4\nDevice setup complete\nYour sensor pairing is confirmed.\n\nSensor paired successfully\nLiving room sensor is paired with Plant: Fern.\nView paired plant\n+ Add Sensor\nReturn to Dashboard"
+  },
+  {
+    "scenario": "contextual-profile",
+    "viewport": "430x932",
+    "fixture": true,
+    "text": "Back\nFern\n\nBoston fern\nLiving room · healthy\nLast scanned: Not recorded\nEdit plant details\nMoisture thresholds: 30% – 80%\nScan this plant\nHealth and care\nNo current sensor readings are available. Check the plant before following saved care advice.\nNo saved diagnosis yet. Scan this plant to get care guidance.\nNo pending saved care actions.\nView scan history\nView care tasks\nGrowing conditions\nLiving room sensor\nWaiting for first sensor reading...\nShow reading history\nRefresh latest reading\nDelete plant"
+  }
+]

@@ -1,0 +1,91 @@
+$ set -euo pipefail
+node --import tsx --test --test-concurrency=1 frontend/tests/plant-telemetry-bff-flow.test.ts
+npm run typecheck --workspace=frontend
+
+--- stdout ---
+TAP version 13
+# Subtest: profile sibling identity remains unique while editing and changes with the plant
+ok 1 - profile sibling identity remains unique while editing and changes with the plant
+  ---
+  duration_ms: 144.776827
+  type: 'test'
+  ...
+# Subtest: production profile renders unpaired from one BFF
+ok 2 - production profile renders unpaired from one BFF
+  ---
+  duration_ms: 61.521479
+  type: 'test'
+  ...
+# Subtest: production profile renders waiting from one BFF
+ok 3 - production profile renders waiting from one BFF
+  ---
+  duration_ms: 55.190622
+  type: 'test'
+  ...
+# Subtest: production profile renders zero metrics from one BFF
+ok 4 - production profile renders zero metrics from one BFF
+  ---
+  duration_ms: 56.994352
+  type: 'test'
+  ...
+# Subtest: production profile reports malformed BFF distinctly and retry recovers
+ok 5 - production profile reports malformed BFF distinctly and retry recovers
+  ---
+  duration_ms: 40.958331
+  type: 'test'
+  ...
+# Subtest: production profile aborts obsolete plant/session responses and refocus observes reassignment
+ok 6 - production profile aborts obsolete plant/session responses and refocus observes reassignment
+  ---
+  duration_ms: 58.550131
+  type: 'test'
+  ...
+# Subtest: collection hydration, retry, missing metadata and controls use AppData
+ok 7 - collection hydration, retry, missing metadata and controls use AppData
+  ---
+  duration_ms: 54.611373
+  type: 'test'
+  ...
+# Subtest: malformed profile target undefined is safe
+ok 8 - malformed profile target undefined is safe
+  ---
+  duration_ms: 40.042015
+  type: 'test'
+  ...
+# Subtest: malformed profile target "" is safe
+ok 9 - malformed profile target "" is safe
+  ---
+  duration_ms: 22.342929
+  type: 'test'
+  ...
+# Subtest: malformed profile target "bad-id" is safe
+ok 10 - malformed profile target "bad-id" is safe
+  ---
+  duration_ms: 28.839028
+  type: 'test'
+  ...
+# Subtest: malformed profile target ["11111111-1111-4111-8111-111111111111"] is safe
+ok 11 - malformed profile target ["11111111-1111-4111-8111-111111111111"] is safe
+  ---
+  duration_ms: 33.13735
+  type: 'test'
+  ...
+# Subtest: guest metadata retains scanning and care without BFF reads
+ok 12 - guest metadata retains scanning and care without BFF reads
+  ---
+  duration_ms: 21.959607
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1530.816454
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---
