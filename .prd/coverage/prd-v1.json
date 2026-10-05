@@ -1,0 +1,251 @@
+{
+  "schema": 1,
+  "change": "prd-v1",
+  "prd": ".prd/prd-v1.md",
+  "scenarios": {
+    "S-01": {
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ]
+    },
+    "S-02": {
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ]
+    },
+    "S-03": {
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ]
+    },
+    "S-04": {
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ]
+    },
+    "S-05": {
+      "tickets": [
+        "T-01"
+      ],
+      "checks": [
+        "C-01",
+        "C-04"
+      ]
+    },
+    "S-06": {
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ]
+    },
+    "S-07": {
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ]
+    },
+    "S-08": {
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ]
+    },
+    "S-09": {
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04",
+        "C-07"
+      ]
+    },
+    "S-10": {
+      "tickets": [
+        "T-02"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ]
+    },
+    "S-11": {
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-12": {
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-13": {
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-14": {
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-15": {
+      "tickets": [
+        "T-03"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-16": {
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-17": {
+      "tickets": [
+        "T-01",
+        "T-02",
+        "T-03"
+      ],
+      "checks": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06"
+      ]
+    }
+  },
+  "scope": {},
+  "tickets": {
+    "T-01": {
+      "role": "implements",
+      "rationale": null
+    },
+    "T-02": {
+      "role": "implements",
+      "rationale": null
+    },
+    "T-03": {
+      "role": "implements",
+      "rationale": null
+    }
+  },
+  "checks": {
+    "C-01": {
+      "kind": "command",
+      "required": true,
+      "command": "node --import tsx/esm --experimental-test-module-mocks --test backend/tests/devices.test.mjs",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Planned HTTP behavior tests; implemented with the owning endpoint."
+    },
+    "C-02": {
+      "kind": "command",
+      "required": true,
+      "command": "node --import tsx/esm --experimental-test-module-mocks --test backend/tests/plant-pairing.test.mjs",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Planned HTTP behavior tests; implemented with the owning endpoint."
+    },
+    "C-03": {
+      "kind": "command",
+      "required": true,
+      "command": "node --import tsx/esm --experimental-test-module-mocks --test backend/tests/plant-telemetry.test.mjs",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Planned HTTP behavior tests; implemented with the owning endpoint."
+    },
+    "C-04": {
+      "kind": "command",
+      "required": true,
+      "command": "npm test --workspace=backend",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Full backend regression suite, run after each endpoint."
+    },
+    "C-05": {
+      "kind": "command",
+      "required": true,
+      "command": "npx tsc --noEmit -p backend/tsconfig.json",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Strict TypeScript compilation, run after each endpoint."
+    },
+    "C-06": {
+      "kind": "review",
+      "required": true,
+      "command": null,
+      "timeout": null,
+      "cwd": null,
+      "obligation": "Inspect git history and verification evidence for three separate conventional endpoint commits, each made after successful focused tests, backend suite and TypeScript checks.",
+      "note": "Commit ordering is reviewed separately from executable endpoint behavior."
+    },
+    "C-07": {
+      "kind": "review",
+      "required": true,
+      "command": null,
+      "timeout": null,
+      "cwd": null,
+      "obligation": "Review Serializable transaction boundaries and conflict retries against installed Prisma 6 contracts. Run isolated live PostgreSQL concurrency verification if test infrastructure is available; otherwise record live concurrency as unverified. Never treat mocked interleavings as proof of actual database isolation.",
+      "note": "Separately records the practical limit of mocked pairing tests."
+    }
+  }
+}
