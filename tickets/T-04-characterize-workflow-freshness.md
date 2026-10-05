@@ -1,10 +1,12 @@
 ---
 ticket: T-04
-status: open
+status: done
 size: M
 prd: .prd/prd-v2.md
 depends_on: []
 timeout: 600
+started: 2026-10-05T08:29:57Z
+finished: 2026-10-05T08:38:55Z
 ---
 
 ## Objective
@@ -23,9 +25,9 @@ Protect existing freshness rejection and legacy behavior before changing the tru
 - Use observable status/readiness outputs and failure verdicts; include fixture cleanup and preserve the Bash-runner regression.
 
 ## Acceptance Criteria
-- [ ] The characterization subset passes against the original runtime and detects weakened rejection checks.
-- [ ] Invalid local evidence is rejected with stale/invalid verdicts and blocks applicable readiness gates.
-- [ ] Legacy/migrated Notes behavior and selected-change authority are covered without editing historical artifacts.
+- [x] The characterization subset passes against the original runtime and detects weakened rejection checks.
+- [x] Invalid local evidence is rejected with stale/invalid verdicts and blocks applicable readiness gates.
+- [x] Legacy/migrated Notes behavior and selected-change authority are covered without editing historical artifacts.
 
 ## Verification
 Proves: Existing negative and mode-specific freshness behavior through disposable Git fixtures; catches broadened evidence exceptions before the runtime fix.
