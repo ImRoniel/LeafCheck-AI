@@ -2,7 +2,8 @@ import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { demoDeviceId, seedDemoTelemetry } from "../lib/demo-telemetry.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
-import { ownedPlant } from "../lib/ownership.js";
+import { ownedPlant, resourceId } from "../lib/ownership.js";
+import { pairPlantDevice } from "../lib/plant-pairing.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { Plant } from "../types/plant.js";
 
@@ -144,6 +145,18 @@ plantsRouter.delete(
     if (!result.count)
       throw new HttpError(404, "NOT_FOUND", "Plant not found.");
     res.status(204).end();
+  }),
+);
+
+plantsRouter.patch(
+  "/:id/pair-device",
+  asyncRoute(async (req, res) => {
+    const { deviceId } = bodyObject(req.body, ["deviceId"]);
+    const targetDevice = deviceId === null ? null : resourceId(deviceId);
+    const plant = await pairPlantDevice(
+      resourceId(req.params.id), res.locals.auth.user.id, targetDevice,
+    );
+    res.json(serializePlant(plant));
   }),
 );
 

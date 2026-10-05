@@ -1,5 +1,8 @@
 import { HttpError } from "./http.js";
 import { prismaPg } from "./prisma-pg.js";
+import type { Prisma } from "../generated/postgres-client/index.js";
+
+type OwnershipClient = Pick<Prisma.TransactionClient, "plant" | "device">;
 
 export function resourceId(value: unknown): string {
   if (
@@ -12,15 +15,15 @@ export function resourceId(value: unknown): string {
   }
   return value;
 }
-export async function ownedPlant(id: unknown, userId: string) {
-  const plant = await prismaPg.plant.findFirst({
+export async function ownedPlant(id: unknown, userId: string, client: OwnershipClient = prismaPg) {
+  const plant = await client.plant.findFirst({
     where: { id: resourceId(id), userId },
   });
   if (!plant) throw new HttpError(404, "NOT_FOUND", "Plant not found.");
   return plant;
 }
-export async function ownedDevice(id: unknown, userId: string) {
-  const device = await prismaPg.device.findFirst({
+export async function ownedDevice(id: unknown, userId: string, client: OwnershipClient = prismaPg) {
+  const device = await client.device.findFirst({
     where: { id: resourceId(id), userId },
   });
   if (!device) throw new HttpError(404, "NOT_FOUND", "Device not found.");
