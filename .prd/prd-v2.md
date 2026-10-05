@@ -97,3 +97,7 @@ Notes, locator and manifest contents are local inputs, not self-authenticating p
 ## Dependencies & Risks
 
 No package or external API is added or upgraded; registry-version verification is inapplicable. Use the installed Node native test runner and existing Git/Bash tooling. Tests need permission to spawn subprocesses in this environment; a sandbox EPERM is infrastructure failure, not corrupted workflow history. The main risk is accepting a broader set of post-candidate changes than intended, mitigated by negative fixtures and unchanged locator validation. Canonical ignored guidance must be deliberately tracked to ensure the fix survives a fresh checkout.
+
+## Evaluation phase boundary clarification
+
+Evaluation review found C-07 circularly requiring a post-export audit before its own first export. T-07 clarifies C-07 as a pre-export delivery/history review; the actual read-only release audit still follows the committed evaluation as required by S-08, and its actual verdict is reported separately. No scenario or release obligation is cut. Never label that future audit passed in candidate evidence. This verification-order correction is within the supplied pincer-evaluate instruction to fix in-scope findings through a ticket.

@@ -69,12 +69,14 @@
     "S-08": {
       "tickets": [
         "T-05",
-        "T-06"
+        "T-06",
+        "T-07"
       ],
       "checks": [
         "C-04",
         "C-05",
-        "C-07"
+        "C-07",
+        "C-03"
       ]
     }
   },
@@ -89,6 +91,10 @@
       "rationale": null
     },
     "T-06": {
+      "role": "implements",
+      "rationale": null
+    },
+    "T-07": {
       "role": "implements",
       "rationale": null
     }
@@ -154,7 +160,7 @@
       "command": null,
       "timeout": null,
       "cwd": null,
-      "obligation": "Inspect scoped commit and fresh verification history, confirm PRD v1 candidate/records/artifacts are unchanged, and record a fresh candidate evaluation followed by a read-only release audit. A failed audit or missing verification remains explicitly unverified, never inferred from documentation.",
+      "obligation": "Pre-export delivery review: inspect scoped commits and fresh verification history, confirm PRD v1 candidate/records/artifacts are unchanged, and review that the candidate is ready for evaluation. The actual post-export release audit is recorded separately after committing the evaluation; this review does not attest a future audit result. Failed or missing verification remains explicitly unverified.",
       "note": null
     }
   }

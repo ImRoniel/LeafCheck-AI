@@ -67,6 +67,19 @@ test('canonical release guidance and both adapters are durably tracked', () => {
   }
 });
 
+test('delivery review separates pre-export evidence from the actual post-export audit', () => {
+  const map = JSON.parse(read('.prd/coverage/prd-v2.json'));
+  const obligation = map.checks['C-07'].obligation;
+  assert.match(obligation, /^Pre-export delivery review:/);
+  assert.match(obligation, /actual post-export release audit is recorded separately after committing the evaluation/);
+  assert.match(obligation, /does not attest a future audit result/);
+  const prose = flat(read(checklist));
+  assert.match(prose, /actual read-only release audit follows the committed evaluation and is reported separately/);
+  assert.match(prose, /Never make that future audit a prerequisite for exporting the same evaluation/);
+  assert.ok(map.scenarios['S-08']);
+  assert.equal(map.scope['S-08'], undefined);
+});
+
 test('release adapters match isolated canonical regeneration without changing the worktree', t => {
   const temporary = mkdtempSync(join(tmpdir(), 'pincer-release-guidance-'));
   t.after(() => rmSync(temporary, { recursive: true, force: true }));

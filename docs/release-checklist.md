@@ -4,6 +4,11 @@ Audit the selected PRD and its evaluated candidate. This checklist applies to pr
 changes in greenfield and brownfield repositories. It is read-only: failures return work
 to the owning stage or a new ticket.
 
+Candidate evaluation records pre-export verification and review outcomes. The actual
+read-only release audit follows the committed evaluation and is reported separately;
+a pre-export review does not attest a future audit result. Never make that future
+audit a prerequisite for exporting the same evaluation or predeclare its verdict.
+
 ## Change identity and state
 
 - [ ] `scripts/pincer-status.sh` selects the intended PRD with `status: built` and no warnings

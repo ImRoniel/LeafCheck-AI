@@ -5,11 +5,11 @@
   "prd": ".prd/prd-v2.md",
   "base": "c442e0cd94f3503f7851787a84b0fff0086a03a0",
   "registered": "2026-10-05T08:26:10Z",
-  "sequence": 6,
+  "sequence": 8,
   "lifecycle": {
-    "state": "completed",
-    "since": "2026-10-05T08:53:25Z",
-    "reason": null,
+    "state": "active",
+    "since": "2026-10-05T08:57:46Z",
+    "reason": "Evaluation found C-07 circularly requiring the post-export audit before export; fix review timing without cutting S-08.",
     "note": null,
     "superseded_by": null
   },
@@ -45,6 +45,23 @@
       "decisions": [],
       "snapshot": ".prd/changes/prd-v2/agreements/G-02.json",
       "recorded": "2026-10-05T08:28:02Z"
+    },
+    {
+      "id": "G-03",
+      "digest": "832c4f06c744b1d8a840fc5550631b329f45662017c6a6d55c547eafaa89e831",
+      "prd_revision": "8c61d4293465448901cf5273dfbc542a1c9aa1e9619fa574bdf6f9aedd5a2034",
+      "breakdown": "a9d318b543e1b912cc94d2a4dbb24f79feb086fdc188bbf558bfee3f16c3ca8c",
+      "inventory": "500623c9b19d872fab1fa59e835cac4f9563f0a949cb8b95114fcdc3d18a8f47",
+      "coverage": "230262133f9d848762196aba1bcff0d29b12d19a612fb2ca2aa6e3ceb1cd42a4",
+      "tickets": [
+        "T-04",
+        "T-05",
+        "T-06",
+        "T-07"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v2/agreements/G-03.json",
+      "recorded": "2026-10-05T08:58:07Z"
     }
   ],
   "authorizations": [
@@ -73,6 +90,19 @@
       "explanation": null,
       "decisions": [],
       "recorded": "2026-10-05T08:28:02Z"
+    },
+    {
+      "id": "A-03",
+      "agreement": "G-03",
+      "digest": "832c4f06c744b1d8a840fc5550631b329f45662017c6a6d55c547eafaa89e831",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-02",
+      "explanation": "User pincer-evaluate explicitly authorizes fixing in-scope findings through tickets. T-07 corrects verification timing only: C-07 reviews pre-export history; the same S-08 post-export release audit remains required and will be run after the evidence commit. No requirement, scenario, scope or runtime trust gate is cut.",
+      "decisions": [],
+      "recorded": "2026-10-05T08:58:07Z"
     }
   ],
   "decisions": [],
@@ -151,6 +181,32 @@
       "reason": null,
       "agreement": "G-02",
       "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 7,
+      "kind": "reopen",
+      "from": "completed",
+      "to": "active",
+      "at": "2026-10-05T08:57:46Z",
+      "reason": "Evaluation found C-07 circularly requiring the post-export audit before export; fix review timing without cutting S-08.",
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 8,
+      "kind": "authorize",
+      "from": "active",
+      "to": "active",
+      "at": "2026-10-05T08:58:07Z",
+      "reason": null,
+      "agreement": "G-03",
+      "authorization": "A-03",
       "decision": null,
       "replacement": null,
       "note": null
