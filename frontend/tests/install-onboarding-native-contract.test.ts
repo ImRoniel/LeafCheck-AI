@@ -4,9 +4,15 @@ import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import ts from 'typescript';
+import { createIntroStore } from '../services/install-onboarding-store';
 import type { IntroStorage } from '../services/install-onboarding-store';
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 function adapter(path: string, overrides: Record<string, unknown>, localStorage?: unknown): IntroStorage {
+  overrides = {
+    'expo-constants': { __esModule: true, default: { executionEnvironment: 'standalone' }, ExecutionEnvironment: { StoreClient: 'storeClient' } },
+    '@react-native-async-storage/async-storage': { __esModule: true, default: { getItem() { throw new Error('Unexpected preview read'); }, setItem() { throw new Error('Unexpected preview write'); } } },
+    ...overrides,
+  };
   const exports: { introStorage?: IntroStorage } = {};
   runInNewContext(ts.transpileModule(read(path), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: (key: string) => { assert.ok(key in overrides); return overrides[key]; }, localStorage });
   assert.ok(exports.introStorage); return exports.introStorage;
@@ -38,4 +44,50 @@ test('static native contracts retain backup exclusion, atomic writes and credent
   assert.match(token, /WHEN_UNLOCKED_THIS_DEVICE_ONLY/); assert.match(token, /leafcheck.refresh.v1/); assert.doesNotMatch(token, /keychainService|accessGroup/);
   const app = JSON.parse(read('app.json')) as { expo: { plugins: unknown[] } };
   assert.ok(app.expo.plugins.some(plugin => Array.isArray(plugin) && plugin[0] === 'expo-secure-store' && plugin[1].configureAndroidBackup === true));
+});
+
+test('Expo Go preview persists completion across stores without loading the custom module', async () => {
+  const values = new Map<string, string>();
+  const storage = adapter('services/install-onboarding-storage.native.ts', {
+    'expo-constants': { __esModule: true, default: { executionEnvironment: 'storeClient' }, ExecutionEnvironment: { StoreClient: 'storeClient' } },
+    '@react-native-async-storage/async-storage': { __esModule: true, default: {
+      async getItem(key: string) { return values.get(key) ?? null; },
+      async setItem(key: string, value: string) { values.set(key, value); },
+    } },
+    'expo-modules-core': { requireOptionalNativeModule() { throw new Error('Expo Go must not request the custom module'); } },
+  });
+  const store = createIntroStore(storage);
+  await store.load(); assert.equal(store.snapshot().phase, 'splash');
+  store.finishSplash(); assert.equal(await store.complete(), true);
+  assert.deepEqual([...values.keys()], ['leafcheck.expo-go.install-intro.v1']);
+  const reload = createIntroStore(storage);
+  await reload.load(); assert.equal(reload.snapshot().phase, 'completed');
+});
+
+test('Expo Go storage rejection stays retryable and never publishes completion early', async () => {
+  let denied = true;
+  const storage = adapter('services/install-onboarding-storage.native.ts', {
+    'expo-constants': { __esModule: true, default: { executionEnvironment: 'storeClient' }, ExecutionEnvironment: { StoreClient: 'storeClient' } },
+    '@react-native-async-storage/async-storage': { __esModule: true, default: {
+      async getItem() { if (denied) throw new Error('private failure'); return null; },
+      async setItem() { if (denied) throw new Error('private failure'); },
+    } },
+    'expo-modules-core': { requireOptionalNativeModule: () => null },
+  });
+  const store = createIntroStore(storage);
+  await store.load(); assert.equal(store.snapshot().phase, 'error');
+  denied = false; await store.load(); store.finishSplash();
+  denied = true; assert.equal(await store.complete(), false); assert.equal(store.snapshot().phase, 'intro');
+  denied = false; assert.equal(await store.complete(), true);
+});
+
+test('missing modules in standalone, development and unknown runtimes never use preview storage', async () => {
+  for (const executionEnvironment of ['standalone', 'bare', undefined]) {
+    const storage = adapter('services/install-onboarding-storage.native.ts', {
+      'expo-constants': { __esModule: true, default: { executionEnvironment }, ExecutionEnvironment: { StoreClient: 'storeClient' } },
+      'expo-modules-core': { requireOptionalNativeModule: () => null },
+    });
+    await assert.rejects(async () => storage.read(), /requires a native build/);
+    await assert.rejects(async () => storage.write('{}'), /requires a native build/);
+  }
 });

@@ -127,9 +127,17 @@ iOS writes under Application Support with explicit backup exclusion. New install
 reinstalls and new-device restores must repeat intro without deleting refresh
 credentials. Existing installations see intro once when adopting this binary.
 
-This module needs a rebuilt native app (Expo prebuild/EAS or local Xcode/Gradle
-build). An OTA-only update or Expo Go cannot provide it; a missing module shows
-retryable recovery rather than falling back to backed-up native storage. Browser
+Production and development builds need a rebuilt native app (Expo prebuild/EAS
+or local Xcode/Gradle build). An OTA-only update cannot provide the module;
+a missing module in these builds remains an error.
+
+Expo Go previews use AsyncStorage under the separate
+`leafcheck.expo-go.install-intro.v1` key. This path is selected only when
+`Constants.executionEnvironment` is `ExecutionEnvironment.StoreClient`, never
+just because the native module is missing. Preview completion persists across
+reloads but does not provide production backup/transfer guarantees and is never
+migrated into the native completion marker. Reload Expo Go after applying the
+JavaScript update; no custom native build is needed for this preview path. Browser
 completion uses browser-local storage; browser-profile synchronization is outside
 the native backup guarantee. Real-device backup/transfer acceptance is separate
 from Node tests.
