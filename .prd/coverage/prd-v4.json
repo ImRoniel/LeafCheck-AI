@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "change": "prd-v4",
+  "prd": ".prd/prd-v4.md",
+  "scenarios": {
+    "S-01": {
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-02": {
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-03": {
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-04": {
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-05": {
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-08": {
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-09": {
+      "tickets": [
+        "T-15",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ]
+    },
+    "S-10": {
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-12": {
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    },
+    "S-13": {
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ]
+    }
+  },
+  "scope": {
+    "S-06": {
+      "disposition": "deferred",
+      "decision": "D-01",
+      "prior": null,
+      "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+    },
+    "S-07": {
+      "disposition": "deferred",
+      "decision": "D-01",
+      "prior": null,
+      "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+    },
+    "S-11": {
+      "disposition": "deferred",
+      "decision": "D-01",
+      "prior": null,
+      "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+    }
+  },
+  "tickets": {
+    "T-14": {
+      "role": "enables",
+      "rationale": "Characterization protects load-bearing routing before implementation; it does not itself implement an acceptance scenario."
+    },
+    "T-15": {
+      "role": "implements",
+      "rationale": null
+    },
+    "T-16": {
+      "role": "implements",
+      "rationale": null
+    },
+    "T-17": {
+      "role": "implements",
+      "rationale": null
+    }
+  },
+  "checks": {
+    "C-01": {
+      "kind": "command",
+      "required": true,
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/garden-navigation.test.ts",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+    },
+    "C-02": {
+      "kind": "command",
+      "required": true,
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-storage.test.ts tests/install-onboarding-native-contract.test.ts tests/session.test.ts\ncd ..\nnpm run typecheck --workspace=frontend",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+    },
+    "C-03": {
+      "kind": "command",
+      "required": true,
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-routing.test.ts tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/local-state.test.ts tests/garden-navigation.test.ts\ncd ..\nnpm run typecheck --workspace=frontend",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+    },
+    "C-04": {
+      "kind": "command",
+      "required": true,
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-integration.test.ts\ncd ..\nnpm test --workspace=frontend\nnpm run typecheck --workspace=frontend",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+    },
+    "C-05": {
+      "kind": "review",
+      "required": false,
+      "command": null,
+      "timeout": null,
+      "cwd": null,
+      "obligation": "Inspect actual iOS and Android builds and record fresh install, relaunch, uninstall/reinstall, cloud-backup restore and device-transfer results in .prd/frontend-install-verification-v4.md. Verify the completion marker is absent on new installs/devices despite restored garden state or valid-session fixtures; inspect backup exclusion and unchanged SecureStore device-only accessibility, key/service, no synchronizable/shared-group configuration and Android backup exclusion. Name builds/devices and artifact references; missing toolchains/devices/backup capability is unverified, never a pass.",
+      "note": "Deferred with T-17 under user-resolved D-01; retained for future native validation, not passed or waived by fabricated evidence."
+    },
+    "C-06": {
+      "kind": "visual",
+      "required": false,
+      "command": null,
+      "timeout": null,
+      "cwd": null,
+      "obligation": "On actual native builds review existing splash then every slide before auth navigation, recovery messages and disabled final actions; check unchanged styling, reduced motion, large text, screen-reader controls and Android Back. Record observations and artifacts in .prd/frontend-install-verification-v4.md. Missing native runtime is unverified.",
+      "note": "Deferred with T-17 under user-resolved D-01; retained for future native validation, not passed or waived by fabricated evidence."
+    }
+  }
+}

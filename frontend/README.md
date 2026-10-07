@@ -118,3 +118,18 @@ Sensor values may be absent or stale. Lux is not PAR/PPFD; pH is not live teleme
 Device mappings are local, unverified associations, not device authentication.
 Diagnosis is advisory and scans can leave server-side intermediate records after
 timeouts. Backend and hardware implementation/deployment remain outside this work.
+
+### Installation onboarding storage
+
+The introductory slides use the local `modules/install-onboarding` Expo module,
+not account garden-setup state or SecureStore. Android writes to `noBackupFilesDir`;
+iOS writes under Application Support with explicit backup exclusion. New installs,
+reinstalls and new-device restores must repeat intro without deleting refresh
+credentials. Existing installations see intro once when adopting this binary.
+
+This module needs a rebuilt native app (Expo prebuild/EAS or local Xcode/Gradle
+build). An OTA-only update or Expo Go cannot provide it; a missing module shows
+retryable recovery rather than falling back to backed-up native storage. Browser
+completion uses browser-local storage; browser-profile synchronization is outside
+the native backup guarantee. Real-device backup/transfer acceptance is separate
+from Node tests.

@@ -270,6 +270,8 @@ test("fresh local entry opens Dashboard once, keeps setup optional, and permits 
   const module = load("app/_layout.tsx", {
     react: state.react,
     "@/components/screen": { Action: "Action", Notice: "Notice", Screen: "Screen" },
+    "@/context/install-onboarding": { InstallOnboardingProvider: "IntroProvider", useInstallOnboarding: () => ({ phase: "completed" }) },
+    "./splash": { __esModule: true, default: "Splash" },
     "@/context/auth": { AuthProvider: "AuthProvider", useAuth: () => auth },
     "@/context/local-state": { LocalStateProvider: "LocalStateProvider", useLocalState: () => local },
     "@/context/app-data": { AppDataProvider: "AppDataProvider" },
@@ -280,15 +282,18 @@ test("fresh local entry opens Dashboard once, keeps setup optional, and permits 
     },
   });
   const root = module.default();
-  const account = invoke(root.props.children);
+  const authProvider = root.props.children as React.ReactElement<Props>;
+  const startup = authProvider.props.children;
+  assert.ok(React.isValidElement(startup));
+  const account = invoke(invoke(startup));
   const provider = account.props.children as React.ReactElement<Props>;
   const routes = provider.props.children as React.ReactElement;
   const render = () => { state.reset(); const tree = invoke(routes); state.flush(); return tree; };
   const tree = render();
   assert.equal(tree.props.initialRouteName, "(tabs)");
   const groups = React.Children.toArray(tree.props.children) as React.ReactElement<Props>[];
-  assert.equal(groups[0].props.guard, true); // Guest may choose setup.
-  assert.equal(groups[1].props.guard, true); // Setup does not block Spaces.
+  assert.equal(groups[1].props.guard, true); // Guest may choose setup.
+  assert.equal(groups[2].props.guard, true); // Setup does not block Spaces.
   assert.deepEqual(replacements, ["/(tabs)"]);
   render();
   assert.deepEqual(replacements, ["/(tabs)"]); // No redirect loop on later login visits.

@@ -27,12 +27,16 @@ const slides = [
 ] as const;
 
 export function OnboardingSlider({
+  error = null,
+  saving = false,
   currentSlide,
   onPrevious,
   onNext,
   onGetStarted,
   onLetsGo,
 }: {
+  error?: string | null;
+  saving?: boolean;
   currentSlide: number;
   onPrevious: () => void;
   onNext: () => void;
@@ -121,14 +125,15 @@ export function OnboardingSlider({
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
+        {error && <Text accessibilityLiveRegion="polite" style={styles.description}>{error}</Text>}
         <View style={styles.dotsContainer} accessible accessibilityLabel={`Page ${currentSlide + 1} of ${slides.length}`}>
           {slides.map((item, index) => (
             <View key={item.eyebrow} style={[styles.dot, index === currentSlide && styles.activeDot]} />
           ))}
         </View>
-        <Pressable onPress={nextAction} accessibilityRole="button"
+        <Pressable onPress={nextAction} disabled={saving} accessibilityState={{ disabled: saving, busy: saving }} accessibilityRole="button"
           style={({ pressed }) => [styles.ctaButton, pressed && styles.pressed]}>
-          <Text style={styles.ctaButtonText}>{currentSlide === 2 ? "Letâ€™s get growing" : "Next"}</Text>
+          <Text style={styles.ctaButtonText}>{saving ? "Saving…" : currentSlide === 2 ? "Letâ€™s get growing" : "Next"}</Text>
           <Ionicons name="arrow-forward" size={21} color="#FFFFFF" />
         </Pressable>
       </View>

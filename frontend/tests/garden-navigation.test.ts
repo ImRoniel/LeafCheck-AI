@@ -250,6 +250,8 @@ test("root stack preserves guards while native pushes reverse on Back and reduce
   for (const reducedMotion of [false, true]) {
     const Stack = Object.assign(() => null, { Screen: "Screen", Protected: "Protected" });
     const { default: Layout } = load("app/_layout.tsx", {
+      "@/context/install-onboarding": { InstallOnboardingProvider: "InstallOnboardingProvider", useInstallOnboarding: () => ({ phase: "completed" }) },
+      "./splash": { __esModule: true, default: "Splash" },
       "@/hooks/use-reduced-motion": { useReducedMotion: () => reducedMotion },
       "@/components/screen": { Screen: "Screen", Notice: "Notice", Action: "Action" },
       "@/context/auth": { AuthProvider: "AuthProvider", useAuth: () => ({ status: "authenticated", isGuest: false }) },
@@ -257,19 +259,26 @@ test("root stack preserves guards while native pushes reverse on Back and reduce
       "@/context/app-data": { AppDataProvider: "AppDataProvider" },
       "expo-router": { Stack, useRouter: () => ({}), useRootNavigationState: () => ({ key: "mounted" }) },
     });
-    const invoke = (element: React.ReactElement<any>): React.ReactElement<any> => (element.type as (props: unknown) => React.ReactElement)(element.props);
-    const root = Layout({} as never) as React.ReactElement<any>;
-    const account = invoke(root.props.children as React.ReactElement);
-    const app = account.props.children as React.ReactElement<any>;
-    const routes = invoke(app.props.children);
+    type RootProps = { children?: React.ReactNode; screenOptions?: { animation: string }; guard?: boolean };
+    const invoke = (element: React.ReactElement<RootProps>): React.ReactElement<RootProps> => (element.type as (props: RootProps) => React.ReactElement<RootProps>)(element.props);
+    let routes = Layout({} as never) as React.ReactElement<RootProps>;
+    while (!routes.props.screenOptions) {
+      if (typeof routes.type === "function") routes = invoke(routes);
+      else {
+        const child = React.Children.toArray(routes.props.children)[0];
+        assert.ok(React.isValidElement<RootProps>(child));
+        routes = child;
+      }
+    }
     assert.equal(routes.props.screenOptions.animation, reducedMotion ? "none" : "slide_from_right");
-    const groups = React.Children.toArray(routes.props.children).filter(React.isValidElement) as React.ReactElement<any>[];
-    assert.equal(groups[0].props.guard, false); // Signed-in setup is already complete.
-    assert.equal(groups[1].props.guard, true);
-    assert.equal(groups[2].props.guard, false); // Authentication routes remain protected.
+    const groups = React.Children.toArray(routes.props.children).filter(React.isValidElement) as React.ReactElement<RootProps>[];
+    assert.equal(groups[1].props.guard, false); // Signed-in setup is already complete.
+    assert.equal(groups[2].props.guard, true);
+    assert.equal(groups[3].props.guard, false); // Authentication routes remain protected.
     const modal = elements(routes).find(node => node.props.name === "modal")!;
-    assert.equal((modal.props.options as any).animation, reducedMotion ? "none" : "slide_from_bottom");
-    assert.equal((modal.props.options as any).presentation, "modal");
+    const options = modal.props.options as { animation: string; presentation: string };
+    assert.equal(options.animation, reducedMotion ? "none" : "slide_from_bottom");
+    assert.equal(options.presentation, "modal");
   }
 });
 

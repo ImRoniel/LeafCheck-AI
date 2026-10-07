@@ -1,19 +1,20 @@
 import { LeafCheckLogo } from "@/components/leaf-check-logo";
-import { useRouter } from "expo-router";
+import { useInstallOnboarding } from "@/context/install-onboarding";
 import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 
 export default function Splash() {
-  const router = useRouter();
+  const intro = useInstallOnboarding();
 
   useEffect(() => {
-    // Auto-navigate to onboarding after 2 seconds
+    if (intro.phase !== "splash") return;
+    // Begin intro only after the installation marker has loaded.
     const timer = setTimeout(() => {
-      router.replace("/onboarding");
+      intro.finishSplash();
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [intro.phase, intro.finishSplash]);
 
   return (
     <View style={styles.container}>

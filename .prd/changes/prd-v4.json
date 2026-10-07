@@ -1,0 +1,372 @@
+{
+  "schema": 3,
+  "runtime": 3,
+  "change": "prd-v4",
+  "prd": ".prd/prd-v4.md",
+  "base": "50fa92d1730fb9ebda86890f871299fb0f25992b",
+  "registered": "2026-10-07T13:36:25Z",
+  "sequence": 13,
+  "lifecycle": {
+    "state": "completed",
+    "since": "2026-10-07T14:13:54Z",
+    "reason": null,
+    "note": null,
+    "superseded_by": null
+  },
+  "agreements": [
+    {
+      "id": "G-01",
+      "digest": "86a9cce109ff3fec019a883a57ff48f903774821b2a51bcd3c42e9c3d088f698",
+      "prd_revision": "2d03f13a929cd0b7d9fb1e3493eeb794bb35c6eef0bcce96c0006544e30b557e",
+      "breakdown": "ae1e8206be9b385baceb504ba00d6becfa8a6941710ed064f83cbcf6036cf18c",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "86e3021695f137290ffbd835868ad7c76d13d1746a25b9907d639c5b2408c711",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-01.json",
+      "recorded": "2026-10-07T13:36:56Z"
+    },
+    {
+      "id": "G-02",
+      "digest": "195717a28b37ea29c04732447b7f07212dc0330ea93f2f916604ef5a4928fa63",
+      "prd_revision": "2d03f13a929cd0b7d9fb1e3493eeb794bb35c6eef0bcce96c0006544e30b557e",
+      "breakdown": "da1ed149c21cd5f274fc26bc37082df02561ca0f0fec745507dccab4abf673d8",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "9c0e71e57fcdf8868a491b36fdcdd420b7fa569f7958ba844a254543e18e4735",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-02.json",
+      "recorded": "2026-10-07T13:39:31Z"
+    },
+    {
+      "id": "G-03",
+      "digest": "a7a5d20c060fd2b010ea554118df5d5090c08402e74d23d81625ca257ba0f39d",
+      "prd_revision": "2d03f13a929cd0b7d9fb1e3493eeb794bb35c6eef0bcce96c0006544e30b557e",
+      "breakdown": "8737ac51eafa16ca9d07979280f2a2d9628d827db89fe4bb51bb9e18002a8e2f",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "4d4859b0d953dd92ddbe02e54bc36ff00144d3856f25105717a9db146a8f2b36",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-03.json",
+      "recorded": "2026-10-07T13:42:45Z"
+    },
+    {
+      "id": "G-04",
+      "digest": "775c1f89a80d9c3d1b3da24836570520d3ea3f1cedc97c54c653086ee9eb4f0c",
+      "prd_revision": "a32a8e7cece37f61e4c997626853230c1d0cda0718f5177e6380e6b25a7057b7",
+      "breakdown": "d350a966079bdb95363312d2ac0b0a338221c0913c5c2c02b0949940f103bc56",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "8165701b9838f1609d4b260ca8df600342996fa2e4f5847ad5ce4cdbd590b87b",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "decisions": [
+        "D-01"
+      ],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-04.json",
+      "recorded": "2026-10-07T14:11:51Z"
+    },
+    {
+      "id": "G-05",
+      "digest": "34577ec9a2e3ae0091ab8e51cdac0f5c14017f00bf0ece453342a4c8336b8bab",
+      "prd_revision": "e6b82da3ecc85f5836bba429e231d5ae7cf1d1bf9d62d3352174e7b7fe12466c",
+      "breakdown": "9997d15f58455c14428272d845d0f0fc69a435d7a6149ef0d41da7ec975382b2",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "8165701b9838f1609d4b260ca8df600342996fa2e4f5847ad5ce4cdbd590b87b",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "decisions": [
+        "D-01"
+      ],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-05.json",
+      "recorded": "2026-10-07T14:24:03Z"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "A-01",
+      "agreement": "G-01",
+      "digest": "86a9cce109ff3fec019a883a57ff48f903774821b2a51bcd3c42e9c3d088f698",
+      "disposition": "user",
+      "reference": "User message invoking pincer-narrow after PRD v4 and the concrete native-module/one-time-intro approval proposal; delegates a faithful ticket breakdown",
+      "excerpt": "$pincer-narrow",
+      "constraints": "PRD v4 scope only; preserve existing visuals and credential storage; no git commits per AGENTS.md",
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-07T13:37:14Z"
+    },
+    {
+      "id": "A-02",
+      "agreement": "G-02",
+      "digest": "195717a28b37ea29c04732447b7f07212dc0330ea93f2f916604ef5a4928fa63",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-01",
+      "explanation": "Correct all focused checks to run from frontend as existing component tests require; test scope and all 13 scenarios remain unchanged.",
+      "decisions": [],
+      "recorded": "2026-10-07T13:39:31Z"
+    },
+    {
+      "id": "A-03",
+      "agreement": "G-03",
+      "digest": "a7a5d20c060fd2b010ea554118df5d5090c08402e74d23d81625ca257ba0f39d",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-02",
+      "explanation": "Restore repository working directory before npm workspace checks; no behavioral scope changes.",
+      "decisions": [],
+      "recorded": "2026-10-07T13:42:45Z"
+    },
+    {
+      "id": "A-04",
+      "agreement": "G-04",
+      "digest": "775c1f89a80d9c3d1b3da24836570520d3ea3f1cedc97c54c653086ee9eb4f0c",
+      "disposition": "user",
+      "reference": "User instruction explicitly deferring T-17 native validation and resuming workflow",
+      "excerpt": "Skip T-17 for now. Mark it as deferred. The native builds will be tested in a future sprint. Resume the PRD workflow.",
+      "constraints": null,
+      "basis": null,
+      "explanation": null,
+      "decisions": [
+        "D-01"
+      ],
+      "recorded": "2026-10-07T14:11:51Z"
+    },
+    {
+      "id": "A-05",
+      "agreement": "G-05",
+      "digest": "34577ec9a2e3ae0091ab8e51cdac0f5c14017f00bf0ece453342a4c8336b8bab",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-04",
+      "explanation": "User explicitly authorized local commits and the AGENTS.md evaluation exception. Update operational constraints only; all scenarios, coverage and user-approved native deferral are unchanged.",
+      "decisions": [
+        "D-01"
+      ],
+      "recorded": "2026-10-07T14:24:03Z"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-01",
+      "status": "resolved",
+      "summary": "Defer T-17 native build/lifecycle/security and visual review obligations C-05/C-06 to a future sprint, including scenarios S-06, S-07 and S-11. Keep completed automated integration coverage in this change; close that portion without claiming native validation.",
+      "reference": "User instruction after native-validation handoff",
+      "excerpt": "Skip T-17 for now. Mark it as deferred. The native builds will be tested in a future sprint. Resume the PRD workflow.",
+      "raised": "2026-10-07T14:10:26Z",
+      "resolved": "2026-10-07T14:10:26Z"
+    }
+  ],
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "register",
+      "from": null,
+      "to": "planned",
+      "at": "2026-10-07T13:36:25Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 2,
+      "kind": "adopt",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-07T13:36:56Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 3,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-07T13:37:14Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 4,
+      "kind": "activate",
+      "from": "planned",
+      "to": "active",
+      "at": "2026-10-07T13:37:58Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 5,
+      "kind": "authorize",
+      "from": "active",
+      "to": "active",
+      "at": "2026-10-07T13:39:31Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 6,
+      "kind": "authorize",
+      "from": "active",
+      "to": "active",
+      "at": "2026-10-07T13:42:45Z",
+      "reason": null,
+      "agreement": "G-03",
+      "authorization": "A-03",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 7,
+      "kind": "pause",
+      "from": "active",
+      "to": "paused",
+      "at": "2026-10-07T13:59:40Z",
+      "reason": "Implementation and automated checks complete; native build/device backup-transfer and visual obligations C-05/C-06 remain unverified because required toolchains/devices are unavailable.",
+      "agreement": null,
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": "T-14/T-15/T-16 done with fresh passing attempts; T-17 in_progress with automated criterion checked, native/visual criteria unchecked. Read .prd/frontend-install-verification-v4.md and frontend/tests/INSTALL_ONBOARDING_MANUAL_CHECKS.md. Rebuild native binaries, collect actual iOS/Android evidence, then resume under current authorization. No scenarios deferred; no commits requested or made."
+    },
+    {
+      "sequence": 8,
+      "kind": "decide",
+      "from": "paused",
+      "to": "paused",
+      "at": "2026-10-07T14:10:26Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 9,
+      "kind": "resolve",
+      "from": "paused",
+      "to": "paused",
+      "at": "2026-10-07T14:10:26Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 10,
+      "kind": "authorize",
+      "from": "paused",
+      "to": "paused",
+      "at": "2026-10-07T14:11:51Z",
+      "reason": null,
+      "agreement": "G-04",
+      "authorization": "A-04",
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 11,
+      "kind": "resume",
+      "from": "paused",
+      "to": "active",
+      "at": "2026-10-07T14:11:52Z",
+      "reason": null,
+      "agreement": "G-04",
+      "authorization": "A-04",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 12,
+      "kind": "complete",
+      "from": "active",
+      "to": "completed",
+      "at": "2026-10-07T14:13:54Z",
+      "reason": null,
+      "agreement": "G-04",
+      "authorization": "A-04",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 13,
+      "kind": "authorize",
+      "from": "completed",
+      "to": "completed",
+      "at": "2026-10-07T14:24:03Z",
+      "reason": null,
+      "agreement": "G-05",
+      "authorization": "A-05",
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    }
+  ],
+  "evaluations": [],
+  "legacy": {
+    "receipts": {},
+    "authorization_text": null,
+    "migrated_from": null,
+    "migrated": null
+  },
+  "coverage": {
+    "map": ".prd/coverage/prd-v4.json",
+    "adopted": "2026-10-07T13:36:56Z",
+    "agreement": "G-01"
+  }
+}

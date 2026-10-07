@@ -104,3 +104,12 @@ AGENTS.md
 #android and ios build artifacts
 android/
 ios/
+# Track the local onboarding module sources, retaining generated build exclusions.
+!frontend/modules/install-onboarding/android/
+!frontend/modules/install-onboarding/android/build.gradle
+!frontend/modules/install-onboarding/android/src/
+!frontend/modules/install-onboarding/android/src/**
+frontend/modules/install-onboarding/android/build/
+!frontend/modules/install-onboarding/ios/
+!frontend/modules/install-onboarding/ios/*.swift
+!frontend/modules/install-onboarding/ios/*.podspec

@@ -39,5 +39,5 @@ LeafCheck AI is a smart indoor plant health monitoring platform. It combines IoT
 ## 6. Workflow Rules
 
 - **Before Coding**: Always read the relevant files (e.g., `schema.postgres.prisma`, `schema.prisma`, `ARCHITECTURE.md`) first. If the task is complex, enter Plan Mode (Shift+Tab) and outline your approach before writing code.
-- **Commits**: Do not commit to git unless explicitly asked. If asked, use conventional commits (e.g., `feat:`, `fix:`).
+- **Commits**: Do not commit to git unless explicitly asked, except that agents may create local commits specifically to establish a clean candidate, fix review findings, and persist evidence for the Pincer evaluation workflow. This exception does not authorize pushing, publishing, or merging. Use conventional commits (e.g., `feat:`, `fix:`).
 - **Done Criteria**: A task is only complete when: 1) The code compiles without TypeScript errors. 2) The specific feature works as described. 3) Existing tests still pass.

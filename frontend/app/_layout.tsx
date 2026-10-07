@@ -2,6 +2,8 @@ import { Action, Notice, Screen } from "@/components/screen";
 import { AppDataProvider } from "@/context/app-data";
 import { AuthProvider, useAuth } from "@/context/auth";
 import { LocalStateProvider, useLocalState } from "@/context/local-state";
+import { InstallOnboardingProvider, useInstallOnboarding } from "@/context/install-onboarding";
+import Splash from "./splash";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { Stack, useRootNavigationState, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -69,12 +71,13 @@ function Routes() {
   const setupRequired = authenticated && setupPending;
   return (
     <Stack
-      initialRouteName={auth.isGuest ? "(tabs)" : undefined}
+      initialRouteName={auth.isGuest ? "(tabs)" : authenticated ? setupRequired ? "setup" : "(tabs)" : "login"}
       screenOptions={{
         headerShown: false,
         animation: reducedMotion ? "none" : "slide_from_right",
       }}
     >
+      <Stack.Screen name="index" />
       <Stack.Protected guard={setupRequired || (auth.isGuest && setupPending)}>
         <Stack.Screen name="setup" />
       </Stack.Protected>
@@ -85,11 +88,13 @@ function Routes() {
       </Stack.Protected>
       <Stack.Protected guard={!authenticated}>
         <Stack.Screen name="login" />
-        <Stack.Screen name="onboarding" />
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
         <Stack.Screen name="otp-verification" />
+      </Stack.Protected>
+      <Stack.Protected guard={false}>
         <Stack.Screen name="splash" />
+        <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Screen name="terms" />
       <Stack.Protected guard={authenticated && !setupRequired}>
@@ -122,10 +127,52 @@ function AccountTree() {
     </LocalStateProvider>
   );
 }
+/** The intro tree is outside account-keyed providers, so restore cannot reset slides. */
+function StartupTree() {
+  const intro = useInstallOnboarding();
+  const reducedMotion = useReducedMotion();
+  if (intro.phase === "loading") return <Splash />;
+  if (intro.phase === "error") return (
+    <Screen title="Introductory setup unavailable">
+      <Notice>{intro.error}</Notice>
+      <Action label="Retry local storage" onPress={() => void intro.retry()} />
+    </Screen>
+  );
+  if (intro.phase !== "completed") return (
+    <Stack initialRouteName="index" screenOptions={{ headerShown: false, animation: reducedMotion ? "none" : "slide_from_right" }}>
+      <Stack.Screen name="index" />
+      <Stack.Protected guard={intro.phase === "splash"}>
+        <Stack.Screen name="splash" />
+      </Stack.Protected>
+      <Stack.Protected guard={intro.phase === "intro"}>
+        <Stack.Screen name="onboarding" />
+      </Stack.Protected>
+      {/* Declare every other root route explicitly: Expo Router auto-adds omitted screens. */}
+      <Stack.Protected guard={false}>
+        <Stack.Screen name="setup" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="device-connection" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="otp-verification" />
+        <Stack.Screen name="terms" />
+        <Stack.Screen name="plant-profile" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="archives" />
+        <Stack.Screen name="modal" />
+      </Stack.Protected>
+    </Stack>
+  );
+  return <AccountTree />;
+}
 export default function Layout() {
   return (
-    <AuthProvider>
-      <AccountTree />
-    </AuthProvider>
+    <InstallOnboardingProvider>
+      <AuthProvider>
+        <StartupTree />
+      </AuthProvider>
+    </InstallOnboardingProvider>
   );
 }
