@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { after, before, mock, test } from "node:test";
 
 let server;
+let application;
 let baseUrl;
 let scanCalls = 0;
 let ttlCalls = 0;
@@ -51,15 +52,16 @@ before(async () => {
   );
   const { default: app } = await import("../src/server.ts");
   listenMock.mock.restore();
-  assert.equal(app.get("trust proxy"), false);
+  application = app;
   if (!server.listening)
     await new Promise((resolve) => server.once("listening", resolve));
+  assert.equal(app.get("trust proxy"), 1);
   assert.equal(server.address().address, "0.0.0.0");
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
 
 after(async () => {
-  if (server)
+  if (server?.listening)
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
@@ -70,6 +72,17 @@ after(async () => {
     else process.env[name] = value;
   }
   mock.restoreAll();
+});
+
+test("one proxy hop accepts the nearest forwarded address, not earlier client entries", () => {
+  const request = Object.create(application.request);
+  request.app = application;
+  request.socket = { remoteAddress: "127.0.0.1" };
+  request.headers = { "x-forwarded-for": "198.51.100.20, 203.0.113.10" };
+  assert.equal(request.ip, "203.0.113.10");
+  assert.deepEqual(request.ips, ["203.0.113.10"]);
+  request.headers = {};
+  assert.equal(request.ip, "127.0.0.1");
 });
 
 test("headers, preflight, independent quotas, and rejection before body parsing", async () => {

@@ -18,7 +18,7 @@ const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-// Direct connections only; never trust client-supplied forwarding headers.
+// Trust one proxy hop; earlier forwarding-chain entries are not trusted.
 app.set("trust proxy", 1);
 app.use(helmet());
 app.use(

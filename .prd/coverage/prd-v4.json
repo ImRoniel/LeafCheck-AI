@@ -150,6 +150,10 @@
     "T-17": {
       "role": "implements",
       "rationale": null
+    },
+    "T-18": {
+      "role": "enables",
+      "rationale": "Repairs the repository release-gate regression for the pre-existing proxy policy; adds no onboarding scenario."
     }
   },
   "checks": {
@@ -260,6 +264,15 @@
       "cwd": null,
       "obligation": "Inspect the running browser build at 430x932, capture splash/slides/post-intro screens for anonymous and mocked restored sessions, confirm persistence on reload and record actual observed rendering. This browser evidence does not satisfy deferred native visual/build/device obligations C-05/C-06.",
       "note": "Evaluation obligation within the requested final-quality workflow."
+    },
+    "C-13": {
+      "kind": "command",
+      "required": true,
+      "command": "set -euo pipefail\nnpm test --workspaces\nnpx tsc --noEmit -p backend/tsconfig.json\nnpm run typecheck --workspace=frontend",
+      "timeout": 600,
+      "cwd": null,
+      "obligation": null,
+      "note": "Repository-wide regression gate added after release failure; retains existing proxy policy."
     }
   }
 }

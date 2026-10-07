@@ -5,11 +5,11 @@
   "prd": ".prd/prd-v4.md",
   "base": "50fa92d1730fb9ebda86890f871299fb0f25992b",
   "registered": "2026-10-07T13:36:25Z",
-  "sequence": 14,
+  "sequence": 16,
   "lifecycle": {
-    "state": "completed",
-    "since": "2026-10-07T14:13:54Z",
-    "reason": null,
+    "state": "active",
+    "since": "2026-10-07T14:47:49Z",
+    "reason": "Release gate found stale security test expectation; T-18 will preserve one-hop proxy policy and repair regression coverage.",
     "note": null,
     "superseded_by": null
   },
@@ -121,6 +121,26 @@
       ],
       "snapshot": ".prd/changes/prd-v4/agreements/G-06.json",
       "recorded": "2026-10-07T14:34:08Z"
+    },
+    {
+      "id": "G-07",
+      "digest": "8f19563d60982a54e90a7c3ba4a19dc06424bface061db745d658ec5b3f2a55c",
+      "prd_revision": "e6b82da3ecc85f5836bba429e231d5ae7cf1d1bf9d62d3352174e7b7fe12466c",
+      "breakdown": "6964d0fee6fc8bcabfe69865abc19747035975804fc6e10f2af24132647bfa7e",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "0999230b3d05a1eada5b0eb016bc2be899dbb471b267b00d9f3f7816161b6a67",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17",
+        "T-18"
+      ],
+      "decisions": [
+        "D-01"
+      ],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-07.json",
+      "recorded": "2026-10-07T14:48:23Z"
     }
   ],
   "authorizations": [
@@ -207,6 +227,21 @@
         "D-01"
       ],
       "recorded": "2026-10-07T14:34:08Z"
+    },
+    {
+      "id": "A-07",
+      "agreement": "G-07",
+      "digest": "8f19563d60982a54e90a7c3ba4a19dc06424bface061db745d658ec5b3f2a55c",
+      "disposition": "user",
+      "reference": "User pincer-code after release failure, 2026-10-07",
+      "excerpt": "$pincer-code",
+      "constraints": "Repair the reported release-gate failure while preserving existing proxy policy and native deferrals.",
+      "basis": null,
+      "explanation": null,
+      "decisions": [
+        "D-01"
+      ],
+      "recorded": "2026-10-07T14:48:23Z"
     }
   ],
   "decisions": [
@@ -399,6 +434,32 @@
       "reason": null,
       "agreement": "G-06",
       "authorization": "A-06",
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 15,
+      "kind": "reopen",
+      "from": "completed",
+      "to": "active",
+      "at": "2026-10-07T14:47:49Z",
+      "reason": "Release gate found stale security test expectation; T-18 will preserve one-hop proxy policy and repair regression coverage.",
+      "agreement": "G-06",
+      "authorization": "A-06",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 16,
+      "kind": "authorize",
+      "from": "active",
+      "to": "active",
+      "at": "2026-10-07T14:48:23Z",
+      "reason": null,
+      "agreement": "G-07",
+      "authorization": "A-07",
       "decision": "D-01",
       "replacement": null,
       "note": null
