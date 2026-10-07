@@ -19,7 +19,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 // Direct connections only; never trust client-supplied forwarding headers.
-app.set("trust proxy", false);
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(
   cors({
