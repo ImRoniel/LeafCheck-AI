@@ -1,0 +1,139 @@
+$ set -euo pipefail
+cd frontend
+node --import tsx --test --test-concurrency=1 tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/garden-navigation.test.ts
+
+--- stdout ---
+TAP version 13
+# "shadow*" style props are deprecated. Use "boxShadow".
+# Subtest: garden search matches name, species and location without mutating either view
+ok 1 - garden search matches name, species and location without mutating either view
+  ---
+  duration_ms: 1.805667
+  type: 'test'
+  ...
+# Subtest: tab layout exposes only three primary tabs and retains hidden compatibility routes
+ok 2 - tab layout exposes only three primary tabs and retains hidden compatibility routes
+  ---
+  duration_ms: 68.704489
+  type: 'test'
+  ...
+# Subtest: custom tab bar stays visible on content routes and hides on scan routes
+ok 3 - custom tab bar stays visible on content routes and hides on scan routes
+  ---
+  duration_ms: 10.907146
+  type: 'test'
+  ...
+# Subtest: bottom navigation emits tab events, respects prevention and keeps Scan an action
+ok 4 - bottom navigation emits tab events, respects prevention and keeps Scan an action
+  ---
+  duration_ms: 36.357772
+  type: 'test'
+  ...
+# Subtest: My Spaces stays selected on Spaces and Space Details and opens the Spaces route
+ok 5 - My Spaces stays selected on Spaces and Space Details and opens the Spaces route
+  ---
+  duration_ms: 30.946821
+  type: 'test'
+  ...
+# Subtest: local and signed-in tab entry defaults to Dashboard
+ok 6 - local and signed-in tab entry defaults to Dashboard
+  ---
+  duration_ms: 17.84522
+  type: 'test'
+  ...
+# Subtest: tabs switch immediately with opaque scenes and preload only the three main screens
+ok 7 - tabs switch immediately with opaque scenes and preload only the three main screens
+  ---
+  duration_ms: 17.792267
+  type: 'test'
+  ...
+# Subtest: root stack preserves guards while native pushes reverse on Back and reduced motion disables them
+ok 8 - root stack preserves guards while native pushes reverse on Back and reduced motion disables them
+  ---
+  duration_ms: 56.74883
+  type: 'test'
+  ...
+# Subtest: collection entry points lead to My Spaces and Garden has no visible tab title
+ok 9 - collection entry points lead to My Spaces and Garden has no visible tab title
+  ---
+  duration_ms: 1.014255
+  type: 'test'
+  ...
+# Subtest: legacy camera redirect preserves target params; notifications lead to actionable tasks
+ok 10 - legacy camera redirect preserves target params; notifications lead to actionable tasks
+  ---
+  duration_ms: 6.223422
+  type: 'test'
+  ...
+# Subtest: dashboard puts plant overview directly after hardware and AI summary last
+ok 11 - dashboard puts plant overview directly after hardware and AI summary last
+  ---
+  duration_ms: 0.365402
+  type: 'test'
+  ...
+# Subtest: logout during refresh discards late rotation and clears secure credential
+ok 12 - logout during refresh discards late rotation and clears secure credential
+  ---
+  duration_ms: 25.648831
+  type: 'test'
+  ...
+# Subtest: secure storage read failure is explicit, retryable, and never reaches network
+ok 13 - secure storage read failure is explicit, retryable, and never reaches network
+  ---
+  duration_ms: 0.880655
+  type: 'test'
+  ...
+# Subtest: login 401 is not refreshed, password whitespace survives, account switch broadcasts
+ok 14 - login 401 is not refreshed, password whitespace survives, account switch broadcasts
+  ---
+  duration_ms: 1.375529
+  type: 'test'
+  ...
+# Subtest: browser coordinators use the same exclusive lock across tabs
+ok 15 - browser coordinators use the same exclusive lock across tabs
+  ---
+  duration_ms: 8.112735
+  type: 'test'
+  ...
+# Subtest: completed installations exclude introductory routes for authenticated sessions
+ok 16 - completed installations exclude introductory routes for authenticated sessions
+  ---
+  duration_ms: 100.607604
+  type: 'test'
+  ...
+# Subtest: anonymous, pending setup, completed and skipped setup retain route guards
+ok 17 - anonymous, pending setup, completed and skipped setup retain route guards
+  ---
+  duration_ms: 118.103792
+  type: 'test'
+  ...
+# Subtest: restore and local failures expose recovery before account routes
+ok 18 - restore and local failures expose recovery before account routes
+  ---
+  duration_ms: 72.855003
+  type: 'test'
+  ...
+# Subtest: guest navigation waits for readiness and reduced motion disables transitions
+ok 19 - guest navigation waits for readiness and reduced motion disables transitions
+  ---
+  duration_ms: 45.945919
+  type: 'test'
+  ...
+# Subtest: saved setup step redirects mismatched deep links
+ok 20 - saved setup step redirects mismatched deep links
+  ---
+  duration_ms: 5.838843
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2215.81748
+--- stderr ---
+
+--- outcome passed (exit 0) ---

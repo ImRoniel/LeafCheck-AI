@@ -1,0 +1,20 @@
+$ python3 -c 'import subprocess,re
+base='"'"'50fa92d1730fb9ebda86890f871299fb0f25992b'"'"'
+commits=subprocess.check_output(['"'"'git'"'"','"'"'rev-list'"'"',base+'"'"'..HEAD'"'"'],text=True).splitlines()
+patterns=[r'"'"'AKIA[0-9A-Z]{16}'"'"',r'"'"'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'"'"',r'"'"'AIza[0-9A-Za-z_-]{35}'"'"',r'"'"'gh[pousr]_[0-9A-Za-z]{30,}'"'"']
+findings=[]
+for commit in commits:
+ for p in subprocess.check_output(['"'"'git'"'"','"'"'diff-tree'"'"','"'"'--no-commit-id'"'"','"'"'--name-only'"'"','"'"'-r'"'"',commit],text=True).splitlines():
+  blob=subprocess.run(['"'"'git'"'"','"'"'show'"'"',commit+'"'"':'"'"'+p],capture_output=True,text=True,encoding="latin-1")
+  if blob.returncode: continue
+  for n,line in enumerate(blob.stdout.splitlines(),1):
+   if any(re.search(pattern,line) for pattern in patterns): findings.append((p,n))
+for p,n in findings: print(p+'"'"':'"'"'+str(n)+'"'"' suspected credential; value redacted'"'"')
+assert not findings, '"'"'Potential secret requires private review and rotation'"'"'
+print('"'"'Bounded redacting history pattern scan found no credentials; dedicated scanner unavailable'"'"')'
+
+--- stdout ---
+Bounded redacting history pattern scan found no credentials; dedicated scanner unavailable
+--- stderr ---
+
+--- outcome passed (exit 0) ---

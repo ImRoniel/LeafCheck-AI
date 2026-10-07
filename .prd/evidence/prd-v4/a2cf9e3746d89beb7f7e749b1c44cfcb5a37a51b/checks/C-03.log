@@ -1,0 +1,238 @@
+$ set -euo pipefail
+cd frontend
+node --import tsx --test --test-concurrency=1 tests/install-onboarding-routing.test.ts tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/local-state.test.ts tests/garden-navigation.test.ts
+cd ..
+npm run typecheck --workspace=frontend
+
+--- stdout ---
+TAP version 13
+# "shadow*" style props are deprecated. Use "boxShadow".
+# Subtest: garden search matches name, species and location without mutating either view
+ok 1 - garden search matches name, species and location without mutating either view
+  ---
+  duration_ms: 1.800187
+  type: 'test'
+  ...
+# Subtest: tab layout exposes only three primary tabs and retains hidden compatibility routes
+ok 2 - tab layout exposes only three primary tabs and retains hidden compatibility routes
+  ---
+  duration_ms: 81.081997
+  type: 'test'
+  ...
+# Subtest: custom tab bar stays visible on content routes and hides on scan routes
+ok 3 - custom tab bar stays visible on content routes and hides on scan routes
+  ---
+  duration_ms: 11.525779
+  type: 'test'
+  ...
+# Subtest: bottom navigation emits tab events, respects prevention and keeps Scan an action
+ok 4 - bottom navigation emits tab events, respects prevention and keeps Scan an action
+  ---
+  duration_ms: 37.279435
+  type: 'test'
+  ...
+# Subtest: My Spaces stays selected on Spaces and Space Details and opens the Spaces route
+ok 5 - My Spaces stays selected on Spaces and Space Details and opens the Spaces route
+  ---
+  duration_ms: 35.992979
+  type: 'test'
+  ...
+# Subtest: local and signed-in tab entry defaults to Dashboard
+ok 6 - local and signed-in tab entry defaults to Dashboard
+  ---
+  duration_ms: 21.367711
+  type: 'test'
+  ...
+# Subtest: tabs switch immediately with opaque scenes and preload only the three main screens
+ok 7 - tabs switch immediately with opaque scenes and preload only the three main screens
+  ---
+  duration_ms: 19.375872
+  type: 'test'
+  ...
+# Subtest: root stack preserves guards while native pushes reverse on Back and reduced motion disables them
+ok 8 - root stack preserves guards while native pushes reverse on Back and reduced motion disables them
+  ---
+  duration_ms: 62.962942
+  type: 'test'
+  ...
+# Subtest: collection entry points lead to My Spaces and Garden has no visible tab title
+ok 9 - collection entry points lead to My Spaces and Garden has no visible tab title
+  ---
+  duration_ms: 1.302938
+  type: 'test'
+  ...
+# Subtest: legacy camera redirect preserves target params; notifications lead to actionable tasks
+ok 10 - legacy camera redirect preserves target params; notifications lead to actionable tasks
+  ---
+  duration_ms: 6.113819
+  type: 'test'
+  ...
+# Subtest: dashboard puts plant overview directly after hardware and AI summary last
+ok 11 - dashboard puts plant overview directly after hardware and AI summary last
+  ---
+  duration_ms: 0.283432
+  type: 'test'
+  ...
+# Subtest: fresh install only admits splash then intro for every authentication outcome and deep-link target
+ok 12 - fresh install only admits splash then intro for every authentication outcome and deep-link target
+  ---
+  duration_ms: 497.997327
+  type: 'test'
+  ...
+# Subtest: bootstrap loading and storage errors cannot mount account navigation
+ok 13 - bootstrap loading and storage errors cannot mount account navigation
+  ---
+  duration_ms: 40.45377
+  type: 'test'
+  ...
+# Subtest: restore completion cannot change intro guards before a durable final action
+ok 14 - restore completion cannot change intro guards before a durable final action
+  ---
+  duration_ms: 42.52331
+  type: 'test'
+  ...
+# Subtest: splash timer advances install state rather than navigating around auth guards
+ok 15 - splash timer advances install state rather than navigating around auth guards
+  ---
+  duration_ms: 9.628135
+  type: 'test'
+  ...
+# Subtest: onboarding final action saves without navigating to login or marking garden setup
+ok 16 - onboarding final action saves without navigating to login or marking garden setup
+  ---
+  duration_ms: 10.191181
+  type: 'test'
+  ...
+# Subtest: all root routes are explicitly guarded, including forbidden deep-link destinations
+ok 17 - all root routes are explicitly guarded, including forbidden deep-link destinations
+  ---
+  duration_ms: 45.679685
+  type: 'test'
+  ...
+# Subtest: splash waits two seconds after marker bootstrap and clears its timer
+ok 18 - splash waits two seconds after marker bootstrap and clears its timer
+  ---
+  duration_ms: 7.1182
+  type: 'test'
+  ...
+# Subtest: new state hydrates without writing defaults
+ok 19 - new state hydrates without writing defaults
+  ---
+  duration_ms: 2.552412
+  type: 'test'
+  ...
+# Subtest: account keys cannot overlap guest or other accounts
+ok 20 - account keys cannot overlap guest or other accounts
+  ---
+  duration_ms: 0.260127
+  type: 'test'
+  ...
+# Subtest: local profile survives reload without crossing account boundaries or requiring migration
+ok 21 - local profile survives reload without crossing account boundaries or requiring migration
+  ---
+  duration_ms: 1.387743
+  type: 'test'
+  ...
+# Subtest: serialized updates and remounted stores preserve independent changes
+ok 22 - serialized updates and remounted stores preserve independent changes
+  ---
+  duration_ms: 0.587494
+  type: 'test'
+  ...
+# Subtest: corrupt and future-version data are not overwritten
+ok 23 - corrupt and future-version data are not overwritten
+  ---
+  duration_ms: 0.587545
+  type: 'test'
+  ...
+# Subtest: failed write keeps committed state and queue remains usable
+ok 24 - failed write keeps committed state and queue remains usable
+  ---
+  duration_ms: 0.527888
+  type: 'test'
+  ...
+# Subtest: complete setup and care schedule survive a new store
+ok 25 - complete setup and care schedule survive a new store
+  ---
+  duration_ms: 1.368907
+  type: 'test'
+  ...
+# Subtest: invalid choices, duplicate spaces, and impossible steps fail validation
+ok 26 - invalid choices, duplicate spaces, and impossible steps fail validation
+  ---
+  duration_ms: 0.323751
+  type: 'test'
+  ...
+# Subtest: care defaults vary by plant and light and reject unsafe input ranges
+ok 27 - care defaults vary by plant and light and reject unsafe input ranges
+  ---
+  duration_ms: 0.774108
+  type: 'test'
+  ...
+# Subtest: logout during refresh discards late rotation and clears secure credential
+ok 28 - logout during refresh discards late rotation and clears secure credential
+  ---
+  duration_ms: 27.317531
+  type: 'test'
+  ...
+# Subtest: secure storage read failure is explicit, retryable, and never reaches network
+ok 29 - secure storage read failure is explicit, retryable, and never reaches network
+  ---
+  duration_ms: 0.72853
+  type: 'test'
+  ...
+# Subtest: login 401 is not refreshed, password whitespace survives, account switch broadcasts
+ok 30 - login 401 is not refreshed, password whitespace survives, account switch broadcasts
+  ---
+  duration_ms: 1.65323
+  type: 'test'
+  ...
+# Subtest: browser coordinators use the same exclusive lock across tabs
+ok 31 - browser coordinators use the same exclusive lock across tabs
+  ---
+  duration_ms: 8.839838
+  type: 'test'
+  ...
+# Subtest: completed installations exclude introductory routes for authenticated sessions
+ok 32 - completed installations exclude introductory routes for authenticated sessions
+  ---
+  duration_ms: 107.824499
+  type: 'test'
+  ...
+# Subtest: anonymous, pending setup, completed and skipped setup retain route guards
+ok 33 - anonymous, pending setup, completed and skipped setup retain route guards
+  ---
+  duration_ms: 132.085247
+  type: 'test'
+  ...
+# Subtest: restore and local failures expose recovery before account routes
+ok 34 - restore and local failures expose recovery before account routes
+  ---
+  duration_ms: 80.998466
+  type: 'test'
+  ...
+# Subtest: guest navigation waits for readiness and reduced motion disables transitions
+ok 35 - guest navigation waits for readiness and reduced motion disables transitions
+  ---
+  duration_ms: 53.715115
+  type: 'test'
+  ...
+# Subtest: saved setup step redirects mismatched deep links
+ok 36 - saved setup step redirects mismatched deep links
+  ---
+  duration_ms: 6.332724
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4052.662799
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

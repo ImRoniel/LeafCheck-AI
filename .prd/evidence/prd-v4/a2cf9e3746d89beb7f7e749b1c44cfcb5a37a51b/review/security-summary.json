@@ -1,0 +1,26 @@
+{
+  "dependencyLockUnchangedFromBase": true,
+  "history": "Final candidate C-08 passed over base-to-HEAD history including binary artifacts; byte-preserving bounded pattern scan, no dedicated scanner available.",
+  "privateEnvFiles": "untracked and ignored; benign filenames containing env are not secret configuration files",
+  "http": [
+    {
+      "input": "empty JSON",
+      "status": 403,
+      "clean4xx": true
+    },
+    {
+      "input": "oversized JSON",
+      "status": 413,
+      "clean4xx": true
+    }
+  ],
+  "dependencies": {
+    "info": 0,
+    "low": 0,
+    "moderate": 11,
+    "high": 23,
+    "critical": 1,
+    "total": 35
+  },
+  "native": "D-01 deferred, not passed"
+}

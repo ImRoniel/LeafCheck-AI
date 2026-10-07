@@ -1,0 +1,830 @@
+{
+  "schema": 3,
+  "prd": ".prd/prd-v4.md",
+  "base": "50fa92d1730fb9ebda86890f871299fb0f25992b",
+  "candidate": "a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b",
+  "created": "2026-10-07T15:07:05Z",
+  "environment": {
+    "os": "linux 6.18.40.1-microsoft-standard-WSL2",
+    "node": "v22.23.3",
+    "tools": [
+      "Node native test runner",
+      "TypeScript",
+      "Expo web export",
+      "Playwright 1.51.1 / Chromium 134",
+      "npm audit",
+      "Bounded redacting history scanner"
+    ],
+    "limitations": [
+      "Native builds, backup transfer, native accessibility and Android Back deferred under user-authorized D-01.",
+      "Browser auth responses use controlled fixtures.",
+      "No dedicated secret scanner available."
+    ]
+  },
+  "coverage_review": "All ten agreed scenarios have meaningful behavioral checks; browser inspection corroborates anonymous and restored-session gate ordering and reload persistence. S-06, S-07 and S-11 remain deferred under D-01. Dependency audit failure is retained separately; dependency upgrades are outside PRD v4. T-18 protects the existing proxy policy; C-13 establishes the full workspace gate. T-19 makes C-08 byte-preserving across prior binary evidence. Fresh checks are required for this final candidate.",
+  "requirements": [
+    {
+      "id": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04",
+        "C-12"
+      ],
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "R-02",
+      "disposition": "deferred",
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-12"
+      ],
+      "scenarios": [
+        "S-05",
+        "S-06",
+        "S-07",
+        "S-08",
+        "S-09"
+      ],
+      "decision": "D-01",
+      "authorization": "A-07",
+      "note": null
+    },
+    {
+      "id": "R-03",
+      "disposition": "deferred",
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-12"
+      ],
+      "scenarios": [
+        "S-10",
+        "S-11",
+        "S-12",
+        "S-13"
+      ],
+      "decision": "D-01",
+      "authorization": "A-07",
+      "note": null
+    }
+  ],
+  "checks": [
+    {
+      "id": "C-01",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/garden-navigation.test.ts",
+      "timestamp": "2026-10-07T15:03:42Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-01.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000182-20261007T150339Z-240720",
+        "sequence": 182,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:03:40Z",
+        "finished": "2026-10-07T15:03:42Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "69f4ab1f258f0b050d79a79e173b7490dd9fe3d5e41e483eb25c5304b2334453",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "45837c2ac860ea14b8e2e20909bb77194c5c4385edb43efb757dfe9a14593531",
+        "truncated": false
+      },
+      "declared": "69f4ab1f258f0b050d79a79e173b7490dd9fe3d5e41e483eb25c5304b2334453"
+    },
+    {
+      "id": "C-02",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-storage.test.ts tests/install-onboarding-native-contract.test.ts tests/session.test.ts\ncd ..\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-07T15:03:52Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-02.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000183-20261007T150343Z-07a847",
+        "sequence": 183,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:03:43Z",
+        "finished": "2026-10-07T15:03:52Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "74912ec8d5df34da2f490bf11a7a641d688c06852f5d2be4b783c73a052e29d2",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "b8b3306ce3ebc761fb9a6d434762ae8ca1283d1b301079be4974b4145fb7a371",
+        "truncated": false
+      },
+      "declared": "74912ec8d5df34da2f490bf11a7a641d688c06852f5d2be4b783c73a052e29d2"
+    },
+    {
+      "id": "C-03",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-routing.test.ts tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/local-state.test.ts tests/garden-navigation.test.ts\ncd ..\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-07T15:04:06Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-03.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000184-20261007T150353Z-100861",
+        "sequence": 184,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:03:53Z",
+        "finished": "2026-10-07T15:04:06Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "223443a0d22ba6c814f766d89341f65b63d6eb6235102076afa7f646d4303a31",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "b9b0bf6a5839268a3a3a546a212a44ba70664ebdaf6ae41247e2a31b2837d29e",
+        "truncated": false
+      },
+      "declared": "223443a0d22ba6c814f766d89341f65b63d6eb6235102076afa7f646d4303a31"
+    },
+    {
+      "id": "C-04",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-integration.test.ts\ncd ..\nnpm test --workspace=frontend\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-07T15:04:31Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-04.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000185-20261007T150407Z-735d24",
+        "sequence": 185,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:04:07Z",
+        "finished": "2026-10-07T15:04:31Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "11f24413654a977b55685d6f4b099c1e7f27244d92f23c06d6c8f4ec3d93460c",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "6504c79d7fdf0e792203601d21bd57cbf299bd042b0769ed29293518b62ebebb",
+        "truncated": false
+      },
+      "declared": "11f24413654a977b55685d6f4b099c1e7f27244d92f23c06d6c8f4ec3d93460c"
+    },
+    {
+      "id": "C-05",
+      "kind": "review",
+      "required": false,
+      "result": "unverified",
+      "timestamp": "2026-10-07T15:04:41Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/native-deferred.md"
+      ],
+      "provenance": "authored",
+      "declared": "6854a15f38e4b96b1f70a84c80af600991024151995e9eb073eaad9ff6fbb5e8"
+    },
+    {
+      "id": "C-06",
+      "kind": "visual",
+      "required": false,
+      "result": "unverified",
+      "timestamp": "2026-10-07T15:04:41Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/native-deferred.md"
+      ],
+      "scenario": "Native lifecycle and accessibility deferred under D-01",
+      "viewport": "Native devices unavailable",
+      "observed": "Unverified; user deferred native validation to a future sprint.",
+      "provenance": "authored",
+      "declared": "c8232fdec1e0ab8486e4cc976c95de9951207d94f91ae07a529c02fe37ea8743"
+    },
+    {
+      "id": "C-07",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "python3 -c 'from pathlib import Path\nimport subprocess\ntracked=subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'ls-files'\"'\"'],text=True).splitlines()\nbad=[p for p in tracked if Path(p).name=='\"'\"'.env'\"'\"' or (Path(p).name.startswith('\"'\"'.env.'\"'\"') and Path(p).name!='\"'\"'.env.example'\"'\"')]\nassert not bad, '\"'\"'tracked private environment file'\"'\"'\nfor p in ['\"'\"'.env'\"'\"','\"'\"'frontend/.env'\"'\"','\"'\"'backend/.env'\"'\"','\"'\"'frontend/.env.production'\"'\"']:\n assert subprocess.run(['\"'\"'git'\"'\"','\"'\"'check-ignore'\"'\"','\"'\"'--no-index'\"'\"','\"'\"'-q'\"'\"',p]).returncode==0, '\"'\"'environment ignore missing'\"'\"'\nassert subprocess.run(['\"'\"'git'\"'\"','\"'\"'check-ignore'\"'\"','\"'\"'--no-index'\"'\"','\"'\"'-q'\"'\"','\"'\"'frontend/.env.example'\"'\"']).returncode!=0\nprint('\"'\"'Private environment files are untracked and ignored; example remains available'\"'\"')'",
+      "timestamp": "2026-10-07T15:04:32Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-07.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000186-20261007T150432Z-7719de",
+        "sequence": 186,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:04:32Z",
+        "finished": "2026-10-07T15:04:32Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "6fa4aa98e2e91af509e34650652286a95a358b7173159361893dd579c413c5a3",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "a11af2dcd3237465bfd118d806b2bb9dd7ffb801da3660aa84606de8f4d244b1",
+        "truncated": false
+      },
+      "declared": "6fa4aa98e2e91af509e34650652286a95a358b7173159361893dd579c413c5a3"
+    },
+    {
+      "id": "C-08",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "python3 -c 'import subprocess,re\nbase='\"'\"'50fa92d1730fb9ebda86890f871299fb0f25992b'\"'\"'\ncommits=subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'rev-list'\"'\"',base+'\"'\"'..HEAD'\"'\"'],text=True).splitlines()\npatterns=[r'\"'\"'AKIA[0-9A-Z]{16}'\"'\"',r'\"'\"'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'\"'\"',r'\"'\"'AIza[0-9A-Za-z_-]{35}'\"'\"',r'\"'\"'gh[pousr]_[0-9A-Za-z]{30,}'\"'\"']\nfindings=[]\nfor commit in commits:\n for p in subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'diff-tree'\"'\"','\"'\"'--no-commit-id'\"'\"','\"'\"'--name-only'\"'\"','\"'\"'-r'\"'\"',commit],text=True).splitlines():\n  blob=subprocess.run(['\"'\"'git'\"'\"','\"'\"'show'\"'\"',commit+'\"'\"':'\"'\"'+p],capture_output=True,text=True,encoding=\"latin-1\")\n  if blob.returncode: continue\n  for n,line in enumerate(blob.stdout.splitlines(),1):\n   if any(re.search(pattern,line) for pattern in patterns): findings.append((p,n))\nfor p,n in findings: print(p+'\"'\"':'\"'\"'+str(n)+'\"'\"' suspected credential; value redacted'\"'\"')\nassert not findings, '\"'\"'Potential secret requires private review and rotation'\"'\"'\nprint('\"'\"'Bounded redacting history pattern scan found no credentials; dedicated scanner unavailable'\"'\"')'",
+      "timestamp": "2026-10-07T15:04:34Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-08.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000187-20261007T150434Z-a33f06",
+        "sequence": 187,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:04:34Z",
+        "finished": "2026-10-07T15:04:34Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "0cc0ade3767ad67a117714fec0ae23ce3f24277510228bd4e212ca2fb3cad780",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "0299f6c7219f8fa8053e4379b30068b253a079be6d7c19cb7502441f3d00b80e",
+        "truncated": false
+      },
+      "declared": "0cc0ade3767ad67a117714fec0ae23ce3f24277510228bd4e212ca2fb3cad780"
+    },
+    {
+      "id": "C-09",
+      "kind": "command",
+      "required": false,
+      "result": "failed",
+      "command": "npm audit --omit=dev --json",
+      "timestamp": "2026-10-07T15:04:48Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-09.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000188-20261007T150435Z-5b3280",
+        "sequence": 188,
+        "outcome": "failed",
+        "exit_code": 1,
+        "started": "2026-10-07T15:04:35Z",
+        "finished": "2026-10-07T15:04:48Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "2215d5fb8345e4ce9ede5f2ec4925812a73c70a6985f730da85ca5980139822d",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "52ee29a1db8e614fd8efde0541b31ae29014c5badd946101e2b86902c5f2c670",
+        "truncated": false
+      },
+      "declared": "2215d5fb8345e4ce9ede5f2ec4925812a73c70a6985f730da85ca5980139822d"
+    },
+    {
+      "id": "C-10",
+      "kind": "command",
+      "required": false,
+      "result": "passed",
+      "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';\nconst raw=fs.readFileSync('\"'\"'frontend/.env'\"'\"','\"'\"'utf8'\"'\"').match(/^EXPO_PUBLIC_API_URL\\s*=\\s*(.+)$/m)?.[1];\nif(!raw){console.log('\"'\"'Configured API unavailable'\"'\"');process.exit(2);}\nconst base=raw.trim().replace(/^\"|\"$/g,'\"'\"''\"'\"').replace(/\\/$/,'\"'\"''\"'\"');\nlet ok=true;\nfor(const body of ['\"'\"'{}'\"'\"',JSON.stringify({padding:'\"'\"'x'\"'\"'.repeat(20000)})]){\ntry{const r=await fetch(base+'\"'\"'/api/auth/login'\"'\"',{method:'\"'\"'POST'\"'\"',headers:{'\"'\"'Content-Type'\"'\"':'\"'\"'application/json'\"'\"'},body,signal:AbortSignal.timeout(15000)});const text=await r.text();const clean=r.status>=400&&r.status<500&&!/stack|at .*\\(|\\/home\\/|node_modules/.test(text);console.log(JSON.stringify({input:body.length>100?'\"'\"'oversized JSON'\"'\"':'\"'\"'empty JSON'\"'\"',status:r.status,clean4xx:clean}));ok=ok&&clean;}catch{console.log('\"'\"'Configured API unreachable; HTTP rejection unverified'\"'\"');ok=false;}}\nif(!ok)process.exit(2);'",
+      "timestamp": "2026-10-07T15:04:50Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-10.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000189-20261007T150449Z-3b0bce",
+        "sequence": 189,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:04:49Z",
+        "finished": "2026-10-07T15:04:50Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "2e287fe31a0db3344803e2ecb95b52822654189398b648185b8a891549aa5a78",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "0f34694c5e3f090f36a745e6d07423a9a9a8d1b50f6e3b2493201aeb23304f7f",
+        "truncated": false
+      },
+      "declared": "2e287fe31a0db3344803e2ecb95b52822654189398b648185b8a891549aa5a78"
+    },
+    {
+      "id": "C-11",
+      "kind": "review",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-07T15:04:41Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/code-quality.md",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/security-summary.json",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/dependency-audit.json"
+      ],
+      "provenance": "authored",
+      "declared": "73fbcff2cf3cf8db48d83952bbd63e5f74f010182f0c7ede5b60b7d90eee2e99"
+    },
+    {
+      "id": "C-12",
+      "kind": "visual",
+      "required": true,
+      "result": "passed",
+      "timestamp": "2026-10-07T15:04:41Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-after.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-intro3.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-intro1.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-splash.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-after.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-intro3.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-intro1.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-splash.png",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/browser-observations.json",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/browser-check.cjs",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/preview-server.cjs",
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/review.md"
+      ],
+      "scenario": "Anonymous and restored session first launch and reload",
+      "viewport": "430x932",
+      "observed": "Splash and all three slides preceded login or authenticated setup; reload skipped intro; no browser errors.",
+      "provenance": "authored",
+      "declared": "d15385efc6205f680d62a820b67b039c66cdccc766498486523fef56ef0d3873"
+    },
+    {
+      "id": "C-13",
+      "kind": "command",
+      "required": true,
+      "result": "passed",
+      "command": "set -euo pipefail\nnpm test --workspaces\nnpx tsc --noEmit -p backend/tsconfig.json\nnpm run typecheck --workspace=frontend",
+      "timestamp": "2026-10-07T15:06:02Z",
+      "artifacts": [
+        ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-13.log"
+      ],
+      "provenance": "runtime",
+      "attempt": {
+        "id": "000190-20261007T150451Z-423db3",
+        "sequence": 190,
+        "outcome": "passed",
+        "exit_code": 0,
+        "started": "2026-10-07T15:04:51Z",
+        "finished": "2026-10-07T15:06:02Z",
+        "source_before": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "source_after": "26f7718663f066bcbfa854489abb3415b207eb325d33d10c906d63cca5a24836",
+        "check_digest": "09b9ef95b16a06ff0dd74be4828344179a028ebbadffbffff0df4f4eaf53d6ca",
+        "runner": {
+          "shell": "/usr/bin/bash",
+          "args": [
+            "-eo",
+            "pipefail",
+            "-c"
+          ],
+          "version": "GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)"
+        },
+        "cwd": ".",
+        "log_sha256": "71cfb5ab2689d6bff50f9bf13226420d8a528c9787d65e48c7776d06592f4952",
+        "truncated": false
+      },
+      "declared": "09b9ef95b16a06ff0dd74be4828344179a028ebbadffbffff0df4f4eaf53d6ca"
+    }
+  ],
+  "visual_review": {
+    "applicable": true,
+    "reason": "Browser rendering inspected with saved screenshots. Native visual review remains deferred under D-01."
+  },
+  "artifacts": [
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-01.log",
+      "sha256": "45837c2ac860ea14b8e2e20909bb77194c5c4385edb43efb757dfe9a14593531"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-02.log",
+      "sha256": "b8b3306ce3ebc761fb9a6d434762ae8ca1283d1b301079be4974b4145fb7a371"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-03.log",
+      "sha256": "b9b0bf6a5839268a3a3a546a212a44ba70664ebdaf6ae41247e2a31b2837d29e"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-04.log",
+      "sha256": "6504c79d7fdf0e792203601d21bd57cbf299bd042b0769ed29293518b62ebebb"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-07.log",
+      "sha256": "a11af2dcd3237465bfd118d806b2bb9dd7ffb801da3660aa84606de8f4d244b1"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-08.log",
+      "sha256": "0299f6c7219f8fa8053e4379b30068b253a079be6d7c19cb7502441f3d00b80e"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-09.log",
+      "sha256": "52ee29a1db8e614fd8efde0541b31ae29014c5badd946101e2b86902c5f2c670"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-10.log",
+      "sha256": "0f34694c5e3f090f36a745e6d07423a9a9a8d1b50f6e3b2493201aeb23304f7f"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/checks/C-13.log",
+      "sha256": "71cfb5ab2689d6bff50f9bf13226420d8a528c9787d65e48c7776d06592f4952"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/coverage/inventory.json",
+      "sha256": "0b53e6811ac1d83360e720c90fb88ab59e4d46ab8f588994048da36af3de35d2"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/coverage/map.json",
+      "sha256": "e84c62ad5b16786e599a1242490331f89e94d1a6149de00bbd3670c03c0d1eb9"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/code-quality.md",
+      "sha256": "d5c03680384f55e7294e82d6a984b4b023c509a903c79918a0d9b234b20bdf02"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/dependency-audit.json",
+      "sha256": "5f1901206ff624f31f64fce9809f130ddae3443cbb27cf1c5c8a2566827931e4"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/native-deferred.md",
+      "sha256": "7b6a9a864bb4d2facc12d1d11646efac2dd5b6e09510d48acd7bfd90152a86f7"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/review/security-summary.json",
+      "sha256": "988431c950c1c73342c57a5d08697e251d9c806e8c9a79ee6d94014322e890b4"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/browser-check.cjs",
+      "sha256": "b42134ca3b4a03190f9f4443be2f84ce117f2c31a02f0f27958a29a04d1af3a5"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/browser-observations.json",
+      "sha256": "992de1d0b8d8b2a98b74c4c9a4a5ea40d41bce159a0ed73652521dff85185443"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-after.png",
+      "sha256": "cf7c4b01f41e27b94c3459b5619c2c1e5625eb4b9444ebb3772ab41d3f641476"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-intro1.png",
+      "sha256": "3d996b046ffc40599e97712fe48e31b684ddd5a5a99ff2e37dedb5e0834e5152"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-intro3.png",
+      "sha256": "750ba951ec8cd6aa898dc861d75539a91f9e4e19dba4e965b598ce4dca4c5fa3"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-anonymous-splash.png",
+      "sha256": "2fc52a6728341bf20dda5838dd551f5db62be23b950f3a4f8ccd3ff253e00f82"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-after.png",
+      "sha256": "857108828e0b6636c5ab1ddcc052892cf80d664a338c8b2880f456765be8abfe"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-intro1.png",
+      "sha256": "3d996b046ffc40599e97712fe48e31b684ddd5a5a99ff2e37dedb5e0834e5152"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-intro3.png",
+      "sha256": "750ba951ec8cd6aa898dc861d75539a91f9e4e19dba4e965b598ce4dca4c5fa3"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/leafcheck-v4-restored-splash.png",
+      "sha256": "2fc52a6728341bf20dda5838dd551f5db62be23b950f3a4f8ccd3ff253e00f82"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/preview-server.cjs",
+      "sha256": "f05047fb8a1c28542483c2390c4d701130fbe72a27b16df0c4e084c7db392228"
+    },
+    {
+      "path": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/visual/review.md",
+      "sha256": "ec2df4160fa21b7f1661bfd23f1bc15b0818e5bdc396d83d55206f7c4673d76e"
+    }
+  ],
+  "change": {
+    "id": "prd-v4",
+    "prd_revision": "e6b82da3ecc85f5836bba429e231d5ae7cf1d1bf9d62d3352174e7b7fe12466c",
+    "base": "50fa92d1730fb9ebda86890f871299fb0f25992b"
+  },
+  "coverage": {
+    "agreement": "89e0d583ba5125eca36ae369b87dd8697d33dd6e7937588f866fbdc2b717d3d7",
+    "authorization": "A-08",
+    "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+    "map": "ca45638579c752242a24138bc83a75d453de35873bda5a23b20df47bbd7171b0",
+    "snapshots": {
+      "inventory": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/coverage/inventory.json",
+      "map": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/coverage/map.json"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "S-01",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04",
+        "C-12"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-02",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04",
+        "C-12"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-03",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-04",
+      "requirement": "R-01",
+      "disposition": "delivered",
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-05",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-12"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-06",
+      "requirement": "R-02",
+      "disposition": "deferred",
+      "tickets": [],
+      "checks": [],
+      "decision": "D-01",
+      "authorization": "A-07",
+      "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+    },
+    {
+      "id": "S-07",
+      "requirement": "R-02",
+      "disposition": "deferred",
+      "tickets": [],
+      "checks": [],
+      "decision": "D-01",
+      "authorization": "A-07",
+      "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+    },
+    {
+      "id": "S-08",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-09",
+      "requirement": "R-02",
+      "disposition": "delivered",
+      "tickets": [
+        "T-15",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-10",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-02",
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-11",
+      "requirement": "R-03",
+      "disposition": "deferred",
+      "tickets": [],
+      "checks": [],
+      "decision": "D-01",
+      "authorization": "A-07",
+      "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+    },
+    {
+      "id": "S-12",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04",
+        "C-12"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    },
+    {
+      "id": "S-13",
+      "requirement": "R-03",
+      "disposition": "delivered",
+      "tickets": [
+        "T-16",
+        "T-17"
+      ],
+      "checks": [
+        "C-03",
+        "C-04"
+      ],
+      "decision": null,
+      "authorization": null,
+      "note": null
+    }
+  ],
+  "adequacy": {
+    "verdict": "adequate",
+    "note": "Checks adequately establish agreed scenarios. Native compilation and device backup behavior remain explicitly unverified; original delivery is incomplete."
+  },
+  "delivery": {
+    "original": false,
+    "agreed": true
+  }
+}
