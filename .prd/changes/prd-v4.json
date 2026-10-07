@@ -5,11 +5,11 @@
   "prd": ".prd/prd-v4.md",
   "base": "50fa92d1730fb9ebda86890f871299fb0f25992b",
   "registered": "2026-10-07T13:36:25Z",
-  "sequence": 17,
+  "sequence": 19,
   "lifecycle": {
-    "state": "completed",
-    "since": "2026-10-07T14:51:39Z",
-    "reason": null,
+    "state": "active",
+    "since": "2026-10-07T14:58:04Z",
+    "reason": "Evaluation C-08 crashes decoding prior PNG evidence as UTF-8; repair scanner through T-19 without weakening ASCII credential detection.",
     "note": null,
     "superseded_by": null
   },
@@ -141,6 +141,27 @@
       ],
       "snapshot": ".prd/changes/prd-v4/agreements/G-07.json",
       "recorded": "2026-10-07T14:48:23Z"
+    },
+    {
+      "id": "G-08",
+      "digest": "89e0d583ba5125eca36ae369b87dd8697d33dd6e7937588f866fbdc2b717d3d7",
+      "prd_revision": "e6b82da3ecc85f5836bba429e231d5ae7cf1d1bf9d62d3352174e7b7fe12466c",
+      "breakdown": "683d34501f5881173d6105b367f249408319be6d976ca4e29b262b8b7b0d249a",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "ca45638579c752242a24138bc83a75d453de35873bda5a23b20df47bbd7171b0",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17",
+        "T-18",
+        "T-19"
+      ],
+      "decisions": [
+        "D-01"
+      ],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-08.json",
+      "recorded": "2026-10-07T14:59:37Z"
     }
   ],
   "authorizations": [
@@ -242,6 +263,19 @@
         "D-01"
       ],
       "recorded": "2026-10-07T14:48:23Z"
+    },
+    {
+      "id": "A-08",
+      "agreement": "G-08",
+      "digest": "89e0d583ba5125eca36ae369b87dd8697d33dd6e7937588f866fbdc2b717d3d7",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-07",
+      "explanation": "Evaluation repairs its required history check to handle prior binary artifacts while retaining every ASCII credential pattern and native deferral; no product scope change.",
+      "decisions": [],
+      "recorded": "2026-10-07T14:59:37Z"
     }
   ],
   "decisions": [
@@ -473,6 +507,32 @@
       "reason": null,
       "agreement": "G-07",
       "authorization": "A-07",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 18,
+      "kind": "reopen",
+      "from": "completed",
+      "to": "active",
+      "at": "2026-10-07T14:58:04Z",
+      "reason": "Evaluation C-08 crashes decoding prior PNG evidence as UTF-8; repair scanner through T-19 without weakening ASCII credential detection.",
+      "agreement": "G-07",
+      "authorization": "A-07",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 19,
+      "kind": "authorize",
+      "from": "active",
+      "to": "active",
+      "at": "2026-10-07T14:59:37Z",
+      "reason": null,
+      "agreement": "G-08",
+      "authorization": "A-08",
       "decision": null,
       "replacement": null,
       "note": null

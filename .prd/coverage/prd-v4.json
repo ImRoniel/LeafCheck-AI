@@ -154,6 +154,10 @@
     "T-18": {
       "role": "enables",
       "rationale": "Repairs the repository release-gate regression for the pre-existing proxy policy; adds no onboarding scenario."
+    },
+    "T-19": {
+      "role": "enables",
+      "rationale": "Makes the required history scanner inspect binary evidence safely without changing credential patterns or scope."
     }
   },
   "checks": {
@@ -223,7 +227,7 @@
     "C-08": {
       "kind": "command",
       "required": true,
-      "command": "python3 -c 'import subprocess,re\nbase='\"'\"'50fa92d1730fb9ebda86890f871299fb0f25992b'\"'\"'\ncommits=subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'rev-list'\"'\"',base+'\"'\"'..HEAD'\"'\"'],text=True).splitlines()\npatterns=[r'\"'\"'AKIA[0-9A-Z]{16}'\"'\"',r'\"'\"'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'\"'\"',r'\"'\"'AIza[0-9A-Za-z_-]{35}'\"'\"',r'\"'\"'gh[pousr]_[0-9A-Za-z]{30,}'\"'\"']\nfindings=[]\nfor commit in commits:\n for p in subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'diff-tree'\"'\"','\"'\"'--no-commit-id'\"'\"','\"'\"'--name-only'\"'\"','\"'\"'-r'\"'\"',commit],text=True).splitlines():\n  blob=subprocess.run(['\"'\"'git'\"'\"','\"'\"'show'\"'\"',commit+'\"'\"':'\"'\"'+p],capture_output=True,text=True)\n  if blob.returncode: continue\n  for n,line in enumerate(blob.stdout.splitlines(),1):\n   if any(re.search(pattern,line) for pattern in patterns): findings.append((p,n))\nfor p,n in findings: print(p+'\"'\"':'\"'\"'+str(n)+'\"'\"' suspected credential; value redacted'\"'\"')\nassert not findings, '\"'\"'Potential secret requires private review and rotation'\"'\"'\nprint('\"'\"'Bounded redacting history pattern scan found no credentials; dedicated scanner unavailable'\"'\"')'",
+      "command": "python3 -c 'import subprocess,re\nbase='\"'\"'50fa92d1730fb9ebda86890f871299fb0f25992b'\"'\"'\ncommits=subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'rev-list'\"'\"',base+'\"'\"'..HEAD'\"'\"'],text=True).splitlines()\npatterns=[r'\"'\"'AKIA[0-9A-Z]{16}'\"'\"',r'\"'\"'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'\"'\"',r'\"'\"'AIza[0-9A-Za-z_-]{35}'\"'\"',r'\"'\"'gh[pousr]_[0-9A-Za-z]{30,}'\"'\"']\nfindings=[]\nfor commit in commits:\n for p in subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'diff-tree'\"'\"','\"'\"'--no-commit-id'\"'\"','\"'\"'--name-only'\"'\"','\"'\"'-r'\"'\"',commit],text=True).splitlines():\n  blob=subprocess.run(['\"'\"'git'\"'\"','\"'\"'show'\"'\"',commit+'\"'\"':'\"'\"'+p],capture_output=True,text=True,encoding=\"latin-1\")\n  if blob.returncode: continue\n  for n,line in enumerate(blob.stdout.splitlines(),1):\n   if any(re.search(pattern,line) for pattern in patterns): findings.append((p,n))\nfor p,n in findings: print(p+'\"'\"':'\"'\"'+str(n)+'\"'\"' suspected credential; value redacted'\"'\"')\nassert not findings, '\"'\"'Potential secret requires private review and rotation'\"'\"'\nprint('\"'\"'Bounded redacting history pattern scan found no credentials; dedicated scanner unavailable'\"'\"')'",
       "timeout": 120,
       "cwd": null,
       "obligation": null,
