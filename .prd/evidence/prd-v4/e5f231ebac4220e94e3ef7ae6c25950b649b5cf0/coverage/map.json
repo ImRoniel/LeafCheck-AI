@@ -1,0 +1,270 @@
+{
+  "schema": 1,
+  "path": ".prd/coverage/prd-v4.json",
+  "digest": "e2b8df685e0a15646010480d643ee0ca24cc305c2520578ebaf631fb1f5ac2a1",
+  "map": {
+    "schema": 1,
+    "change": "prd-v4",
+    "prd": ".prd/prd-v4.md",
+    "scenarios": {
+      "S-01": {
+        "tickets": [
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-03",
+          "C-04",
+          "C-12"
+        ]
+      },
+      "S-02": {
+        "tickets": [
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-03",
+          "C-04",
+          "C-12"
+        ]
+      },
+      "S-03": {
+        "tickets": [
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-03",
+          "C-04"
+        ]
+      },
+      "S-04": {
+        "tickets": [
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-03",
+          "C-04"
+        ]
+      },
+      "S-05": {
+        "tickets": [
+          "T-15",
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-02",
+          "C-03",
+          "C-04",
+          "C-12"
+        ]
+      },
+      "S-08": {
+        "tickets": [
+          "T-15",
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-02",
+          "C-03",
+          "C-04"
+        ]
+      },
+      "S-09": {
+        "tickets": [
+          "T-15",
+          "T-17"
+        ],
+        "checks": [
+          "C-02",
+          "C-04"
+        ]
+      },
+      "S-10": {
+        "tickets": [
+          "T-15",
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-02",
+          "C-03",
+          "C-04"
+        ]
+      },
+      "S-12": {
+        "tickets": [
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-03",
+          "C-04",
+          "C-12"
+        ]
+      },
+      "S-13": {
+        "tickets": [
+          "T-16",
+          "T-17"
+        ],
+        "checks": [
+          "C-03",
+          "C-04"
+        ]
+      }
+    },
+    "scope": {
+      "S-06": {
+        "disposition": "deferred",
+        "decision": "D-01",
+        "prior": null,
+        "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+      },
+      "S-07": {
+        "disposition": "deferred",
+        "decision": "D-01",
+        "prior": null,
+        "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+      },
+      "S-11": {
+        "disposition": "deferred",
+        "decision": "D-01",
+        "prior": null,
+        "note": "T-17 native validation deferred by the user to a future sprint; no native evidence claimed."
+      }
+    },
+    "tickets": {
+      "T-14": {
+        "role": "enables",
+        "rationale": "Characterization protects load-bearing routing before implementation; it does not itself implement an acceptance scenario."
+      },
+      "T-15": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-16": {
+        "role": "implements",
+        "rationale": null
+      },
+      "T-17": {
+        "role": "implements",
+        "rationale": null
+      }
+    },
+    "checks": {
+      "C-01": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/garden-navigation.test.ts",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+      },
+      "C-02": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-storage.test.ts tests/install-onboarding-native-contract.test.ts tests/session.test.ts\ncd ..\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+      },
+      "C-03": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-routing.test.ts tests/startup-characterization.test.ts tests/session-transitions.test.ts tests/local-state.test.ts tests/garden-navigation.test.ts\ncd ..\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+      },
+      "C-04": {
+        "kind": "command",
+        "required": true,
+        "command": "set -euo pipefail\ncd frontend\nnode --import tsx --test --test-concurrency=1 tests/install-onboarding-integration.test.ts\ncd ..\nnpm test --workspace=frontend\nnpm run typecheck --workspace=frontend",
+        "timeout": 600,
+        "cwd": null,
+        "obligation": null,
+        "note": "Planned proof; owning ticket must create the named new test files. No passing result is asserted."
+      },
+      "C-05": {
+        "kind": "review",
+        "required": false,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "Inspect actual iOS and Android builds and record fresh install, relaunch, uninstall/reinstall, cloud-backup restore and device-transfer results in .prd/frontend-install-verification-v4.md. Verify the completion marker is absent on new installs/devices despite restored garden state or valid-session fixtures; inspect backup exclusion and unchanged SecureStore device-only accessibility, key/service, no synchronizable/shared-group configuration and Android backup exclusion. Name builds/devices and artifact references; missing toolchains/devices/backup capability is unverified, never a pass.",
+        "note": "Deferred with T-17 under user-resolved D-01; retained for future native validation, not passed or waived by fabricated evidence."
+      },
+      "C-06": {
+        "kind": "visual",
+        "required": false,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "On actual native builds review existing splash then every slide before auth navigation, recovery messages and disabled final actions; check unchanged styling, reduced motion, large text, screen-reader controls and Android Back. Record observations and artifacts in .prd/frontend-install-verification-v4.md. Missing native runtime is unverified.",
+        "note": "Deferred with T-17 under user-resolved D-01; retained for future native validation, not passed or waived by fabricated evidence."
+      },
+      "C-07": {
+        "kind": "command",
+        "required": true,
+        "command": "python3 -c 'from pathlib import Path\nimport subprocess\ntracked=subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'ls-files'\"'\"'],text=True).splitlines()\nbad=[p for p in tracked if Path(p).name=='\"'\"'.env'\"'\"' or (Path(p).name.startswith('\"'\"'.env.'\"'\"') and Path(p).name!='\"'\"'.env.example'\"'\"')]\nassert not bad, '\"'\"'tracked private environment file'\"'\"'\nfor p in ['\"'\"'.env'\"'\"','\"'\"'frontend/.env'\"'\"','\"'\"'backend/.env'\"'\"','\"'\"'frontend/.env.production'\"'\"']:\n assert subprocess.run(['\"'\"'git'\"'\"','\"'\"'check-ignore'\"'\"','\"'\"'--no-index'\"'\"','\"'\"'-q'\"'\"',p]).returncode==0, '\"'\"'environment ignore missing'\"'\"'\nassert subprocess.run(['\"'\"'git'\"'\"','\"'\"'check-ignore'\"'\"','\"'\"'--no-index'\"'\"','\"'\"'-q'\"'\"','\"'\"'frontend/.env.example'\"'\"']).returncode!=0\nprint('\"'\"'Private environment files are untracked and ignored; example remains available'\"'\"')'",
+        "timeout": 120,
+        "cwd": null,
+        "obligation": null,
+        "note": "Separate mechanical security evidence; bounded scan does not replace a dedicated scanner."
+      },
+      "C-08": {
+        "kind": "command",
+        "required": true,
+        "command": "python3 -c 'import subprocess,re\nbase='\"'\"'50fa92d1730fb9ebda86890f871299fb0f25992b'\"'\"'\ncommits=subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'rev-list'\"'\"',base+'\"'\"'..HEAD'\"'\"'],text=True).splitlines()\npatterns=[r'\"'\"'AKIA[0-9A-Z]{16}'\"'\"',r'\"'\"'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'\"'\"',r'\"'\"'AIza[0-9A-Za-z_-]{35}'\"'\"',r'\"'\"'gh[pousr]_[0-9A-Za-z]{30,}'\"'\"']\nfindings=[]\nfor commit in commits:\n for p in subprocess.check_output(['\"'\"'git'\"'\"','\"'\"'diff-tree'\"'\"','\"'\"'--no-commit-id'\"'\"','\"'\"'--name-only'\"'\"','\"'\"'-r'\"'\"',commit],text=True).splitlines():\n  blob=subprocess.run(['\"'\"'git'\"'\"','\"'\"'show'\"'\"',commit+'\"'\"':'\"'\"'+p],capture_output=True,text=True)\n  if blob.returncode: continue\n  for n,line in enumerate(blob.stdout.splitlines(),1):\n   if any(re.search(pattern,line) for pattern in patterns): findings.append((p,n))\nfor p,n in findings: print(p+'\"'\"':'\"'\"'+str(n)+'\"'\"' suspected credential; value redacted'\"'\"')\nassert not findings, '\"'\"'Potential secret requires private review and rotation'\"'\"'\nprint('\"'\"'Bounded redacting history pattern scan found no credentials; dedicated scanner unavailable'\"'\"')'",
+        "timeout": 120,
+        "cwd": null,
+        "obligation": null,
+        "note": "Separate mechanical security evidence; bounded scan does not replace a dedicated scanner."
+      },
+      "C-09": {
+        "kind": "command",
+        "required": false,
+        "command": "npm audit --omit=dev --json",
+        "timeout": 120,
+        "cwd": null,
+        "obligation": null,
+        "note": "Evaluation security check. Dependency audit findings and unreachable configured API are reported separately from feature delivery; dependency changes are outside PRD v4."
+      },
+      "C-10": {
+        "kind": "command",
+        "required": false,
+        "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';\nconst raw=fs.readFileSync('\"'\"'frontend/.env'\"'\"','\"'\"'utf8'\"'\"').match(/^EXPO_PUBLIC_API_URL\\s*=\\s*(.+)$/m)?.[1];\nif(!raw){console.log('\"'\"'Configured API unavailable'\"'\"');process.exit(2);}\nconst base=raw.trim().replace(/^\"|\"$/g,'\"'\"''\"'\"').replace(/\\/$/,'\"'\"''\"'\"');\nlet ok=true;\nfor(const body of ['\"'\"'{}'\"'\"',JSON.stringify({padding:'\"'\"'x'\"'\"'.repeat(20000)})]){\ntry{const r=await fetch(base+'\"'\"'/api/auth/login'\"'\"',{method:'\"'\"'POST'\"'\"',headers:{'\"'\"'Content-Type'\"'\"':'\"'\"'application/json'\"'\"'},body,signal:AbortSignal.timeout(15000)});const text=await r.text();const clean=r.status>=400&&r.status<500&&!/stack|at .*\\(|\\/home\\/|node_modules/.test(text);console.log(JSON.stringify({input:body.length>100?'\"'\"'oversized JSON'\"'\"':'\"'\"'empty JSON'\"'\"',status:r.status,clean4xx:clean}));ok=ok&&clean;}catch{console.log('\"'\"'Configured API unreachable; HTTP rejection unverified'\"'\"');ok=false;}}\nif(!ok)process.exit(2);'",
+        "timeout": 120,
+        "cwd": null,
+        "obligation": null,
+        "note": "Evaluation security check. Dependency audit findings and unreachable configured API are reported separately from feature delivery; dependency changes are outside PRD v4."
+      },
+      "C-11": {
+        "kind": "review",
+        "required": true,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "Review the complete base-to-candidate diff against the quality rubric and all in-scope scenarios; save findings with dispositions or an explicit no-new-findings report. Report existing dependency audit findings and baseline visual issues without certifying deferred native behavior.",
+        "note": "Evaluation obligation within the requested final-quality workflow."
+      },
+      "C-12": {
+        "kind": "visual",
+        "required": true,
+        "command": null,
+        "timeout": null,
+        "cwd": null,
+        "obligation": "Inspect the running browser build at 430x932, capture splash/slides/post-intro screens for anonymous and mocked restored sessions, confirm persistence on reload and record actual observed rendering. This browser evidence does not satisfy deferred native visual/build/device obligations C-05/C-06.",
+        "note": "Evaluation obligation within the requested final-quality workflow."
+      }
+    }
+  }
+}

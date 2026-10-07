@@ -1,0 +1,15 @@
+$ python3 -c 'from pathlib import Path
+import subprocess
+tracked=subprocess.check_output(['"'"'git'"'"','"'"'ls-files'"'"'],text=True).splitlines()
+bad=[p for p in tracked if Path(p).name=='"'"'.env'"'"' or (Path(p).name.startswith('"'"'.env.'"'"') and Path(p).name!='"'"'.env.example'"'"')]
+assert not bad, '"'"'tracked private environment file'"'"'
+for p in ['"'"'.env'"'"','"'"'frontend/.env'"'"','"'"'backend/.env'"'"','"'"'frontend/.env.production'"'"']:
+ assert subprocess.run(['"'"'git'"'"','"'"'check-ignore'"'"','"'"'--no-index'"'"','"'"'-q'"'"',p]).returncode==0, '"'"'environment ignore missing'"'"'
+assert subprocess.run(['"'"'git'"'"','"'"'check-ignore'"'"','"'"'--no-index'"'"','"'"'-q'"'"','"'"'frontend/.env.example'"'"']).returncode!=0
+print('"'"'Private environment files are untracked and ignored; example remains available'"'"')'
+
+--- stdout ---
+Private environment files are untracked and ignored; example remains available
+--- stderr ---
+
+--- outcome passed (exit 0) ---

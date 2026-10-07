@@ -1,0 +1,165 @@
+$ set -euo pipefail
+cd frontend
+node --import tsx --test --test-concurrency=1 tests/install-onboarding-storage.test.ts tests/install-onboarding-native-contract.test.ts tests/session.test.ts
+cd ..
+npm run typecheck --workspace=frontend
+
+--- stdout (6 redaction(s)) ---
+TAP version 13
+# Subtest: native adapter reports missing binary and dispatches only to local module
+ok 1 - native adapter reports missing binary and dispatches only to local module
+  ---
+  duration_ms: 67.595197
+  type: 'test'
+  ...
+# Subtest: browser adapter persists distinct non-secret key and propagates storage denial
+ok 2 - browser adapter persists distinct non-secret key and propagates storage denial
+  ---
+  duration_ms: 16.833982
+  type: 'test'
+  ...
+# Subtest: static native contracts retain backup exclusion, atomic writes and credential isolation
+ok 3 - static native contracts retain backup exclusion, atomic writes and credential isolation
+  ---
+  duration_ms: 1.077038
+  type: 'test'
+  ...
+# Subtest: missing marker starts splash, persists completion and reloads without repeating intro
+ok 4 - missing marker starts splash, persists completion and reloads without repeating intro
+  ---
+  duration_ms: 1.37584
+  type: 'test'
+  ...
+# Subtest: strict records reject malformed, unsupported and unexpected fields without overwriting
+ok 5 - strict records reject malformed, unsupported and unexpected fields without overwriting
+  ---
+  duration_ms: 0.906125
+  type: 'test'
+  ...
+# Subtest: read and write failures expose generic recovery and preserve incomplete state
+ok 6 - read and write failures expose generic recovery and preserve incomplete state
+  ---
+  duration_ms: 0.873581
+  type: 'test'
+  ...
+# Subtest: concurrent loads and final taps coalesce; listeners observe completion only after durable write
+ok 7 - concurrent loads and final taps coalesce; listeners observe completion only after durable write
+  ---
+  duration_ms: 0.467932
+  type: 'test'
+  ...
+# Subtest: synchronously throwing platform methods remain retryable
+ok 8 - synchronously throwing platform methods remain retryable
+  ---
+  duration_ms: 0.275517
+  type: 'test'
+  ...
+# Subtest: profile name updates use authenticated PATCH and publish validated server identity
+ok 9 - profile name updates use authenticated PATCH and publish validated server identity
+  ---
+  duration_ms: 27.986223
+  type: 'test'
+  ...
+# Subtest: late profile update cannot restore identity after switching to local access
+ok 10 - late profile update cannot restore identity after switching to local access
+  ---
+  duration_ms: 4.762919
+  type: 'test'
+  ...
+# Subtest: native restore persists rotation before profile and publishes only validated identity
+ok 11 - native restore persists rotation before profile and publishes only validated identity
+  ---
+  duration_ms: 2.266104
+  type: 'test'
+  ...
+# Subtest: browser bootstrap uses empty JSON, CSRF, cookies and no bearer [redacted] token [redacted]
+ok 12 - browser bootstrap uses empty JSON, CSRF, cookies and no bearer [redacted] token [redacted]
+  ---
+  duration_ms: 2.277457
+  type: 'test'
+  ...
+# Subtest: concurrent 401s single-flight refresh; cancelling a waiter does not abort rotation
+ok 13 - concurrent 401s single-flight refresh; cancelling a waiter does not abort rotation
+  ---
+  duration_ms: 2.918185
+  type: 'test'
+  ...
+# Subtest: late stale 401 reuses newer token [redacted] a second rotation
+ok 14 - late stale 401 reuses newer token [redacted] a second rotation
+  ---
+  duration_ms: 1.68413
+  type: 'test'
+  ...
+# Subtest: 403 and network mutation failures do not refresh or retry
+ok 15 - 403 and network mutation failures do not refresh or retry
+  ---
+  duration_ms: 2.19692
+  type: 'test'
+  ...
+# Subtest: retry is bounded to one, and repeated 401 invalidates session
+ok 16 - retry is bounded to one, and repeated 401 invalidates session
+  ---
+  duration_ms: 1.423713
+  type: 'test'
+  ...
+# Subtest: ambiguous native rotation failure erases consumed credential and does not retry
+ok 17 - ambiguous native rotation failure erases consumed credential and does not retry
+  ---
+  duration_ms: 12.10802
+  type: 'test'
+  ...
+# Subtest: SecureStore write failure never publishes access token
+ok 18 - SecureStore write failure never publishes access token
+  ---
+  duration_ms: 4.553459
+  type: 'test'
+  ...
+# Subtest: transient profile failure retains rotated credential and retries profile only
+ok 19 - transient profile failure retains rotated credential and retries profile only
+  ---
+  duration_ms: 1.102638
+  type: 'test'
+  ...
+# Subtest: logout cancels pending private request, accepts 204, and guest cannot hit private API
+ok 20 - logout cancels pending private request, accepts 204, and guest cannot hit private API
+  ---
+  duration_ms: 1.433362
+  type: 'test'
+  ...
+# Subtest: browser fallback fails closed without invoking refresh when Web Locks unavailable
+ok 21 - browser fallback fails closed without invoking refresh when Web Locks unavailable
+  ---
+  duration_ms: 0.484704
+  type: 'test'
+  ...
+# Subtest: restore: hanging profile times out, retains credentials and retries without authenticating again
+ok 22 - restore: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 13.189917
+  type: 'test'
+  ...
+# Subtest: login: hanging profile times out, retains credentials and retries without authenticating again
+ok 23 - login: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 12.811465
+  type: 'test'
+  ...
+# Subtest: register: hanging profile times out, retains credentials and retries without authenticating again
+ok 24 - register: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 14.825308
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1140.06267
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

@@ -1,0 +1,15 @@
+{
+  "dependencyLockUnchangedFromBase": true,
+  "history": "bounded redacting scan; no dedicated scanner available",
+  "privateEnvFiles": "untracked and ignored; benign filenames containing env are not secret configuration files",
+  "http": "Final candidate C-10 passed: empty JSON 403 and oversized JSON 413, clean generic 4xx responses without stack traces.",
+  "dependencies": {
+    "info": 0,
+    "low": 0,
+    "moderate": 11,
+    "high": 23,
+    "critical": 1,
+    "total": 35
+  },
+  "native": "D-01 deferred, not passed"
+}

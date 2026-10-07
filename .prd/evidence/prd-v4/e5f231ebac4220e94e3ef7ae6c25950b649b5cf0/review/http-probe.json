@@ -1,0 +1,12 @@
+[
+  {
+    "input": "empty JSON",
+    "status": 403,
+    "clean4xx": true
+  },
+  {
+    "input": "oversized JSON",
+    "status": 413,
+    "clean4xx": true
+  }
+]
