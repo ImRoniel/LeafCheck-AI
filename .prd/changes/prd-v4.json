@@ -5,11 +5,11 @@
   "prd": ".prd/prd-v4.md",
   "base": "50fa92d1730fb9ebda86890f871299fb0f25992b",
   "registered": "2026-10-07T13:36:25Z",
-  "sequence": 16,
+  "sequence": 17,
   "lifecycle": {
-    "state": "active",
-    "since": "2026-10-07T14:47:49Z",
-    "reason": "Release gate found stale security test expectation; T-18 will preserve one-hop proxy policy and repair regression coverage.",
+    "state": "completed",
+    "since": "2026-10-07T14:51:39Z",
+    "reason": null,
     "note": null,
     "superseded_by": null
   },
@@ -461,6 +461,19 @@
       "agreement": "G-07",
       "authorization": "A-07",
       "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 17,
+      "kind": "complete",
+      "from": "active",
+      "to": "completed",
+      "at": "2026-10-07T14:51:39Z",
+      "reason": null,
+      "agreement": "G-07",
+      "authorization": "A-07",
+      "decision": null,
       "replacement": null,
       "note": null
     }
