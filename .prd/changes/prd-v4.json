@@ -5,7 +5,7 @@
   "prd": ".prd/prd-v4.md",
   "base": "50fa92d1730fb9ebda86890f871299fb0f25992b",
   "registered": "2026-10-07T13:36:25Z",
-  "sequence": 13,
+  "sequence": 14,
   "lifecycle": {
     "state": "completed",
     "since": "2026-10-07T14:13:54Z",
@@ -102,6 +102,25 @@
       ],
       "snapshot": ".prd/changes/prd-v4/agreements/G-05.json",
       "recorded": "2026-10-07T14:24:03Z"
+    },
+    {
+      "id": "G-06",
+      "digest": "6f101298f7e1aa9690a3a42e13791d35edc4633cb576da8745f4682dc55bb7b4",
+      "prd_revision": "e6b82da3ecc85f5836bba429e231d5ae7cf1d1bf9d62d3352174e7b7fe12466c",
+      "breakdown": "9997d15f58455c14428272d845d0f0fc69a435d7a6149ef0d41da7ec975382b2",
+      "inventory": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+      "coverage": "e2b8df685e0a15646010480d643ee0ca24cc305c2520578ebaf631fb1f5ac2a1",
+      "tickets": [
+        "T-14",
+        "T-15",
+        "T-16",
+        "T-17"
+      ],
+      "decisions": [
+        "D-01"
+      ],
+      "snapshot": ".prd/changes/prd-v4/agreements/G-06.json",
+      "recorded": "2026-10-07T14:34:08Z"
     }
   ],
   "authorizations": [
@@ -173,6 +192,21 @@
         "D-01"
       ],
       "recorded": "2026-10-07T14:24:03Z"
+    },
+    {
+      "id": "A-06",
+      "agreement": "G-06",
+      "digest": "6f101298f7e1aa9690a3a42e13791d35edc4633cb576da8745f4682dc55bb7b4",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-05",
+      "explanation": "Declare separate env/history scan, dependency audit, invalid HTTP, code review and browser inspection checks required by the invoked evaluation skill. No product requirements or native deferral changed; baseline dependency findings and unavailable HTTP are explicit optional audit limitations.",
+      "decisions": [
+        "D-01"
+      ],
+      "recorded": "2026-10-07T14:34:08Z"
     }
   ],
   "decisions": [
@@ -352,6 +386,19 @@
       "reason": null,
       "agreement": "G-05",
       "authorization": "A-05",
+      "decision": "D-01",
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 14,
+      "kind": "authorize",
+      "from": "completed",
+      "to": "completed",
+      "at": "2026-10-07T14:34:08Z",
+      "reason": null,
+      "agreement": "G-06",
+      "authorization": "A-06",
       "decision": "D-01",
       "replacement": null,
       "note": null
