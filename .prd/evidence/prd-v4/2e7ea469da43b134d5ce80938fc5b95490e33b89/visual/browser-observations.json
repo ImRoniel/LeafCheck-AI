@@ -1,0 +1,26 @@
+[
+  {
+    "scenario": "anonymous",
+    "slidesSeen": 3,
+    "finalPath": "/login",
+    "marker": "{\"version\":1,\"completed\":true}",
+    "errors": []
+  },
+  {
+    "scenario": "anonymous reload",
+    "path": "/login",
+    "introSkipped": true
+  },
+  {
+    "scenario": "restored",
+    "slidesSeen": 3,
+    "finalPath": "/setup/experience",
+    "marker": "{\"version\":1,\"completed\":true}",
+    "errors": []
+  },
+  {
+    "scenario": "restored reload",
+    "path": "/setup/experience",
+    "introSkipped": true
+  }
+]

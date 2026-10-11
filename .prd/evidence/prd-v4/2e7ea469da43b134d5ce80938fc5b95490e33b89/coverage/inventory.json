@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "prd": ".prd/prd-v4.md",
+  "digest": "69821b76021e3946056879a88c2535eec3191ade40d4840e92f1a9c4ed5fa885",
+  "projection": "pincer inventory 1\nprd .prd/prd-v4.md\nrequirement R-01 cebac763020769768ee2eb7710969fff944a88e4c691011082fb6b5e18d53cfc\nrequirement R-02 dd4cd4b30aff6faaee2b4569c7736aba96f7030c61808cc4eed1e697bfed46a9\nrequirement R-03 1fce34d45648e2db0b8e7414775f15174144bd8edae8c0c7dcfeda9aeb9cc231\nscenario S-01 R-01 48dc556837e0810a27b1245663b6c12d3c353809f62bab174a640eaf458d80df\nscenario S-02 R-01 7132543a915ba00fb2ac920b8a1f1b9577e3d480522a1339301ddf3ce4fc9bfe\nscenario S-03 R-01 61db695dfacd0c3db2c287755b0b1fd0685431adb54b58cccd012b3d182df193\nscenario S-04 R-01 971b05a2cab5e7b1c33e0e1c8d48624e24cf899a90c9813e430e16dba9e33f48\nscenario S-05 R-02 1a5eb58d748bdef529e9c7ab03235e166eb2a7eec671b91f6d427140e8464c5f\nscenario S-06 R-02 b708c1940e0c0e5a6aa09b4aea6a607aee4555f7c5f4b67d152c2acf646f7714\nscenario S-07 R-02 fdb34facc2016634fb5e32e8653f0b02c864f7727cc938b04b84089fac27af9f\nscenario S-08 R-02 fbed55e546427490edd9444d789071cac5eeb39a7d11aa18764e2e87aab747d4\nscenario S-09 R-02 a7fad3c06cdfb9b1311ba58d296b0888a86e0e81344c6dbe278a92aac7326ca4\nscenario S-10 R-03 966075aff823ae6c0a9e1a2d0b92db5e9edd0058c4c3df8a96bc732268142d6b\nscenario S-11 R-03 a0dd8877c6156943e435b44035ea186c7f17c6757207069a66e28e4802085b85\nscenario S-12 R-03 38d92ff69948959fb5e55a14b7f81047ef180c06d5f69b6012ed49b947049ab8\nscenario S-13 R-03 76ff77422c4a4c3ce7e01c0306511c0436692226ede8b5b4553650b5e7e74c77\n",
+  "requirements": {
+    "R-01": {
+      "title": "First-install launch takes precedence over authentication",
+      "text": "First-install launch takes precedence over authentication",
+      "digest": "cebac763020769768ee2eb7710969fff944a88e4c691011082fb6b5e18d53cfc",
+      "line": 29,
+      "end": 34,
+      "scenarios": [
+        "S-01",
+        "S-02",
+        "S-03",
+        "S-04"
+      ]
+    },
+    "R-02": {
+      "title": "Completion belongs to the installation",
+      "text": "Completion belongs to the installation",
+      "digest": "dd4cd4b30aff6faaee2b4569c7736aba96f7030c61808cc4eed1e697bfed46a9",
+      "line": 36,
+      "end": 42,
+      "scenarios": [
+        "S-05",
+        "S-06",
+        "S-07",
+        "S-08",
+        "S-09"
+      ]
+    },
+    "R-03": {
+      "title": "Preserve authentication security and garden setup",
+      "text": "Preserve authentication security and garden setup",
+      "digest": "1fce34d45648e2db0b8e7414775f15174144bd8edae8c0c7dcfeda9aeb9cc231",
+      "line": 44,
+      "end": 49,
+      "scenarios": [
+        "S-10",
+        "S-11",
+        "S-12",
+        "S-13"
+      ]
+    }
+  },
+  "scenarios": {
+    "S-01": {
+      "requirement": "R-01",
+      "text": "Given a missing completion marker and no credential, launch shows the existing splash, then introductory onboarding, then login after completion; Home never appears first.",
+      "digest": "48dc556837e0810a27b1245663b6c12d3c353809f62bab174a640eaf458d80df",
+      "line": 31,
+      "end": 31
+    },
+    "S-02": {
+      "requirement": "R-01",
+      "text": "Given a missing completion marker and a valid restored session, launch shows splash and introductory onboarding; after completion it skips login and follows existing authenticated setup/Home guards.",
+      "digest": "7132543a915ba00fb2ac920b8a1f1b9577e3d480522a1339301ddf3ce4fc9bfe",
+      "line": 32,
+      "end": 32
+    },
+    "S-03": {
+      "requirement": "R-01",
+      "text": "Given a missing completion marker and expired credentials, restore rejection or an offline restore error, splash and intro remain reachable; after completion the existing anonymous/error recovery behavior applies.",
+      "digest": "61db695dfacd0c3db2c287755b0b1fd0685431adb54b58cccd012b3d182df193",
+      "line": 33,
+      "end": 33
+    },
+    "S-04": {
+      "requirement": "R-01",
+      "text": "Given a direct link to Home, setup, login or another protected screen on an incomplete installation, the intro gate still takes precedence; guest-entry effects and navigation Back cannot bypass it.",
+      "digest": "971b05a2cab5e7b1c33e0e1c8d48624e24cf899a90c9813e430e16dba9e33f48",
+      "line": 34,
+      "end": 34
+    },
+    "S-05": {
+      "requirement": "R-02",
+      "text": "Completing the final slide durably saves the installation marker before unlocking subsequent routes. Restart on the same installation skips intro regardless of account switching, sign-out or guest mode.",
+      "digest": "1a5eb58d748bdef529e9c7ab03235e166eb2a7eec671b91f6d427140e8464c5f",
+      "line": 38,
+      "end": 38
+    },
+    "S-06": {
+      "requirement": "R-02",
+      "text": "A new-device cloud-backup restore or device transfer with account setup data and an otherwise valid session cannot restore introductory completion; splash and intro run again on both supported native platforms.",
+      "digest": "b708c1940e0c0e5a6aa09b4aea6a607aee4555f7c5f4b67d152c2acf646f7714",
+      "line": 39,
+      "end": 39
+    },
+    "S-07": {
+      "requirement": "R-02",
+      "text": "Uninstall/reinstall or clearing native app data removes introductory completion even if iOS retains a refresh credential; intro runs again without proactively deleting that credential.",
+      "digest": "fdb34facc2016634fb5e32e8653f0b02c864f7727cc938b04b84089fac27af9f",
+      "line": 40,
+      "end": 40
+    },
+    "S-08": {
+      "requirement": "R-02",
+      "text": "Missing markers mean incomplete. A read error, malformed/unsupported record or write failure shows retryable local recovery and does not publish completion, bypass the gate or erase existing garden data. Repeated final-slide taps cannot navigate before a successful write.",
+      "digest": "fbed55e546427490edd9444d789071cac5eeb39a7d11aa18764e2e87aab747d4",
+      "line": 41,
+      "end": 41
+    },
+    "S-09": {
+      "requirement": "R-02",
+      "text": "On web, completion persists in browser-local storage independently of account state; denied storage produces recovery. Native backup guarantees are not claimed for browser profile synchronization.",
+      "digest": "a7fad3c06cdfb9b1311ba58d296b0888a86e0e81344c6dbe278a92aac7326ca4",
+      "line": 42,
+      "end": 42
+    },
+    "S-10": {
+      "requirement": "R-03",
+      "text": "Native refresh tokens remain exclusively in SecureStore and access JWTs remain in memory; no intro record or log contains credentials. Web continues using the existing HttpOnly cookie flow.",
+      "digest": "966075aff823ae6c0a9e1a2d0b92db5e9edd0058c4c3df8a96bc732268142d6b",
+      "line": 46,
+      "end": 46
+    },
+    "S-11": {
+      "requirement": "R-03",
+      "text": "SecureStore get/set/delete retain the existing key and matching options, including `WHEN_UNLOCKED_THIS_DEVICE_ONLY`; Android SecureStore backup exclusion remains enabled. Native inspection verifies no synchronizable Keychain attributes or shared access group are introduced.",
+      "digest": "a0dd8877c6156943e435b44035ea186c7f17c6757207069a66e28e4802085b85",
+      "line": 47,
+      "end": 47
+    },
+    "S-12": {
+      "requirement": "R-03",
+      "text": "Once intro is complete, existing authenticated pending garden setup resumes its saved step, completed/skipped setup reaches Home, and guest routes retain their existing behavior and account isolation.",
+      "digest": "38d92ff69948959fb5e55a14b7f81047ef180c06d5f69b6012ed49b947049ab8",
+      "line": 48,
+      "end": 48
+    },
+    "S-13": {
+      "requirement": "R-03",
+      "text": "If restoration finishes during any introductory slide, the slide remains visible until completion; slow restore after completion uses existing restoring/error UI without a dashboard flash or duplicate navigation.",
+      "digest": "76ff77422c4a4c3ce7e01c0306511c0436692226ede8b5b4553650b5e7e74c77",
+      "line": 49,
+      "end": 49
+    }
+  }
+}

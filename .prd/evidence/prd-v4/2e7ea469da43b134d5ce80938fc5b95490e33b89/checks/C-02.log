@@ -1,0 +1,183 @@
+$ set -euo pipefail
+cd frontend
+node --import tsx --test --test-concurrency=1 tests/install-onboarding-storage.test.ts tests/install-onboarding-native-contract.test.ts tests/session.test.ts
+cd ..
+npm run typecheck --workspace=frontend
+
+--- stdout (6 redaction(s)) ---
+TAP version 13
+# Subtest: native adapter reports missing binary and dispatches only to local module
+ok 1 - native adapter reports missing binary and dispatches only to local module
+  ---
+  duration_ms: 243.464613
+  type: 'test'
+  ...
+# Subtest: browser adapter persists distinct non-secret key and propagates storage denial
+ok 2 - browser adapter persists distinct non-secret key and propagates storage denial
+  ---
+  duration_ms: 75.47632
+  type: 'test'
+  ...
+# Subtest: static native contracts retain backup exclusion, atomic writes and credential isolation
+ok 3 - static native contracts retain backup exclusion, atomic writes and credential isolation
+  ---
+  duration_ms: 2.847242
+  type: 'test'
+  ...
+# Subtest: Expo Go preview persists completion across stores without loading the custom module
+ok 4 - Expo Go preview persists completion across stores without loading the custom module
+  ---
+  duration_ms: 50.64133
+  type: 'test'
+  ...
+# Subtest: Expo Go storage rejection stays retryable and never publishes completion early
+ok 5 - Expo Go storage rejection stays retryable and never publishes completion early
+  ---
+  duration_ms: 61.104943
+  type: 'test'
+  ...
+# Subtest: missing modules in standalone, development and unknown runtimes never use preview storage
+ok 6 - missing modules in standalone, development and unknown runtimes never use preview storage
+  ---
+  duration_ms: 120.954905
+  type: 'test'
+  ...
+# Subtest: missing marker starts splash, persists completion and reloads without repeating intro
+ok 7 - missing marker starts splash, persists completion and reloads without repeating intro
+  ---
+  duration_ms: 2.766704
+  type: 'test'
+  ...
+# Subtest: strict records reject malformed, unsupported and unexpected fields without overwriting
+ok 8 - strict records reject malformed, unsupported and unexpected fields without overwriting
+  ---
+  duration_ms: 6.097646
+  type: 'test'
+  ...
+# Subtest: read and write failures expose generic recovery and preserve incomplete state
+ok 9 - read and write failures expose generic recovery and preserve incomplete state
+  ---
+  duration_ms: 1.719847
+  type: 'test'
+  ...
+# Subtest: concurrent loads and final taps coalesce; listeners observe completion only after durable write
+ok 10 - concurrent loads and final taps coalesce; listeners observe completion only after durable write
+  ---
+  duration_ms: 0.860805
+  type: 'test'
+  ...
+# Subtest: synchronously throwing platform methods remain retryable
+ok 11 - synchronously throwing platform methods remain retryable
+  ---
+  duration_ms: 3.816669
+  type: 'test'
+  ...
+# Subtest: profile name updates use authenticated PATCH and publish validated server identity
+ok 12 - profile name updates use authenticated PATCH and publish validated server identity
+  ---
+  duration_ms: 108.399751
+  type: 'test'
+  ...
+# Subtest: late profile update cannot restore identity after switching to local access
+ok 13 - late profile update cannot restore identity after switching to local access
+  ---
+  duration_ms: 14.096101
+  type: 'test'
+  ...
+# Subtest: native restore persists rotation before profile and publishes only validated identity
+ok 14 - native restore persists rotation before profile and publishes only validated identity
+  ---
+  duration_ms: 25.348039
+  type: 'test'
+  ...
+# Subtest: browser bootstrap uses empty JSON, CSRF, cookies and no bearer [redacted] token [redacted]
+ok 15 - browser bootstrap uses empty JSON, CSRF, cookies and no bearer [redacted] token [redacted]
+  ---
+  duration_ms: 9.267476
+  type: 'test'
+  ...
+# Subtest: concurrent 401s single-flight refresh; cancelling a waiter does not abort rotation
+ok 16 - concurrent 401s single-flight refresh; cancelling a waiter does not abort rotation
+  ---
+  duration_ms: 7.011556
+  type: 'test'
+  ...
+# Subtest: late stale 401 reuses newer token [redacted] a second rotation
+ok 17 - late stale 401 reuses newer token [redacted] a second rotation
+  ---
+  duration_ms: 8.889587
+  type: 'test'
+  ...
+# Subtest: 403 and network mutation failures do not refresh or retry
+ok 18 - 403 and network mutation failures do not refresh or retry
+  ---
+  duration_ms: 3.921782
+  type: 'test'
+  ...
+# Subtest: retry is bounded to one, and repeated 401 invalidates session
+ok 19 - retry is bounded to one, and repeated 401 invalidates session
+  ---
+  duration_ms: 11.54146
+  type: 'test'
+  ...
+# Subtest: ambiguous native rotation failure erases consumed credential and does not retry
+ok 20 - ambiguous native rotation failure erases consumed credential and does not retry
+  ---
+  duration_ms: 62.317563
+  type: 'test'
+  ...
+# Subtest: SecureStore write failure never publishes access token
+ok 21 - SecureStore write failure never publishes access token
+  ---
+  duration_ms: 21.2167
+  type: 'test'
+  ...
+# Subtest: transient profile failure retains rotated credential and retries profile only
+ok 22 - transient profile failure retains rotated credential and retries profile only
+  ---
+  duration_ms: 6.260102
+  type: 'test'
+  ...
+# Subtest: logout cancels pending private request, accepts 204, and guest cannot hit private API
+ok 23 - logout cancels pending private request, accepts 204, and guest cannot hit private API
+  ---
+  duration_ms: 15.656447
+  type: 'test'
+  ...
+# Subtest: browser fallback fails closed without invoking refresh when Web Locks unavailable
+ok 24 - browser fallback fails closed without invoking refresh when Web Locks unavailable
+  ---
+  duration_ms: 0.813423
+  type: 'test'
+  ...
+# Subtest: restore: hanging profile times out, retains credentials and retries without authenticating again
+ok 25 - restore: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 27.000145
+  type: 'test'
+  ...
+# Subtest: login: hanging profile times out, retains credentials and retries without authenticating again
+ok 26 - login: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 25.342538
+  type: 'test'
+  ...
+# Subtest: register: hanging profile times out, retains credentials and retries without authenticating again
+ok 27 - register: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 50.88273
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4822.951983
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

@@ -1,0 +1,2086 @@
+$ set -euo pipefail
+cd frontend
+node --import tsx --test --test-concurrency=1 tests/install-onboarding-integration.test.ts
+cd ..
+npm test --workspace=frontend
+npm run typecheck --workspace=frontend
+
+--- stdout (10 redaction(s)) ---
+TAP version 13
+# Subtest: fresh anonymous and restored sessions traverse every slide and skip only the correct login
+ok 1 - fresh anonymous and restored sessions traverse every slide and skip only the correct login
+  ---
+  duration_ms: 740.516508
+  type: 'test'
+  ...
+# Subtest: restore finishing on a middle slide leaves the same slide and guest/account setup untouched
+ok 2 - restore finishing on a middle slide leaves the same slide and guest/account setup untouched
+  ---
+  duration_ms: 152.767424
+  type: 'test'
+  ...
+# Subtest: final write denial keeps the last slide and its retry; completion waits for a replacement write
+ok 3 - final write denial keeps the last slide and its retry; completion waits for a replacement write
+  ---
+  duration_ms: 31.131795
+  type: 'test'
+  ...
+# Subtest: corrupt/browser-denied storage cannot admit restored sessions and does not erase disk data
+ok 4 - corrupt/browser-denied storage cannot admit restored sessions and does not erase disk data
+  ---
+  duration_ms: 12.408596
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1858.672596
+TAP version 13
+# Subtest: plant creation and deletion use normalized payloads, parsed responses and empty 204
+ok 1 - plant creation and deletion use normalized payloads, parsed responses and empty 204
+  ---
+  duration_ms: 104.661997
+  type: 'test'
+  ...
+# Subtest: plant mutations validate inputs and preserve API errors
+ok 2 - plant mutations validate inputs and preserve API errors
+  ---
+  duration_ms: 31.521824
+  type: 'test'
+  ...
+# Subtest: URL environment precedence and platform defaults
+ok 3 - URL environment precedence and platform defaults
+  ---
+  duration_ms: 0.46774
+  type: 'test'
+  ...
+# Subtest: plant updates trim fields, preserve clearing and moisture bounds, and attach bearer [redacted]
+ok 4 - plant updates trim fields, preserve clearing and moisture bounds, and attach bearer [redacted]
+  ---
+  duration_ms: 7.596839
+  type: 'test'
+  ...
+# Subtest: plant updates reject invalid fields and propagate missing plants
+ok 5 - plant updates reject invalid fields and propagate missing plants
+  ---
+  duration_ms: 8.863524
+  type: 'test'
+  ...
+# Subtest: all seven operations use correct routes and bodies
+ok 6 - all seven operations use correct routes and bodies
+  ---
+  duration_ms: 23.046225
+  type: 'test'
+  ...
+# Subtest: only latest 404 becomes null
+ok 7 - only latest 404 becomes null
+  ---
+  duration_ms: 5.842162
+  type: 'test'
+  ...
+# Subtest: nested validation rejects invalid data instead of manufacturing defaults
+ok 8 - nested validation rejects invalid data instead of manufacturing defaults
+  ---
+  duration_ms: 9.873922
+  type: 'test'
+  ...
+# Subtest: network, invalid JSON, timeout and external cancellation are typed
+ok 9 - network, invalid JSON, timeout and external cancellation are typed
+  ---
+  duration_ms: 44.93276
+  type: 'test'
+  ...
+# "shadow*" style props are deprecated. Use "boxShadow".
+# Subtest: reference-sized floating pill and camera share a centerline and retain readable labels
+ok 10 - reference-sized floating pill and camera share a centerline and retain readable labels
+  ---
+  duration_ms: 350.794429
+  type: 'test'
+  ...
+# Subtest: each navigation item opens its own route with reference Home/Spaces icons and a distinct task icon
+ok 11 - each navigation item opens its own route with reference Home/Spaces icons and a distinct task icon
+  ---
+  duration_ms: 517.916224
+  type: 'test'
+  ...
+# Subtest: dock respects safe areas and remains centered at the reference width on small screens
+ok 12 - dock respects safe areas and remains centered at the reference width on small screens
+  ---
+  duration_ms: 63.948259
+  type: 'test'
+  ...
+# Subtest: installed Router v57 clears retained plant/device targets on the untargeted Scan action
+ok 13 - installed Router v57 clears retained plant/device targets on the untargeted Scan action
+  ---
+  duration_ms: 94.561083
+  type: 'test'
+  ...
+# Subtest: selected-tab color and emphasis follow Spaces details, reverse selections, and stop for reduced motion
+ok 14 - selected-tab color and emphasis follow Spaces details, reverse selections, and stop for reduced motion
+  ---
+  duration_ms: 132.884129
+  type: 'test'
+  ...
+# Subtest: reduced-motion startup and tab changes render static selection without resetting animated values
+ok 15 - reduced-motion startup and tab changes render static selection without resetting animated values
+  ---
+  duration_ms: 88.262321
+  type: 'test'
+  ...
+# Subtest: installed tab history reverses navigation without losing the Space Details target
+ok 16 - installed tab history reverses navigation without losing the Space Details target
+  ---
+  duration_ms: 1.733124
+  type: 'test'
+  ...
+# Subtest: task mutation cancellation rejects even when transport ignores abort and returns late
+ok 17 - task mutation cancellation rejects even when transport ignores abort and returns late
+  ---
+  duration_ms: 155.62144
+  type: 'test'
+  ...
+# Subtest: already cancelled task mutation never reaches transport
+ok 18 - already cancelled task mutation never reaches transport
+  ---
+  duration_ms: 4.241267
+  type: 'test'
+  ...
+# Subtest: Monday calendar filters retain overdue/manual checks and distinguish exact week boundaries
+ok 19 - Monday calendar filters retain overdue/manual checks and distinguish exact week boundaries
+  ---
+  duration_ms: 13.883096
+  type: 'test'
+  ...
+# Subtest: completed views use completion timestamps rather than inventing manual due dates
+ok 20 - completed views use completion timestamps rather than inventing manual due dates
+  ---
+  duration_ms: 8.789801
+  type: 'test'
+  ...
+# Subtest: task mutation retains the full list and confirmed write when reload fails
+ok 21 - task mutation retains the full list and confirmed write when reload fails
+  ---
+  duration_ms: 354.905249
+  type: 'test'
+  ...
+# Subtest: task mutation aborts on blur and ignores a late success
+ok 22 - task mutation aborts on blur and ignores a late success
+  ---
+  duration_ms: 156.916001
+  type: 'test'
+  ...
+# Subtest: task mutation aborts on background and ignores a late success
+ok 23 - task mutation aborts on background and ignores a late success
+  ---
+  duration_ms: 259.201994
+  type: 'test'
+  ...
+# Subtest: task mutation aborts on unmount and ignores a late success
+ok 24 - task mutation aborts on unmount and ignores a late success
+  ---
+  duration_ms: 85.120936
+  type: 'test'
+  ...
+# Subtest: task mutation locks duplicate taps and does not confirm a failed write
+ok 25 - task mutation locks duplicate taps and does not confirm a failed write
+  ---
+  duration_ms: 128.070605
+  type: 'test'
+  ...
+# Subtest: Skip uses SKIPPED only after a successful PATCH and retains previous status on failure
+ok 26 - Skip uses SKIPPED only after a successful PATCH and retains previous status on failure
+  ---
+  duration_ms: 64.509731
+  type: 'test'
+  ...
+# Subtest: Skip aborts on blur and ignores a late successful response
+ok 27 - Skip aborts on blur and ignores a late successful response
+  ---
+  duration_ms: 80.008583
+  type: 'test'
+  ...
+# Subtest: Skip aborts on background and ignores a late successful response
+ok 28 - Skip aborts on background and ignores a late successful response
+  ---
+  duration_ms: 87.833237
+  type: 'test'
+  ...
+# Subtest: Skip aborts on unmount and ignores a late successful response
+ok 29 - Skip aborts on unmount and ignores a late successful response
+  ---
+  duration_ms: 58.199417
+  type: 'test'
+  ...
+# Subtest: disabled account task hook cannot Skip
+ok 30 - disabled account task hook cannot Skip
+  ---
+  duration_ms: 107.916965
+  type: 'test'
+  ...
+# Subtest: focus and fresh client session restore account task status from authoritative GET
+ok 31 - focus and fresh client session restore account task status from authoritative GET
+  ---
+  duration_ms: 231.482008
+  type: 'test'
+  ...
+# Subtest: authoritative GET retires confirmed overlays, including after another failed reload
+ok 32 - authoritative GET retires confirmed overlays, including after another failed reload
+  ---
+  duration_ms: 68.367762
+  type: 'test'
+  ...
+# Subtest: blur cancellation revalidates before settlement and late finally cannot unlock a newer mutation
+ok 33 - blur cancellation revalidates before settlement and late finally cannot unlock a newer mutation
+  ---
+  duration_ms: 177.609057
+  type: 'test'
+  ...
+# Subtest: a GET published between the synchronous mutation lock and effect cleanup cannot overwrite confirmation
+ok 34 - a GET published between the synchronous mutation lock and effect cleanup cannot overwrite confirmation
+  ---
+  duration_ms: 152.955404
+  type: 'test'
+  ...
+# Subtest: Due today includes earlier-today overdue tasks and excludes undated, completed, invalid and other dates
+ok 35 - Due today includes earlier-today overdue tasks and excludes undated, completed, invalid and other dates
+  ---
+  duration_ms: 4.030196
+  type: 'test'
+  ...
+# Subtest: Due today follows local calendar boundaries through short and long daylight-saving days
+ok 36 - Due today follows local calendar boundaries through short and long daylight-saving days
+  ---
+  duration_ms: 11.245602
+  type: 'test'
+  ...
+# Subtest: task previews retain short details and select a concise sentence without changing the saved explanation
+ok 37 - task previews retain short details and select a concise sentence without changing the saved explanation
+  ---
+  duration_ms: 0.604416
+  type: 'test'
+  ...
+# Subtest: task thumbnails show the real saved plant image or an accessible missing-photo placeholder
+ok 38 - task thumbnails show the real saved plant image or an accessible missing-photo placeholder
+  ---
+  duration_ms: 218.838506
+  type: 'test'
+  ...
+# Subtest: thumbnail load errors fall back and a different saved image recovers without stale-error interference
+ok 39 - thumbnail load errors fall back and a different saved image recovers without stale-error interference
+  ---
+  duration_ms: 42.229799
+  type: 'test'
+  ...
+# Subtest: Guest task controls persist completion/undo, retain pending tasks on failure and open the selected space
+ok 40 - Guest task controls persist completion/undo, retain pending tasks on failure and open the selected space
+  ---
+  duration_ms: 790.468816
+  type: 'test'
+  ...
+# Subtest: account Skip uses only the server source, leaves failed tasks visible and removes confirmed skips
+ok 41 - account Skip uses only the server source, leaves failed tasks visible and removes confirmed skips
+  ---
+  duration_ms: 277.35939
+  type: 'test'
+  ...
+# Subtest: account completion and Undo send COMPLETED and PENDING without writing local history
+ok 42 - account completion and Undo send COMPLETED and PENDING without writing local history
+  ---
+  duration_ms: 198.889213
+  type: 'test'
+  ...
+# Subtest: loading and partial refresh failure have retry controls without a false empty success
+ok 43 - loading and partial refresh failure have retry controls without a false empty success
+  ---
+  duration_ms: 193.060362
+  type: 'test'
+  ...
+# Subtest: pull-to-refresh remains wired and three interactive summary cards show readable real counts
+ok 44 - pull-to-refresh remains wired and three interactive summary cards show readable real counts
+  ---
+  duration_ms: 268.352116
+  type: 'test'
+  ...
+# Subtest: direct task buttons are text-only and offer only supported pending/completed actions
+ok 45 - direct task buttons are text-only and offer only supported pending/completed actions
+  ---
+  duration_ms: 570.086476
+  type: 'test'
+  ...
+# Subtest: empty states fill the remaining screen and have no My Spaces action
+ok 46 - empty states fill the remaining screen and have no My Spaces action
+  ---
+  duration_ms: 127.606282
+  type: 'test'
+  ...
+# Subtest: green period dropdown switches task views without changing persistent task sources
+ok 47 - green period dropdown switches task views without changing persistent task sources
+  ---
+  duration_ms: 164.775161
+  type: 'test'
+  ...
+# Subtest: Care Tasks filter remains interactive without animation when reduced motion is enabled
+ok 48 - Care Tasks filter remains interactive without animation when reduced motion is enabled
+  ---
+  duration_ms: 318.668836
+  type: 'test'
+  ...
+# Subtest: Care Tasks uses a clean white page without decorative artwork and retains real plant thumbnails
+ok 49 - Care Tasks uses a clean white page without decorative artwork and retains real plant thumbnails
+  ---
+  duration_ms: 115.053377
+  type: 'test'
+  ...
+# Subtest: summary due-today filter includes earlier-today Overdue and excludes manual, yesterday, and tomorrow tasks
+ok 50 - summary due-today filter includes earlier-today Overdue and excludes manual, yesterday, and tomorrow tasks
+  ---
+  duration_ms: 191.53331
+  type: 'test'
+  ...
+# Subtest: All, Pending and Completed views share confirmed counts without changing task sources
+ok 51 - All, Pending and Completed views share confirmed counts without changing task sources
+  ---
+  duration_ms: 244.906202
+  type: 'test'
+  ...
+# Subtest: short previews can expand to the original saved details without marking care complete
+ok 52 - short previews can expand to the original saved details without marking care complete
+  ---
+  duration_ms: 87.60913
+  type: 'test'
+  ...
+# Subtest: account plant loading cannot show an empty success before local schedules and history hydrate
+ok 53 - account plant loading cannot show an empty success before local schedules and history hydrate
+  ---
+  duration_ms: 100.193266
+  type: 'test'
+  ...
+# Subtest: presentation groups exact due times and leaves unscheduled and future urgent checks undated or upcoming
+ok 54 - presentation groups exact due times and leaves unscheduled and future urgent checks undated or upcoming
+  ---
+  duration_ms: 36.726809
+  type: 'test'
+  ...
+# Subtest: completed recurring tasks stay in history while their next occurrence is upcoming; undo restores overdue
+ok 55 - completed recurring tasks stay in history while their next occurrence is upcoming; undo restores overdue
+  ---
+  duration_ms: 5.232134
+  type: 'test'
+  ...
+# Subtest: server tasks merge by urgency and due date, preserve completion and omit skipped/deleted targets
+ok 56 - server tasks merge by urgency and due date, preserve completion and omit skipped/deleted targets
+  ---
+  duration_ms: 1.42823
+  type: 'test'
+  ...
+# Subtest: aggregates all plants, prioritizes urgent recommendations, and does not invent healthy readings
+ok 57 - aggregates all plants, prioritizes urgent recommendations, and does not invent healthy readings
+  ---
+  duration_ms: 3.360053
+  type: 'test'
+  ...
+# Subtest: saved schedules group overdue/today separately from future checks and preserve reminder time
+ok 58 - saved schedules group overdue/today separately from future checks and preserve reminder time
+  ---
+  duration_ms: 2.033677
+  type: 'test'
+  ...
+# Subtest: completion is idempotent, recurring checks advance, undo restores occurrence
+ok 59 - completion is idempotent, recurring checks advance, undo restores occurrence
+  ---
+  duration_ms: 1.272127
+  type: 'test'
+  ...
+# Subtest: one-off tasks stay complete; updated versions renew tasks; deleted plants leave the hub
+ok 60 - one-off tasks stay complete; updated versions renew tasks; deleted plants leave the hub
+  ---
+  duration_ms: 0.781571
+  type: 'test'
+  ...
+# Subtest: legacy local state migrates completions; invalid history fails closed
+ok 61 - legacy local state migrates completions; invalid history fails closed
+  ---
+  duration_ms: 2.11097
+  type: 'test'
+  ...
+# Subtest: completions survive remount, stay account-scoped, and failed writes do not check off tasks
+ok 62 - completions survive remount, stay account-scoped, and failed writes do not check off tasks
+  ---
+  duration_ms: 3.754168
+  type: 'test'
+  ...
+# Subtest: hardware widget persists with 0 sensors and working entry points
+ok 63 - hardware widget persists with 0 sensors and working entry points
+  ---
+  duration_ms: 590.359842
+  type: 'test'
+  ...
+# Subtest: hardware widget persists with 1 sensors and working entry points
+ok 64 - hardware widget persists with 1 sensors and working entry points
+  ---
+  duration_ms: 91.694043
+  type: 'test'
+  ...
+# Subtest: hardware widget persists with 2 sensors and working entry points
+ok 65 - hardware widget persists with 2 sensors and working entry points
+  ---
+  duration_ms: 84.472202
+  type: 'test'
+  ...
+# Subtest: dashboard keeps both quick actions and hardware widget for 0 sensors
+ok 66 - dashboard keeps both quick actions and hardware widget for 0 sensors
+  ---
+  duration_ms: 233.291781
+  type: 'test'
+  ...
+# Subtest: dashboard keeps both quick actions and hardware widget for 2 sensors
+ok 67 - dashboard keeps both quick actions and hardware widget for 2 sensors
+  ---
+  duration_ms: 188.868675
+  type: 'test'
+  ...
+# Subtest: dashboard retains initial loading and retry without fabricating AI content
+ok 68 - dashboard retains initial loading and retry without fabricating AI content
+  ---
+  duration_ms: 2.052435
+  type: 'test'
+  ...
+# Subtest: loaded collections do not recreate the removed garden summary
+ok 69 - loaded collections do not recreate the removed garden summary
+  ---
+  duration_ms: 0.598475
+  type: 'test'
+  ...
+# Subtest: overview status distinguishes refresh and failed refresh
+ok 70 - overview status distinguishes refresh and failed refresh
+  ---
+  duration_ms: 0.73501
+  type: 'test'
+  ...
+# Subtest: guest messaging stays local and does not promise guest AI scans
+ok 71 - guest messaging stays local and does not promise guest AI scans
+  ---
+  duration_ms: 0.558047
+  type: 'test'
+  ...
+# Subtest: sensor alerts do not infer missing hardware from incomplete collections
+ok 72 - sensor alerts do not infer missing hardware from incomplete collections
+  ---
+  duration_ms: 0.532166
+  type: 'test'
+  ...
+# Subtest: missing sensor links keep hardware optional and pairing unavailable
+ok 73 - missing sensor links keep hardware optional and pairing unavailable
+  ---
+  duration_ms: 0.583435
+  type: 'test'
+  ...
+# Subtest: a saved sensor link is not presented as a live observation
+ok 74 - a saved sensor link is not presented as a live observation
+  ---
+  duration_ms: 0.368437
+  type: 'test'
+  ...
+# Subtest: demo-only and mixed collections explicitly distinguish simulated telemetry
+ok 75 - demo-only and mixed collections explicitly distinguish simulated telemetry
+  ---
+  duration_ms: 0.571794
+  type: 'test'
+  ...
+# Subtest: device activity uses Router focus without a standalone navigation provider
+ok 76 - device activity uses Router focus without a standalone navigation provider
+  ---
+  duration_ms: 195.654994
+  type: 'test'
+  ...
+# Subtest: device activity stays paused in background or inactive and resumes only when focused
+ok 77 - device activity stays paused in background or inactive and resumes only when focused
+  ---
+  duration_ms: 37.305194
+  type: 'test'
+  ...
+# Subtest: web visibility gates device work and both listeners are removed
+ok 78 - web visibility gates device work and both listeners are removed
+  ---
+  duration_ms: 22.39161
+  type: 'test'
+  ...
+# Subtest: empty successful responses reject when contracts require a payload
+ok 79 - empty successful responses reject when contracts require a payload
+  ---
+  duration_ms: 85.793225
+  type: 'test'
+  ...
+# Subtest: device routes preserve UUID/MAC, bodies, bearer [redacted] all BFF states
+ok 80 - device routes preserve UUID/MAC, bodies, bearer [redacted] all BFF states
+  ---
+  duration_ms: 27.894715
+  type: 'test'
+  ...
+# Subtest: invalid inputs reject before transport and conventional MACs normalize
+ok 81 - invalid inputs reject before transport and conventional MACs normalize
+  ---
+  duration_ms: 3.022795
+  type: 'test'
+  ...
+# Subtest: conflicts and malformed successful responses never become success
+ok 82 - conflicts and malformed successful responses never become success
+  ---
+  duration_ms: 24.56016
+  type: 'test'
+  ...
+# Subtest: new routes refresh once and respect cancellation and timeout
+ok 83 - new routes refresh once and respect cancellation and timeout
+  ---
+  duration_ms: 17.106551
+  type: 'test'
+  ...
+# Subtest: production scanner coalesces scan/submission and hands off server UUID and target
+ok 84 - production scanner coalesces scan/submission and hands off server UUID and target
+  ---
+  duration_ms: 422.343601
+  type: 'test'
+  ...
+# Subtest: manual input validates visibly, ownership conflict stays and retry succeeds with camera denied
+ok 85 - manual input validates visibly, ownership conflict stays and retry succeeds with camera denied
+  ---
+  duration_ms: 225.011993
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after blur
+ok 86 - production scanner suppresses pending state and navigation after blur
+  ---
+  duration_ms: 147.979082
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after cancel
+ok 87 - production scanner suppresses pending state and navigation after cancel
+  ---
+  duration_ms: 128.407024
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after dispose
+ok 88 - production scanner suppresses pending state and navigation after dispose
+  ---
+  duration_ms: 137.037441
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after auth
+ok 89 - production scanner suppresses pending state and navigation after auth
+  ---
+  duration_ms: 119.095494
+  type: 'test'
+  ...
+# Subtest: production scanner suppresses pending state and navigation after snapshotOnly
+ok 90 - production scanner suppresses pending state and navigation after snapshotOnly
+  ---
+  duration_ms: 83.261446
+  type: 'test'
+  ...
+# Subtest: guest scanner offers sign-in without claim or camera access
+ok 91 - guest scanner offers sign-in without claim or camera access
+  ---
+  duration_ms: 99.211385
+  type: 'test'
+  ...
+# Subtest: legacy selection bypasses mock nodes and retains contextual target
+ok 92 - legacy selection bypasses mock nodes and retains contextual target
+  ---
+  duration_ms: 51.985862
+  type: 'test'
+  ...
+# Subtest: production AppData fences old claim closure and clears ephemeral Device on account remount
+ok 93 - production AppData fences old claim closure and clears ephemeral Device on account remount
+  ---
+  duration_ms: 319.939491
+  type: 'test'
+  ...
+# Subtest: permission rejection after unmount never writes screen state
+ok 94 - permission rejection after unmount never writes screen state
+  ---
+  duration_ms: 48.226041
+  type: 'test'
+  ...
+# Subtest: nonconflict claim error is sanitized and scanned retry remains usable
+ok 95 - nonconflict claim error is sanitized and scanned retry remains usable
+  ---
+  duration_ms: 66.716598
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=false and disabled=false, contextual=false
+ok 96 - web assignment buttons announce selected=false and disabled=false, contextual=false
+  ---
+  duration_ms: 640.489772
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=false and disabled=true, contextual=false
+ok 97 - web assignment buttons announce selected=false and disabled=true, contextual=false
+  ---
+  duration_ms: 216.419077
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=true and disabled=false, contextual=false
+ok 98 - web assignment buttons announce selected=true and disabled=false, contextual=false
+  ---
+  duration_ms: 269.704141
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=true and disabled=true, contextual=false
+ok 99 - web assignment buttons announce selected=true and disabled=true, contextual=false
+  ---
+  duration_ms: 285.244125
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=false and disabled=false, contextual=true
+ok 100 - web assignment buttons announce selected=false and disabled=false, contextual=true
+  ---
+  duration_ms: 155.867133
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=false and disabled=true, contextual=true
+ok 101 - web assignment buttons announce selected=false and disabled=true, contextual=true
+  ---
+  duration_ms: 212.170114
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=true and disabled=false, contextual=true
+ok 102 - web assignment buttons announce selected=true and disabled=false, contextual=true
+  ---
+  duration_ms: 145.801079
+  type: 'test'
+  ...
+# Subtest: web assignment buttons announce selected=true and disabled=true, contextual=true
+ok 103 - web assignment buttons announce selected=true and disabled=true, contextual=true
+  ---
+  duration_ms: 52.624931
+  type: 'test'
+  ...
+# (node:128754) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: management removal preserves all devices on failure and removes only its ID on retry
+ok 104 - management removal preserves all devices on failure and removes only its ID on retry
+  ---
+  duration_ms: 330.17721
+  type: 'test'
+  ...
+# Subtest: actual local provider fences a session change when queued
+ok 105 - actual local provider fences a session change when queued
+  ---
+  duration_ms: 62.762571
+  type: 'test'
+  ...
+# Subtest: actual local provider fences a session change when commit started
+ok 106 - actual local provider fences a session change when commit started
+  ---
+  duration_ms: 74.878546
+  type: 'test'
+  ...
+# (node:128761) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: discovery contains only uniquely identified mock nodes and rejects invalid route parameters
+ok 107 - discovery contains only uniquely identified mock nodes and rejects invalid route parameters
+  ---
+  duration_ms: 3.778115
+  type: 'test'
+  ...
+# Subtest: assignment supports existing spaces and plants without mutating sensor links
+ok 108 - assignment supports existing spaces and plants without mutating sensor links
+  ---
+  duration_ms: 3.128911
+  type: 'test'
+  ...
+# Subtest: existing v1 state stays valid; malformed mock assignments fail closed
+ok 109 - existing v1 state stays valid; malformed mock assignments fail closed
+  ---
+  duration_ms: 2.007668
+  type: 'test'
+  ...
+# Subtest: completed assignments survive reload and remain isolated from other accounts and guests
+ok 110 - completed assignments survive reload and remain isolated from other accounts and guests
+  ---
+  duration_ms: 4.140611
+  type: 'test'
+  ...
+# Subtest: failed persistence does not publish a successful connection and retry succeeds
+ok 111 - failed persistence does not publish a successful connection and retry succeeds
+  ---
+  duration_ms: 1.83889
+  type: 'test'
+  ...
+# Subtest: mock delays finish only after their timeout
+ok 112 - mock delays finish only after their timeout
+  ---
+  duration_ms: 2.506149
+  type: 'test'
+  ...
+# Subtest: cancelled and already-aborted mock work never completes
+ok 113 - cancelled and already-aborted mock work never completes
+  ---
+  duration_ms: 5.744363
+  type: 'test'
+  ...
+# Subtest: a cancelled queued assignment never writes and the queue remains usable
+ok 114 - a cancelled queued assignment never writes and the queue remains usable
+  ---
+  duration_ms: 3.132959
+  type: 'test'
+  ...
+# Subtest: invalid persisted mock assignment blocks loading and preserves stored data
+ok 115 - invalid persisted mock assignment blocks loading and preserves stored data
+  ---
+  duration_ms: 2.760143
+  type: 'test'
+  ...
+# Subtest: legacy single connection migrates once without resurrecting removed devices
+ok 116 - legacy single connection migrates once without resurrecting removed devices
+  ---
+  duration_ms: 1.070224
+  type: 'test'
+  ...
+# Subtest: multiple sensors append, reassignment replaces only the matching identity
+ok 117 - multiple sensors append, reassignment replaces only the matching identity
+  ---
+  duration_ms: 0.745692
+  type: 'test'
+  ...
+# Subtest: device collections fail closed on corrupt, duplicate, or spoofed live entries
+ok 118 - device collections fail closed on corrupt, duplicate, or spoofed live entries
+  ---
+  duration_ms: 1.044183
+  type: 'test'
+  ...
+# Subtest: contextual targets lock selection and invalid or deleted destinations never fall back
+ok 119 - contextual targets lock selection and invalid or deleted destinations never fall back
+  ---
+  duration_ms: 0.700754
+  type: 'test'
+  ...
+# Subtest: concurrent pairing preserves multiple sensors across reload and removal
+ok 120 - concurrent pairing preserves multiple sensors across reload and removal
+  ---
+  duration_ms: 6.853844
+  type: 'test'
+  ...
+# Subtest: production Scanner -> provider -> Assignment -> Success -> Profile uses UUID and one BFF through real client
+ok 121 - production Scanner -> provider -> Assignment -> Success -> Profile uses UUID and one BFF through real client
+  ---
+  duration_ms: 1384.621105
+  type: 'test'
+  ...
+# Subtest: real transport preserves claim 409, same-owner reclaim and failed pairing retry
+ok 122 - real transport preserves claim 409, same-owner reclaim and failed pairing retry
+  ---
+  duration_ms: 464.995312
+  type: 'test'
+  ...
+# Subtest: late HTTP claim completion after account boundary cannot store a Device or navigate
+ok 123 - late HTTP claim completion after account boundary cannot store a Device or navigate
+  ---
+  duration_ms: 47.321782
+  type: 'test'
+  ...
+# Subtest: production assignment pairs claimed UUID once, updates reassignment and offers confirmed profile
+ok 124 - production assignment pairs claimed UUID once, updates reassignment and offers confirmed profile
+  ---
+  duration_ms: 1102.314397
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":"space","targetId":"Bedroom"}
+ok 125 - production assignment rejects unsupported or missing contextual target {"targetType":"space","targetId":"Bedroom"}
+  ---
+  duration_ms: 482.670001
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"missing"}
+ok 126 - production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"missing"}
+  ---
+  duration_ms: 338.765623
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"mock-leaf-node-01"}
+ok 127 - production assignment rejects unsupported or missing contextual target {"targetType":"plant","targetId":"mock-leaf-node-01"}
+  ---
+  duration_ms: 193.779328
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetType":["plant"],"targetId":"44444444-4444-4444-8444-444444444444"}
+ok 128 - production assignment rejects unsupported or missing contextual target {"targetType":["plant"],"targetId":"44444444-4444-4444-8444-444444444444"}
+  ---
+  duration_ms: 232.812959
+  type: 'test'
+  ...
+# Subtest: production assignment rejects unsupported or missing contextual target {"targetId":"44444444-4444-4444-8444-444444444444"}
+ok 129 - production assignment rejects unsupported or missing contextual target {"targetId":"44444444-4444-4444-8444-444444444444"}
+  ---
+  duration_ms: 141.838567
+  type: 'test'
+  ...
+# Subtest: missing claim, forged UUID and guests cannot mutate
+ok 130 - missing claim, forged UUID and guests cannot mutate
+  ---
+  duration_ms: 214.949532
+  type: 'test'
+  ...
+# Subtest: pair mutation failure remains retryable and refresh failure preserves successful cache and warning
+ok 131 - pair mutation failure remains retryable and refresh failure preserves successful cache and warning
+  ---
+  duration_ms: 193.576131
+  type: 'test'
+  ...
+# Subtest: production pairing handles account without implying a confirmed write rolled back
+ok 132 - production pairing handles account without implying a confirmed write rolled back
+  ---
+  duration_ms: 167.465273
+  type: 'test'
+  ...
+# Subtest: production pairing handles unmount without implying a confirmed write rolled back
+ok 133 - production pairing handles unmount without implying a confirmed write rolled back
+  ---
+  duration_ms: 154.449925
+  type: 'test'
+  ...
+# Subtest: production pairing handles cancel without implying a confirmed write rolled back
+ok 134 - production pairing handles cancel without implying a confirmed write rolled back
+  ---
+  duration_ms: 151.957724
+  type: 'test'
+  ...
+# Subtest: provider rejects unavailable plants and mismatched server confirmation
+ok 135 - provider rejects unavailable plants and mismatched server confirmation
+  ---
+  duration_ms: 42.781282
+  type: 'test'
+  ...
+# Subtest: confirmed mutation stays on assignment while refresh is pending, then success survives failed refresh
+ok 136 - confirmed mutation stays on assignment while refresh is pending, then success survives failed refresh
+  ---
+  duration_ms: 166.473734
+  type: 'test'
+  ...
+# Subtest: changing route while mutation runs suppresses the old target handoff
+ok 137 - changing route while mutation runs suppresses the old target handoff
+  ---
+  duration_ms: 105.064707
+  type: 'test'
+  ...
+# Subtest: connection diagnostics are replaced entirely with the standard message
+ok 138 - connection diagnostics are replaced entirely with the standard message
+  ---
+  duration_ms: 3.037733
+  type: 'test'
+  ...
+# Subtest: API normalization preserves kinds, status and diagnostic details, not network text
+ok 139 - API normalization preserves kinds, status and diagnostic details, not network text
+  ---
+  duration_ms: 0.663662
+  type: 'test'
+  ...
+# Subtest: validation, credential, cancellation and informational messages remain useful
+ok 140 - validation, credential, cancellation and informational messages remain useful
+  ---
+  duration_ms: 0.45699
+  type: 'test'
+  ...
+# Subtest: login, registration and collection requests sanitize rejected transports and API diagnostics
+ok 141 - login, registration and collection requests sanitize rejected transports and API diagnostics
+  ---
+  duration_ms: 114.066847
+  type: 'test'
+  ...
+# Subtest: request timeouts use the same connection message
+ok 142 - request timeouts use the same connection message
+  ---
+  duration_ms: 22.832157
+  type: 'test'
+  ...
+# "shadow*" style props are deprecated. Use "boxShadow".
+# Subtest: garden search matches name, species and location without mutating either view
+ok 143 - garden search matches name, species and location without mutating either view
+  ---
+  duration_ms: 14.096235
+  type: 'test'
+  ...
+# Subtest: tab layout exposes only three primary tabs and retains hidden compatibility routes
+ok 144 - tab layout exposes only three primary tabs and retains hidden compatibility routes
+  ---
+  duration_ms: 328.870674
+  type: 'test'
+  ...
+# Subtest: custom tab bar stays visible on content routes and hides on scan routes
+ok 145 - custom tab bar stays visible on content routes and hides on scan routes
+  ---
+  duration_ms: 53.080831
+  type: 'test'
+  ...
+# Subtest: bottom navigation emits tab events, respects prevention and keeps Scan an action
+ok 146 - bottom navigation emits tab events, respects prevention and keeps Scan an action
+  ---
+  duration_ms: 211.771156
+  type: 'test'
+  ...
+# Subtest: My Spaces stays selected on Spaces and Space Details and opens the Spaces route
+ok 147 - My Spaces stays selected on Spaces and Space Details and opens the Spaces route
+  ---
+  duration_ms: 123.900053
+  type: 'test'
+  ...
+# Subtest: local and signed-in tab entry defaults to Dashboard
+ok 148 - local and signed-in tab entry defaults to Dashboard
+  ---
+  duration_ms: 104.301211
+  type: 'test'
+  ...
+# Subtest: tabs switch immediately with opaque scenes and preload only the three main screens
+ok 149 - tabs switch immediately with opaque scenes and preload only the three main screens
+  ---
+  duration_ms: 63.130578
+  type: 'test'
+  ...
+# Subtest: root stack preserves guards while native pushes reverse on Back and reduced motion disables them
+ok 150 - root stack preserves guards while native pushes reverse on Back and reduced motion disables them
+  ---
+  duration_ms: 203.974162
+  type: 'test'
+  ...
+# Subtest: collection entry points lead to My Spaces and Garden has no visible tab title
+ok 151 - collection entry points lead to My Spaces and Garden has no visible tab title
+  ---
+  duration_ms: 2.94561
+  type: 'test'
+  ...
+# Subtest: legacy camera redirect preserves target params; notifications lead to actionable tasks
+ok 152 - legacy camera redirect preserves target params; notifications lead to actionable tasks
+  ---
+  duration_ms: 25.760958
+  type: 'test'
+  ...
+# Subtest: dashboard puts plant overview directly after hardware and AI summary last
+ok 153 - dashboard puts plant overview directly after hardware and AI summary last
+  ---
+  duration_ms: 0.917616
+  type: 'test'
+  ...
+# Subtest: fresh anonymous and restored sessions traverse every slide and skip only the correct login
+ok 154 - fresh anonymous and restored sessions traverse every slide and skip only the correct login
+  ---
+  duration_ms: 1987.185557
+  type: 'test'
+  ...
+# Subtest: restore finishing on a middle slide leaves the same slide and guest/account setup untouched
+ok 155 - restore finishing on a middle slide leaves the same slide and guest/account setup untouched
+  ---
+  duration_ms: 335.197088
+  type: 'test'
+  ...
+# Subtest: final write denial keeps the last slide and its retry; completion waits for a replacement write
+ok 156 - final write denial keeps the last slide and its retry; completion waits for a replacement write
+  ---
+  duration_ms: 62.239355
+  type: 'test'
+  ...
+# Subtest: corrupt/browser-denied storage cannot admit restored sessions and does not erase disk data
+ok 157 - corrupt/browser-denied storage cannot admit restored sessions and does not erase disk data
+  ---
+  duration_ms: 44.182902
+  type: 'test'
+  ...
+# Subtest: native adapter reports missing binary and dispatches only to local module
+ok 158 - native adapter reports missing binary and dispatches only to local module
+  ---
+  duration_ms: 454.521354
+  type: 'test'
+  ...
+# Subtest: browser adapter persists distinct non-secret key and propagates storage denial
+ok 159 - browser adapter persists distinct non-secret key and propagates storage denial
+  ---
+  duration_ms: 91.721435
+  type: 'test'
+  ...
+# Subtest: static native contracts retain backup exclusion, atomic writes and credential isolation
+ok 160 - static native contracts retain backup exclusion, atomic writes and credential isolation
+  ---
+  duration_ms: 2.280579
+  type: 'test'
+  ...
+# Subtest: Expo Go preview persists completion across stores without loading the custom module
+ok 161 - Expo Go preview persists completion across stores without loading the custom module
+  ---
+  duration_ms: 56.775882
+  type: 'test'
+  ...
+# Subtest: Expo Go storage rejection stays retryable and never publishes completion early
+ok 162 - Expo Go storage rejection stays retryable and never publishes completion early
+  ---
+  duration_ms: 30.807231
+  type: 'test'
+  ...
+# Subtest: missing modules in standalone, development and unknown runtimes never use preview storage
+ok 163 - missing modules in standalone, development and unknown runtimes never use preview storage
+  ---
+  duration_ms: 94.015048
+  type: 'test'
+  ...
+# Subtest: fresh install only admits splash then intro for every authentication outcome and deep-link target
+ok 164 - fresh install only admits splash then intro for every authentication outcome and deep-link target
+  ---
+  duration_ms: 1330.467599
+  type: 'test'
+  ...
+# Subtest: bootstrap loading and storage errors cannot mount account navigation
+ok 165 - bootstrap loading and storage errors cannot mount account navigation
+  ---
+  duration_ms: 168.689476
+  type: 'test'
+  ...
+# Subtest: restore completion cannot change intro guards before a durable final action
+ok 166 - restore completion cannot change intro guards before a durable final action
+  ---
+  duration_ms: 140.937096
+  type: 'test'
+  ...
+# Subtest: splash timer advances install state rather than navigating around auth guards
+ok 167 - splash timer advances install state rather than navigating around auth guards
+  ---
+  duration_ms: 26.779597
+  type: 'test'
+  ...
+# Subtest: onboarding final action saves without navigating to login or marking garden setup
+ok 168 - onboarding final action saves without navigating to login or marking garden setup
+  ---
+  duration_ms: 30.821317
+  type: 'test'
+  ...
+# Subtest: all root routes are explicitly guarded, including forbidden deep-link destinations
+ok 169 - all root routes are explicitly guarded, including forbidden deep-link destinations
+  ---
+  duration_ms: 150.690465
+  type: 'test'
+  ...
+# Subtest: splash waits two seconds after marker bootstrap and clears its timer
+ok 170 - splash waits two seconds after marker bootstrap and clears its timer
+  ---
+  duration_ms: 18.350918
+  type: 'test'
+  ...
+# Subtest: missing marker starts splash, persists completion and reloads without repeating intro
+ok 171 - missing marker starts splash, persists completion and reloads without repeating intro
+  ---
+  duration_ms: 2.931345
+  type: 'test'
+  ...
+# Subtest: strict records reject malformed, unsupported and unexpected fields without overwriting
+ok 172 - strict records reject malformed, unsupported and unexpected fields without overwriting
+  ---
+  duration_ms: 1.638238
+  type: 'test'
+  ...
+# Subtest: read and write failures expose generic recovery and preserve incomplete state
+ok 173 - read and write failures expose generic recovery and preserve incomplete state
+  ---
+  duration_ms: 0.953626
+  type: 'test'
+  ...
+# Subtest: concurrent loads and final taps coalesce; listeners observe completion only after durable write
+ok 174 - concurrent loads and final taps coalesce; listeners observe completion only after durable write
+  ---
+  duration_ms: 1.122194
+  type: 'test'
+  ...
+# Subtest: synchronously throwing platform methods remain retryable
+ok 175 - synchronously throwing platform methods remain retryable
+  ---
+  duration_ms: 1.120671
+  type: 'test'
+  ...
+# Subtest: new state hydrates without writing defaults
+ok 176 - new state hydrates without writing defaults
+  ---
+  duration_ms: 6.161602
+  type: 'test'
+  ...
+# Subtest: account keys cannot overlap guest or other accounts
+ok 177 - account keys cannot overlap guest or other accounts
+  ---
+  duration_ms: 0.638492
+  type: 'test'
+  ...
+# Subtest: local profile survives reload without crossing account boundaries or requiring migration
+ok 178 - local profile survives reload without crossing account boundaries or requiring migration
+  ---
+  duration_ms: 3.381712
+  type: 'test'
+  ...
+# Subtest: serialized updates and remounted stores preserve independent changes
+ok 179 - serialized updates and remounted stores preserve independent changes
+  ---
+  duration_ms: 2.007636
+  type: 'test'
+  ...
+# Subtest: corrupt and future-version data are not overwritten
+ok 180 - corrupt and future-version data are not overwritten
+  ---
+  duration_ms: 1.404975
+  type: 'test'
+  ...
+# Subtest: failed write keeps committed state and queue remains usable
+ok 181 - failed write keeps committed state and queue remains usable
+  ---
+  duration_ms: 1.43911
+  type: 'test'
+  ...
+# Subtest: complete setup and care schedule survive a new store
+ok 182 - complete setup and care schedule survive a new store
+  ---
+  duration_ms: 2.720665
+  type: 'test'
+  ...
+# Subtest: invalid choices, duplicate spaces, and impossible steps fail validation
+ok 183 - invalid choices, duplicate spaces, and impossible steps fail validation
+  ---
+  duration_ms: 1.158154
+  type: 'test'
+  ...
+# Subtest: care defaults vary by plant and light and reject unsafe input ranges
+ok 184 - care defaults vary by plant and light and reject unsafe input ranges
+  ---
+  duration_ms: 2.110157
+  type: 'test'
+  ...
+# Subtest: missing navigation defaults to focused on initial and telemetry re-renders
+ok 185 - missing navigation defaults to focused on initial and telemetry re-renders
+  ---
+  duration_ms: 229.517899
+  type: 'test'
+  ...
+# Subtest: navigation focus and blur are observed and both listeners are cleaned up
+ok 186 - navigation focus and blur are observed and both listeners are cleaned up
+  ---
+  duration_ms: 59.985309
+  type: 'test'
+  ...
+# Subtest: plant care view renders saved guidance, missing-data warning and history without interpreting HTML
+ok 187 - plant care view renders saved guidance, missing-data warning and history without interpreting HTML
+  ---
+  duration_ms: 376.168999
+  type: 'test'
+  ...
+# Subtest: plant care view labels stale readings and does not invent a diagnosis for an unscanned plant
+ok 188 - plant care view labels stale readings and does not invent a diagnosis for an unscanned plant
+  ---
+  duration_ms: 161.840707
+  type: 'test'
+  ...
+# Subtest: telemetry guidance distinguishes fresh, stale, missing, failed, simulated and unverified data
+ok 189 - telemetry guidance distinguishes fresh, stale, missing, failed, simulated and unverified data
+  ---
+  duration_ms: 2.568068
+  type: 'test'
+  ...
+# Subtest: guidance selects the latest diagnosis and pending tasks only for the requested plant
+ok 190 - guidance selects the latest diagnosis and pending tasks only for the requested plant
+  ---
+  duration_ms: 1.934194
+  type: 'test'
+  ...
+# Subtest: guidance API includes an encoded plant filter and preserves unfiltered history
+ok 191 - guidance API includes an encoded plant filter and preserves unfiltered history
+  ---
+  duration_ms: 103.947631
+  type: 'test'
+  ...
+# Subtest: profile sibling identity remains unique while editing and changes with the plant
+ok 192 - profile sibling identity remains unique while editing and changes with the plant
+  ---
+  duration_ms: 504.434149
+  type: 'test'
+  ...
+# Subtest: production profile renders unpaired from one BFF
+ok 193 - production profile renders unpaired from one BFF
+  ---
+  duration_ms: 294.905969
+  type: 'test'
+  ...
+# Subtest: production profile renders waiting from one BFF
+ok 194 - production profile renders waiting from one BFF
+  ---
+  duration_ms: 150.910603
+  type: 'test'
+  ...
+# Subtest: production profile renders zero metrics from one BFF
+ok 195 - production profile renders zero metrics from one BFF
+  ---
+  duration_ms: 177.027847
+  type: 'test'
+  ...
+# Subtest: production profile reports malformed BFF distinctly and retry recovers
+ok 196 - production profile reports malformed BFF distinctly and retry recovers
+  ---
+  duration_ms: 153.762034
+  type: 'test'
+  ...
+# Subtest: production profile aborts obsolete plant/session responses and refocus observes reassignment
+ok 197 - production profile aborts obsolete plant/session responses and refocus observes reassignment
+  ---
+  duration_ms: 75.481027
+  type: 'test'
+  ...
+# Subtest: collection hydration, retry, missing metadata and controls use AppData
+ok 198 - collection hydration, retry, missing metadata and controls use AppData
+  ---
+  duration_ms: 95.589033
+  type: 'test'
+  ...
+# Subtest: malformed profile target undefined is safe
+ok 199 - malformed profile target undefined is safe
+  ---
+  duration_ms: 121.468682
+  type: 'test'
+  ...
+# Subtest: malformed profile target "" is safe
+ok 200 - malformed profile target "" is safe
+  ---
+  duration_ms: 96.442494
+  type: 'test'
+  ...
+# Subtest: malformed profile target "bad-id" is safe
+ok 201 - malformed profile target "bad-id" is safe
+  ---
+  duration_ms: 111.126975
+  type: 'test'
+  ...
+# Subtest: malformed profile target ["11111111-1111-4111-8111-111111111111"] is safe
+ok 202 - malformed profile target ["11111111-1111-4111-8111-111111111111"] is safe
+  ---
+  duration_ms: 173.582319
+  type: 'test'
+  ...
+# Subtest: guest metadata retains scanning and care without BFF reads
+ok 203 - guest metadata retains scanning and care without BFF reads
+  ---
+  duration_ms: 118.436319
+  type: 'test'
+  ...
+# Subtest: refresh coalesces, stop aborts, late results are suppressed
+ok 204 - refresh coalesces, stop aborts, late results are suppressed
+  ---
+  duration_ms: 4.11564
+  type: 'test'
+  ...
+# Subtest: restart fences old failures and publishes new data
+ok 205 - restart fences old failures and publishes new data
+  ---
+  duration_ms: 2.627303
+  type: 'test'
+  ...
+# Subtest: passing image returns exactly the requested contract on every platform
+ok 206 - passing image returns exactly the requested contract on every platform
+  ---
+  duration_ms: 4.692412
+  type: 'test'
+  ...
+# Subtest: uses JPEG bytes rather than base64 length and rejects below the 50 KiB boundary
+ok 207 - uses JPEG bytes rather than base64 length and rejects below the 50 KiB boundary
+  ---
+  duration_ms: 1.036257
+  type: 'test'
+  ...
+# Subtest: base64 padding is excluded from file size without decoding pixels
+ok 208 - base64 padding is excluded from file size without decoding pixels
+  ---
+  duration_ms: 1.38698
+  type: 'test'
+  ...
+# Subtest: missing and malformed base64 reject instead of failing open
+ok 209 - missing and malformed base64 reject instead of failing open
+  ---
+  duration_ms: 3.960749
+  type: 'test'
+  ...
+# Subtest: undersized dimensions reject independently of file size in portrait and landscape
+ok 210 - undersized dimensions reject independently of file size in portrait and landscape
+  ---
+  duration_ms: 1.614973
+  type: 'test'
+  ...
+# Subtest: invalid dimension metadata rejects safely
+ok 211 - invalid dimension metadata rejects safely
+  ---
+  duration_ms: 2.832383
+  type: 'test'
+  ...
+# Subtest: cancelled session never produces a passing result
+ok 212 - cancelled session never produces a passing result
+  ---
+  duration_ms: 3.588664
+  type: 'test'
+  ...
+# Subtest: animated press feedback forwards native measurement refs, accessibility and action callbacks unchanged
+ok 213 - animated press feedback forwards native measurement refs, accessibility and action callbacks unchanged
+  ---
+  duration_ms: 319.775862
+  type: 'test'
+  ...
+# Subtest: web accessibility states map to ARIA without overriding explicit false values or altering native states
+ok 214 - web accessibility states map to ARIA without overriding explicit false values or altering native states
+  ---
+  duration_ms: 318.503236
+  type: 'test'
+  ...
+# Subtest: pressed style callbacks and existing transforms remain intact through subtle compression and spring release
+ok 215 - pressed style callbacks and existing transforms remain intact through subtle compression and spring release
+  ---
+  duration_ms: 54.686556
+  type: 'test'
+  ...
+# Subtest: feedback uses native animation on iOS and Android, and a web animation driver in the browser
+ok 216 - feedback uses native animation on iOS and Android, and a web animation driver in the browser
+  ---
+  duration_ms: 169.026072
+  type: 'test'
+  ...
+# Subtest: web hover state and hover callbacks remain interactive alongside pressed feedback
+ok 217 - web hover state and hover callbacks remain interactive alongside pressed feedback
+  ---
+  duration_ms: 61.275037
+  type: 'test'
+  ...
+# Subtest: disabled and reduced-motion buttons retain readable pressed styling without scale animations
+ok 218 - disabled and reduced-motion buttons retain readable pressed styling without scale animations
+  ---
+  duration_ms: 101.650471
+  type: 'test'
+  ...
+# Subtest: changing motion preference or disabling a held button cancels its running feedback
+ok 219 - changing motion preference or disabling a held button cancels its running feedback
+  ---
+  duration_ms: 138.583445
+  type: 'test'
+  ...
+# Subtest: string CSS transforms are preserved instead of overwritten by native transform feedback
+ok 220 - string CSS transforms are preserved instead of overwritten by native transform feedback
+  ---
+  duration_ms: 45.592744
+  type: 'test'
+  ...
+# Subtest: reduced motion stays conservative until the initial device preference is known
+ok 221 - reduced motion stays conservative until the initial device preference is known
+  ---
+  duration_ms: 121.802503
+  type: 'test'
+  ...
+# Subtest: live reduced-motion changes override an older in-flight preference query
+ok 222 - live reduced-motion changes override an older in-flight preference query
+  ---
+  duration_ms: 25.782721
+  type: 'test'
+  ...
+# Subtest: preference failures keep motion disabled while live preference changes still work
+ok 223 - preference failures keep motion disabled while live preference changes still work
+  ---
+  duration_ms: 16.51351
+  type: 'test'
+  ...
+# Subtest: unmount removes the preference listener and ignores late query and event updates
+ok 224 - unmount removes the preference listener and ignores late query and event updates
+  ---
+  duration_ms: 25.629511
+  type: 'test'
+  ...
+# Subtest: crop preview maps portrait, landscape and zoomed edges to square image bounds
+ok 225 - crop preview maps portrait, landscape and zoomed edges to square image bounds
+  ---
+  duration_ms: 4.335007
+  type: 'test'
+  ...
+# Subtest: gallery denial, permanent denial, cancellation and invalid assets do not prepare or save a photo
+ok 226 - gallery denial, permanent denial, cancellation and invalid assets do not prepare or save a photo
+  ---
+  duration_ms: 1.498376
+  type: 'test'
+  ...
+# Subtest: gallery selection normalizes the chosen photo before cropping and propagates preparation errors
+ok 227 - gallery selection normalizes the chosen photo before cropping and propagates preparation errors
+  ---
+  duration_ms: 1.1461
+  type: 'test'
+  ...
+# Subtest: cropped photos copy to documents before persistence; failed saves preserve the previous avatar
+ok 228 - cropped photos copy to documents before persistence; failed saves preserve the previous avatar
+  ---
+  duration_ms: 0.937926
+  type: 'test'
+  ...
+# Subtest: local profile validation accepts managed image files and preserves existing URL photos
+ok 229 - local profile validation accepts managed image files and preserves existing URL photos
+  ---
+  duration_ms: 1.733083
+  type: 'test'
+  ...
+# Subtest: active frontend source uses Router-provided navigation modules
+ok 230 - active frontend source uses Router-provided navigation modules
+  ---
+  duration_ms: 1578.449301
+  type: 'test'
+  ...
+# Subtest: current no-plant codes and legacy provider JSON become helpful guidance
+ok 231 - current no-plant codes and legacy provider JSON become helpful guidance
+  ---
+  duration_ms: 4.089158
+  type: 'test'
+  ...
+# Subtest: scan failures have actionable messages without diagnostic passthrough
+ok 232 - scan failures have actionable messages without diagnostic passthrough
+  ---
+  duration_ms: 1.359927
+  type: 'test'
+  ...
+# Subtest: provider configuration failures are not mistaken for user authentication or bad photos
+ok 233 - provider configuration failures are not mistaken for user authentication or bad photos
+  ---
+  duration_ms: 0.717938
+  type: 'test'
+  ...
+# Subtest: patch failure retains report and retry only synchronizes
+ok 234 - patch failure retains report and retry only synchronizes
+  ---
+  duration_ms: 15.689166
+  type: 'test'
+  ...
+# Subtest: refetch retry skips a completed patch and guards duplicate scans
+ok 235 - refetch retry skips a completed patch and guards duplicate scans
+  ---
+  duration_ms: 1.892824
+  type: 'test'
+  ...
+# Subtest: cancelled scan suppresses late completion and never patches
+ok 236 - cancelled scan suppresses late completion and never patches
+  ---
+  duration_ms: 0.671848
+  type: 'test'
+  ...
+# Subtest: a scan for the wrong plant is rejected before any state mutation
+ok 237 - a scan for the wrong plant is rejected before any state mutation
+  ---
+  duration_ms: 1.196278
+  type: 'test'
+  ...
+# Subtest: a mismatched refreshed plant never enters the completed scan state
+ok 238 - a mismatched refreshed plant never enters the completed scan state
+  ---
+  duration_ms: 17.167493
+  type: 'test'
+  ...
+# Subtest: endSession is idempotent and clears successful and failed flow snapshots
+ok 239 - endSession is idempotent and clears successful and failed flow snapshots
+  ---
+  duration_ms: 7.631221
+  type: 'test'
+  ...
+# Subtest: closed scan resolve cannot alter or unlock a new pending scan
+ok 240 - closed scan resolve cannot alter or unlock a new pending scan
+  ---
+  duration_ms: 11.754368
+  type: 'test'
+  ...
+# Subtest: closed scan reject cannot alter or unlock a new pending scan
+ok 241 - closed scan reject cannot alter or unlock a new pending scan
+  ---
+  duration_ms: 2.269557
+  type: 'test'
+  ...
+# Subtest: closed update resolve cannot alter or unlock a new pending scan
+ok 242 - closed update resolve cannot alter or unlock a new pending scan
+  ---
+  duration_ms: 6.376321
+  type: 'test'
+  ...
+# Subtest: closed update reject cannot alter or unlock a new pending scan
+ok 243 - closed update reject cannot alter or unlock a new pending scan
+  ---
+  duration_ms: 1.646716
+  type: 'test'
+  ...
+# Subtest: closed fetch resolve cannot alter or unlock a new pending scan
+ok 244 - closed fetch resolve cannot alter or unlock a new pending scan
+  ---
+  duration_ms: 3.448512
+  type: 'test'
+  ...
+# Subtest: closed fetch reject cannot alter or unlock a new pending scan
+ok 245 - closed fetch reject cannot alter or unlock a new pending scan
+  ---
+  duration_ms: 0.987713
+  type: 'test'
+  ...
+# Subtest: saved result shows the actual 1-task count and routes to Care Tasks
+ok 246 - saved result shows the actual 1-task count and routes to Care Tasks
+  ---
+  duration_ms: 1412.166418
+  type: 'test'
+  ...
+# Subtest: saved result shows the actual 2-task count and routes to Care Tasks
+ok 247 - saved result shows the actual 2-task count and routes to Care Tasks
+  ---
+  duration_ms: 646.784653
+  type: 'test'
+  ...
+# Subtest: review fallback is counted as one saved task with readable explanation
+ok 248 - review fallback is counted as one saved task with readable explanation
+  ---
+  duration_ms: 292.436688
+  type: 'test'
+  ...
+# Subtest: failed synchronization retains tasks without false success; retry never scans again
+ok 249 - failed synchronization retains tasks without false success; retry never scans again
+  ---
+  duration_ms: 258.63916
+  type: 'test'
+  ...
+# Subtest: provider failure cannot display a saved-task result
+ok 250 - provider failure cannot display a saved-task result
+  ---
+  duration_ms: 241.293896
+  type: 'test'
+  ...
+# Subtest: scanner gates capture on readiness and blocks duplicate captures
+ok 251 - scanner gates capture on readiness and blocks duplicate captures
+  ---
+  duration_ms: 1366.731308
+  type: 'test'
+  ...
+# Subtest: scanner preserves target forwarding and New Scan readiness
+ok 252 - scanner preserves target forwarding and New Scan readiness
+  ---
+  duration_ms: 470.204633
+  type: 'test'
+  ...
+# Subtest: missing and oversized camera payloads never reach the scan provider
+ok 253 - missing and oversized camera payloads never reach the scan provider
+  ---
+  duration_ms: 466.232029
+  type: 'test'
+  ...
+# Subtest: failed scan can Retake, and Retry Sync preserves diagnosis within the visit
+ok 254 - failed scan can Retake, and Retry Sync preserves diagnosis within the visit
+  ---
+  duration_ms: 321.247502
+  type: 'test'
+  ...
+# Subtest: guest, permission-denied, unfocused and background states cannot capture
+ok 255 - guest, permission-denied, unfocused and background states cannot capture
+  ---
+  duration_ms: 170.38949
+  type: 'test'
+  ...
+# Subtest: hook clears reports on route exit but preserves retry state across backgrounding
+ok 256 - hook clears reports on route exit but preserves retry state across backgrounding
+  ---
+  duration_ms: 149.750114
+  type: 'test'
+  ...
+# Subtest: hook unmount aborts an outstanding request and drops the transient report
+ok 257 - hook unmount aborts an outstanding request and drops the transient report
+  ---
+  duration_ms: 197.754804
+  type: 'test'
+  ...
+# Subtest: X clears failed photos and results Back permits three independent scan visits
+ok 258 - X clears failed photos and results Back permits three independent scan visits
+  ---
+  duration_ms: 257.82649
+  type: 'test'
+  ...
+# Subtest: X during capture: late resolve cannot unlock or replace the reopened capture
+ok 259 - X during capture: late resolve cannot unlock or replace the reopened capture
+  ---
+  duration_ms: 171.788922
+  type: 'test'
+  ...
+# Subtest: X during capture: late reject cannot unlock or replace the reopened capture
+ok 260 - X during capture: late reject cannot unlock or replace the reopened capture
+  ---
+  duration_ms: 161.294322
+  type: 'test'
+  ...
+# Subtest: leaving during scan: stale resolve produces no state or feedback in the next visit
+ok 261 - leaving during scan: stale resolve produces no state or feedback in the next visit
+  ---
+  duration_ms: 146.335902
+  type: 'test'
+  ...
+# Subtest: leaving during scan: stale reject produces no state or feedback in the next visit
+ok 262 - leaving during scan: stale reject produces no state or feedback in the next visit
+  ---
+  duration_ms: 103.456852
+  type: 'test'
+  ...
+# Subtest: leaving during update: stale resolve produces no state or feedback in the next visit
+ok 263 - leaving during update: stale resolve produces no state or feedback in the next visit
+  ---
+  duration_ms: 132.977516
+  type: 'test'
+  ...
+# Subtest: leaving during update: stale reject produces no state or feedback in the next visit
+ok 264 - leaving during update: stale reject produces no state or feedback in the next visit
+  ---
+  duration_ms: 104.820596
+  type: 'test'
+  ...
+# Subtest: leaving during fetch: stale resolve produces no state or feedback in the next visit
+ok 265 - leaving during fetch: stale resolve produces no state or feedback in the next visit
+  ---
+  duration_ms: 124.434729
+  type: 'test'
+  ...
+# Subtest: leaving during fetch: stale reject produces no state or feedback in the next visit
+ok 266 - leaving during fetch: stale reject produces no state or feedback in the next visit
+  ---
+  duration_ms: 145.606551
+  type: 'test'
+  ...
+# Subtest: old camera callbacks cannot ready or break a new preview; mount/permission recovery works
+ok 267 - old camera callbacks cannot ready or break a new preview; mount/permission recovery works
+  ---
+  duration_ms: 145.156755
+  type: 'test'
+  ...
+# Subtest: late permission rejection and unmounted capture cannot write into a later session
+ok 268 - late permission rejection and unmounted capture cannot write into a later session
+  ---
+  duration_ms: 121.892641
+  type: 'test'
+  ...
+# Subtest: untargeted reentry drops old route context and later targeted entry uses new context
+ok 269 - untargeted reentry drops old route context and later targeted entry uses new context
+  ---
+  duration_ms: 150.447724
+  type: 'test'
+  ...
+# Subtest: backgrounded capture cannot keep the foreground preview locked
+ok 270 - backgrounded capture cannot keep the foreground preview locked
+  ---
+  duration_ms: 188.171014
+  type: 'test'
+  ...
+# Subtest: development effect cleanup/setup replay leaves a readyable camera
+ok 271 - development effect cleanup/setup replay leaves a readyable camera
+  ---
+  duration_ms: 109.957315
+  type: 'test'
+  ...
+# Subtest: late Retry Sync finalizer cannot unlock a newly reopened capture
+ok 272 - late Retry Sync finalizer cannot unlock a newly reopened capture
+  ---
+  duration_ms: 100.046648
+  type: 'test'
+  ...
+# Subtest: scanner waits for validation, locks duplicate taps and submits a passing capture once
+ok 273 - scanner waits for validation, locks duplicate taps and submits a passing capture once
+  ---
+  duration_ms: 940.408045
+  type: 'test'
+  ...
+# Subtest: image_too_small never uploads and retake clears feedback
+ok 274 - image_too_small never uploads and retake clears feedback
+  ---
+  duration_ms: 272.016343
+  type: 'test'
+  ...
+# Subtest: low_resolution never uploads and retake clears feedback
+ok 275 - low_resolution never uploads and retake clears feedback
+  ---
+  duration_ms: 269.835859
+  type: 'test'
+  ...
+# Subtest: invalid_image never uploads and retake clears feedback
+ok 276 - invalid_image never uploads and retake clears feedback
+  ---
+  duration_ms: 293.078632
+  type: 'test'
+  ...
+# Subtest: cancelled never uploads and retake clears feedback
+ok 277 - cancelled never uploads and retake clears feedback
+  ---
+  duration_ms: 201.156425
+  type: 'test'
+  ...
+# Subtest: leaving via close aborts validation and ignores a late passing result
+ok 278 - leaving via close aborts validation and ignores a late passing result
+  ---
+  duration_ms: 153.935924
+  type: 'test'
+  ...
+# Subtest: leaving via route aborts validation and ignores a late passing result
+ok 279 - leaving via route aborts validation and ignores a late passing result
+  ---
+  duration_ms: 114.83289
+  type: 'test'
+  ...
+# Subtest: leaving via background aborts validation and ignores a late passing result
+ok 280 - leaving via background aborts validation and ignores a late passing result
+  ---
+  duration_ms: 122.215101
+  type: 'test'
+  ...
+# Subtest: leaving via signout aborts validation and ignores a late passing result
+ok 281 - leaving via signout aborts validation and ignores a late passing result
+  ---
+  duration_ms: 116.797746
+  type: 'test'
+  ...
+# Subtest: leaving via permission aborts validation and ignores a late passing result
+ok 282 - leaving via permission aborts validation and ignores a late passing result
+  ---
+  duration_ms: 121.867333
+  type: 'test'
+  ...
+# Subtest: leaving via unmount aborts validation and ignores a late passing result
+ok 283 - leaving via unmount aborts validation and ignores a late passing result
+  ---
+  duration_ms: 126.026316
+  type: 'test'
+  ...
+# Subtest: old validation cannot overwrite or unlock a new capture session
+ok 284 - old validation cannot overwrite or unlock a new capture session
+  ---
+  duration_ms: 146.777069
+  type: 'test'
+  ...
+# Subtest: real JS scanner validator rejects small_file before upload
+ok 285 - real JS scanner validator rejects small_file before upload
+  ---
+  duration_ms: 147.018238
+  type: 'test'
+  ...
+# Subtest: real JS scanner validator rejects small_dimensions before upload
+ok 286 - real JS scanner validator rejects small_dimensions before upload
+  ---
+  duration_ms: 120.09824
+  type: 'test'
+  ...
+# Subtest: real JS scanner validator rejects missing_dimensions before upload
+ok 287 - real JS scanner validator rejects missing_dimensions before upload
+  ---
+  duration_ms: 178.246631
+  type: 'test'
+  ...
+# Subtest: logout during refresh discards late rotation and clears secure credential
+ok 288 - logout during refresh discards late rotation and clears secure credential
+  ---
+  duration_ms: 81.032261
+  type: 'test'
+  ...
+# Subtest: secure storage read failure is explicit, retryable, and never reaches network
+ok 289 - secure storage read failure is explicit, retryable, and never reaches network
+  ---
+  duration_ms: 1.976617
+  type: 'test'
+  ...
+# Subtest: login 401 is not refreshed, password whitespace survives, account switch broadcasts
+ok 290 - login 401 is not refreshed, password whitespace survives, account switch broadcasts
+  ---
+  duration_ms: 3.919138
+  type: 'test'
+  ...
+# Subtest: browser coordinators use the same exclusive lock across tabs
+ok 291 - browser coordinators use the same exclusive lock across tabs
+  ---
+  duration_ms: 41.662535
+  type: 'test'
+  ...
+# Subtest: profile name updates use authenticated PATCH and publish validated server identity
+ok 292 - profile name updates use authenticated PATCH and publish validated server identity
+  ---
+  duration_ms: 143.692916
+  type: 'test'
+  ...
+# Subtest: late profile update cannot restore identity after switching to local access
+ok 293 - late profile update cannot restore identity after switching to local access
+  ---
+  duration_ms: 6.773172
+  type: 'test'
+  ...
+# Subtest: native restore persists rotation before profile and publishes only validated identity
+ok 294 - native restore persists rotation before profile and publishes only validated identity
+  ---
+  duration_ms: 14.337555
+  type: 'test'
+  ...
+# Subtest: browser bootstrap uses empty JSON, CSRF, cookies and no bearer [redacted] token [redacted]
+ok 295 - browser bootstrap uses empty JSON, CSRF, cookies and no bearer [redacted] token [redacted]
+  ---
+  duration_ms: 4.026236
+  type: 'test'
+  ...
+# Subtest: concurrent 401s single-flight refresh; cancelling a waiter does not abort rotation
+ok 296 - concurrent 401s single-flight refresh; cancelling a waiter does not abort rotation
+  ---
+  duration_ms: 7.392478
+  type: 'test'
+  ...
+# Subtest: late stale 401 reuses newer token [redacted] a second rotation
+ok 297 - late stale 401 reuses newer token [redacted] a second rotation
+  ---
+  duration_ms: 8.935431
+  type: 'test'
+  ...
+# Subtest: 403 and network mutation failures do not refresh or retry
+ok 298 - 403 and network mutation failures do not refresh or retry
+  ---
+  duration_ms: 4.574092
+  type: 'test'
+  ...
+# Subtest: retry is bounded to one, and repeated 401 invalidates session
+ok 299 - retry is bounded to one, and repeated 401 invalidates session
+  ---
+  duration_ms: 4.024863
+  type: 'test'
+  ...
+# Subtest: ambiguous native rotation failure erases consumed credential and does not retry
+ok 300 - ambiguous native rotation failure erases consumed credential and does not retry
+  ---
+  duration_ms: 45.326567
+  type: 'test'
+  ...
+# Subtest: SecureStore write failure never publishes access token
+ok 301 - SecureStore write failure never publishes access token
+  ---
+  duration_ms: 20.930878
+  type: 'test'
+  ...
+# Subtest: transient profile failure retains rotated credential and retries profile only
+ok 302 - transient profile failure retains rotated credential and retries profile only
+  ---
+  duration_ms: 4.051484
+  type: 'test'
+  ...
+# Subtest: logout cancels pending private request, accepts 204, and guest cannot hit private API
+ok 303 - logout cancels pending private request, accepts 204, and guest cannot hit private API
+  ---
+  duration_ms: 8.778976
+  type: 'test'
+  ...
+# Subtest: browser fallback fails closed without invoking refresh when Web Locks unavailable
+ok 304 - browser fallback fails closed without invoking refresh when Web Locks unavailable
+  ---
+  duration_ms: 0.804706
+  type: 'test'
+  ...
+# Subtest: restore: hanging profile times out, retains credentials and retries without authenticating again
+ok 305 - restore: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 30.968003
+  type: 'test'
+  ...
+# Subtest: login: hanging profile times out, retains credentials and retries without authenticating again
+ok 306 - login: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 16.04605
+  type: 'test'
+  ...
+# Subtest: register: hanging profile times out, retains credentials and retries without authenticating again
+ok 307 - register: hanging profile times out, retains credentials and retries without authenticating again
+  ---
+  duration_ms: 47.120941
+  type: 'test'
+  ...
+# Subtest: local profile edits persist while account names use the real profile endpoint
+ok 308 - local profile edits persist while account names use the real profile endpoint
+  ---
+  duration_ms: 268.585827
+  type: 'test'
+  ...
+# Subtest: profile photo persistence preserves names and isolates late writes across session changes
+ok 309 - profile photo persistence preserves names and isolates late writes across session changes
+  ---
+  duration_ms: 65.066964
+  type: 'test'
+  ...
+# Subtest: login offers account-free Dashboard entry without calling real sign-in
+ok 310 - login offers account-free Dashboard entry without calling real sign-in
+  ---
+  duration_ms: 106.096753
+  type: 'test'
+  ...
+# Subtest: profile keeps independent Rename, removes duplicate rows and gates account settings
+ok 311 - profile keeps independent Rename, removes duplicate rows and gates account settings
+  ---
+  duration_ms: 230.135541
+  type: 'test'
+  ...
+# Subtest: circular crop controls adjust image bounds, guard duplicate saves, keep errors retryable and cancel without saving
+ok 312 - circular crop controls adjust image bounds, guard duplicate saves, keep errors retryable and cancel without saving
+  ---
+  duration_ms: 172.712952
+  type: 'test'
+  ...
+# Subtest: fresh local entry opens Dashboard once, keeps setup optional, and permits later sign-in
+ok 313 - fresh local entry opens Dashboard once, keeps setup optional, and permits later sign-in
+  ---
+  duration_ms: 119.894632
+  type: 'test'
+  ...
+# Subtest: Guest cards open the selected space and its manual-add flow, persist data, and have no Garden entry
+ok 314 - Guest cards open the selected space and its manual-add flow, persist data, and have no Garden entry
+  ---
+  duration_ms: 548.008636
+  type: 'test'
+  ...
+# Subtest: space suggestions fill an editable name without creating a space and preserve custom-name saves in both sessions
+ok 315 - space suggestions fill an editable name without creating a space and preserve custom-name saves in both sessions
+  ---
+  duration_ms: 182.853215
+  type: 'test'
+  ...
+# Subtest: space-card counts stay beside their names and update with the current plant groups
+ok 316 - space-card counts stay beside their names and update with the current plant groups
+  ---
+  duration_ms: 63.074828
+  type: 'test'
+  ...
+# Subtest: detail cards keep cover photos above white name footers with bottom-right anchored menus and photo fallbacks
+ok 317 - detail cards keep cover photos above white name footers with bottom-right anchored menus and photo fallbacks
+  ---
+  duration_ms: 179.102877
+  type: 'test'
+  ...
+# Subtest: horizontal dots match measured dimensions and colors within an invisible accessible touch area
+ok 318 - horizontal dots match measured dimensions and colors within an invisible accessible touch area
+  ---
+  duration_ms: 11.277918
+  type: 'test'
+  ...
+# Subtest: reference dropdown has 75 by 32 pills, Inter Semi Bold labels and exact visible-dot anchoring
+ok 319 - reference dropdown has 75 by 32 pills, Inter Semi Bold labels and exact visible-dot anchoring
+  ---
+  duration_ms: 11.284521
+  type: 'test'
+  ...
+# Subtest: space dots measure their actual window position and stop card navigation
+ok 320 - space dots measure their actual window position and stop card navigation
+  ---
+  duration_ms: 13.258273
+  type: 'test'
+  ...
+# Subtest: dropdown overlay converts coordinates, pops open, closes outside and respects reduced motion
+ok 321 - dropdown overlay converts coordinates, pops open, closes outside and respects reduced motion
+  ---
+  duration_ms: 131.087984
+  type: 'test'
+  ...
+# Subtest: plus dropdown is left of its trigger and stays within narrow screen bounds
+ok 322 - plus dropdown is left of its trigger and stays within narrow screen bounds
+  ---
+  duration_ms: 14.321391
+  type: 'test'
+  ...
+# Subtest: dropdowns close on navigation blur and release native Back listeners on close and unmount
+ok 323 - dropdowns close on navigation blur and release native Back listeners on close and unmount
+  ---
+  duration_ms: 46.06243
+  type: 'test'
+  ...
+# Subtest: large-text add menus widen and wrap while retaining the gap beside the plus on narrow screens
+ok 324 - large-text add menus widen and wrap while retaining the gap beside the plus on narrow screens
+  ---
+  duration_ms: 840.310527
+  type: 'test'
+  ...
+# Subtest: plus opens only Scan Plant and Add a Plant beside it, dismisses outside, and preserves flows in both sessions
+ok 325 - plus opens only Scan Plant and Add a Plant beside it, dismisses outside, and preserves flows in both sessions
+  ---
+  duration_ms: 172.930897
+  type: 'test'
+  ...
+# Subtest: anchored dropdown sits below dots, closes outside or on selection, and confirms destructive changes
+ok 326 - anchored dropdown sits below dots, closes outside or on selection, and confirms destructive changes
+  ---
+  duration_ms: 78.344083
+  type: 'test'
+  ...
+# Subtest: space Archive and Delete use existing persistence, confirm deletion, and retain failed changes
+ok 327 - space Archive and Delete use existing persistence, confirm deletion, and retain failed changes
+  ---
+  duration_ms: 36.376693
+  type: 'test'
+  ...
+# Subtest: detail archive is scoped to the viewed space, with separate compact styling and retained fade dismissal
+ok 328 - detail archive is scoped to the viewed space, with separate compact styling and retained fade dismissal
+  ---
+  duration_ms: 34.734303
+  type: 'test'
+  ...
+# Subtest: plant menus are separate from spaces and gate unsupported Archive and guest deletion
+ok 329 - plant menus are separate from spaces and gate unsupported Archive and guest deletion
+  ---
+  duration_ms: 46.029757
+  type: 'test'
+  ...
+# Subtest: long press plant removal can be cancelled and only commits confirmed successful account deletion
+ok 330 - long press plant removal can be cancelled and only commits confirmed successful account deletion
+  ---
+  duration_ms: 67.615004
+  type: 'test'
+  ...
+# Subtest: completed installations exclude introductory routes for authenticated sessions
+ok 331 - completed installations exclude introductory routes for authenticated sessions
+  ---
+  duration_ms: 364.777393
+  type: 'test'
+  ...
+# Subtest: anonymous, pending setup, completed and skipped setup retain route guards
+ok 332 - anonymous, pending setup, completed and skipped setup retain route guards
+  ---
+  duration_ms: 446.231829
+  type: 'test'
+  ...
+# Subtest: restore and local failures expose recovery before account routes
+ok 333 - restore and local failures expose recovery before account routes
+  ---
+  duration_ms: 209.530992
+  type: 'test'
+  ...
+# Subtest: guest navigation waits for readiness and reduced motion disables transitions
+ok 334 - guest navigation waits for readiness and reduced motion disables transitions
+  ---
+  duration_ms: 123.887354
+  type: 'test'
+  ...
+# Subtest: saved setup step redirects mismatched deep links
+ok 335 - saved setup step redirects mismatched deep links
+  ---
+  duration_ms: 21.933694
+  type: 'test'
+  ...
+# Subtest: all 193 samples are chronological without mutating API order or losing null/zero light
+ok 336 - all 193 samples are chronological without mutating API order or losing null/zero light
+  ---
+  duration_ms: 5.715594
+  type: 'test'
+  ...
+# Subtest: seed client posts and preserves server device linkage and simulation marker
+ok 337 - seed client posts and preserves server device linkage and simulation marker
+  ---
+  duration_ms: 159.043032
+  type: 'test'
+  ...
+1..337
+# tests 337
+# suites 0
+# pass 337
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 19257.666919
+--- stderr ---
+npm notice run leaf-check-ai-frontend@1.0.0 test
+npm notice run node --import tsx --test tests/*.test.ts
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+--- outcome passed (exit 0) ---

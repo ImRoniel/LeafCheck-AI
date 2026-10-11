@@ -1,0 +1,18 @@
+{
+  "candidate": "2e7ea469da43b134d5ce80938fc5b95490e33b89",
+  "environment_files": "C-07 passed: private environment files untracked/ignored; examples allowed",
+  "history_scan": "C-08 passed: no matching credentials in bounded byte-safe redacting history scan; no dedicated scanner",
+  "dependency_audit": {
+    "result": "failed",
+    "high": 23,
+    "critical": 1,
+    "disposition": "Known unchanged dependencies; separate dependency-remediation scope recommended"
+  },
+  "http_invalid_input": {
+    "result": "passed",
+    "empty_status": 403,
+    "oversized_status": 413,
+    "generic_no_stack": true
+  },
+  "native": "Deferred/unverified D-01"
+}

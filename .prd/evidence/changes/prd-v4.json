@@ -19,6 +19,15 @@
       "agreement": "89e0d583ba5125eca36ae369b87dd8697d33dd6e7937588f866fbdc2b717d3d7",
       "manifest": ".prd/evidence/prd-v4/a2cf9e3746d89beb7f7e749b1c44cfcb5a37a51b/manifest.json",
       "recorded": "2026-10-07T15:07:06Z"
+    },
+    {
+      "candidate": "2e7ea469da43b134d5ce80938fc5b95490e33b89",
+      "base": "50fa92d1730fb9ebda86890f871299fb0f25992b",
+      "prd": ".prd/prd-v4.md",
+      "prd_revision": "e6b82da3ecc85f5836bba429e231d5ae7cf1d1bf9d62d3352174e7b7fe12466c",
+      "agreement": "89e0d583ba5125eca36ae369b87dd8697d33dd6e7937588f866fbdc2b717d3d7",
+      "manifest": ".prd/evidence/prd-v4/2e7ea469da43b134d5ce80938fc5b95490e33b89/manifest.json",
+      "recorded": "2026-10-11T02:28:52Z"
     }
   ]
 }

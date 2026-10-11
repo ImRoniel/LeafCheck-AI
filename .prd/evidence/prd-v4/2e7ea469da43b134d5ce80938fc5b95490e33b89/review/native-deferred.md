@@ -1,0 +1,1 @@
+Native C-05/C-06 and S-06/S-07/S-11 remain unverified under user-resolved D-01. No native build/device/backup/transfer/accessibility/Android Back evidence is claimed. Expo Go preview is local testing only and does not establish native acceptance. Follow frontend/tests/INSTALL_ONBOARDING_MANUAL_CHECKS.md and .prd/frontend-install-verification-v4.md in the future sprint.
