@@ -176,38 +176,10 @@ plantsRouter.get(
     // Virtual demo sensors retain their UUID and calibrated percentage contract.
     const isDemo = device.macAddress.startsWith("DEMO:");
     const queryDeviceId = isDemo ? device.id : device.macAddress;
-    const debug = process.env.TELEMETRY_DEBUG === "true";
-    if (debug) {
-      let databaseName: string | null = null;
-      try {
-        databaseName = new URL(process.env.DATABASE_URL ?? "").pathname.slice(1) || null;
-      } catch { /* Report missing/invalid configuration without exposing the URI. */ }
-      console.info("[Plant telemetry] MongoDB query", {
-        plantId: plant.id,
-        macAddress: device.macAddress,
-        queryDeviceId,
-        databaseUrlConfigured: Boolean(process.env.DATABASE_URL),
-        databaseName,
-        collection: "sensorReadings",
-      });
-    }
     const reading = await prisma.sensorReading.findFirst({
       where: { deviceId: queryDeviceId },
       orderBy: { timestamp: "desc" },
-    }).catch((cause: unknown) => {
-      if (debug) {
-        const code = typeof cause === "object" && cause !== null &&
-          "code" in cause && typeof cause.code === "string" ? cause.code : null;
-        // Full error messages can contain credentials or Prisma arguments.
-        console.error("[Plant telemetry] MongoDB query failed", {
-          queryDeviceId,
-          errorName: cause instanceof Error ? cause.name : "UnknownError",
-          code,
-        });
-      }
-      throw cause; // Preserve the existing sanitized HTTP error response.
     });
-    if (debug) console.info("[Plant telemetry] MongoDB result", { queryDeviceId, reading });
     let telemetry: TelemetryPayload | null = null;
     if (reading) {
       const lux = isDemo ? reading.lightLevel ?? null : reading.lightLux ?? null;

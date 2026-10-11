@@ -15,17 +15,6 @@ import { telemetryRouter } from "./routes/telemetry.js";
 import { usersRouter } from "./routes/users.js";
 
 const app = express();
-// Temporary request tracing: register before CORS, parsers, auth and routes.
-app.use((req, res, next) => {
-  const method = req.method;
-  const url = req.originalUrl.split("?")[0]; // Exclude potentially sensitive query values.
-  console.log("[HTTP] Incoming", { method, url });
-  res.once("finish", () => console.log("[HTTP] Complete", { method, url, status: res.statusCode }));
-  res.once("close", () => {
-    if (!res.writableFinished) console.log("[HTTP] Closed before completion", { method, url });
-  });
-  next();
-});
 const PORT = Number(process.env.PORT ?? 3000);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────

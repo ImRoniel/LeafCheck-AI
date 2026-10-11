@@ -191,13 +191,9 @@ export function createApiClient(
           };
           const usedToken = session?.snapshot().token ?? null;
           let response = await send();
-          if (/^\/api\/plants\/[^/]+\/telemetry$/.test(path))
-            console.log("[Plant telemetry API] HTTP response", { url: `${base}${path}`, status: response.status });
           if (response.status === 401 && !authRoute && session) {
             await session.refresh(usedToken);
             response = await send();
-            if (/^\/api\/plants\/[^/]+\/telemetry$/.test(path))
-              console.log("[Plant telemetry API] HTTP response after token refresh", { url: `${base}${path}`, status: response.status });
             if (response.status === 401) session.reject();
           }
           if (controller.signal.aborted) throw abortError;
@@ -300,21 +296,8 @@ export function createApiClient(
       return request(`/api/plants/${id(plantId)}/pair-device`, v.parsePairedPlant, options, "PATCH", { deviceId });
     },
     fetchPlantTelemetry: (plantId: string, options?: RequestOptions) => {
-      const url = `${base}/api/plants/${encodeURIComponent(plantId)}/telemetry`;
-      console.log("[Plant telemetry API] Request", { method: "GET", url });
-      const logFailure = (cause: unknown): never => {
-        const error = asApiError(cause);
-        console.log("[Plant telemetry API] Failed", {
-          url, kind: error.kind, status: error.status ?? null, message: error.message,
-        });
-        throw cause;
-      };
-      try {
-        v.uuid(plantId, "plantId");
-        return request(`/api/plants/${id(plantId)}/telemetry`, v.parsePlantTelemetry, options).catch(logFailure);
-      } catch (cause: unknown) {
-        return logFailure(cause);
-      }
+      v.uuid(plantId, "plantId");
+      return request(`/api/plants/${id(plantId)}/telemetry`, v.parsePlantTelemetry, options);
     },
     fetchPlant: (plantId: string, options?: RequestOptions) =>
       request(`/api/plants/${id(plantId)}`, v.parsePlant, options),
