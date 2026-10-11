@@ -1,0 +1,239 @@
+{
+  "command": "npm audit --omit=dev --json",
+  "result": "failed",
+  "counts": {
+    "high": 23,
+    "critical": 1
+  },
+  "findings": {
+    "@expo/cli": {
+      "severity": "high",
+      "range": "<=0.0.0-canary-20231123-1b19f96-4 || >=0.0.1-canary-20231125-d600e44",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "@expo/code-signing-certificates": {
+      "severity": "high",
+      "range": "*",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "@expo/metro": {
+      "severity": "high",
+      "range": "*",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "@expo/metro-config": {
+      "severity": "high",
+      "range": "<=0.0.1-canary-20240418-8d74597 || >=0.1.49-alpha.0",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "@expo/metro-file-map": {
+      "severity": "high",
+      "range": "<=57.0.3 || 58.0.0-canary-20260806-8c2d007 - 58.0.3",
+      "isDirect": false,
+      "fixAvailable": true
+    },
+    "@prisma/config": {
+      "severity": "high",
+      "range": "6.13.0-dev.1 - 8.1.0-dev.4",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.12.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@react-native/community-cli-plugin": {
+      "severity": "high",
+      "range": "*",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "react-native",
+        "version": "0.72.17",
+        "isSemVerMajor": true
+      }
+    },
+    "@react-native/metro-config": {
+      "severity": "high",
+      "range": "*",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "react-native",
+        "version": "0.72.17",
+        "isSemVerMajor": true
+      }
+    },
+    "@react-native/virtualized-lists": {
+      "severity": "high",
+      "range": ">=0.85.0-nightly-20260108-1236b6be4",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "react-native",
+        "version": "0.72.17",
+        "isSemVerMajor": true
+      }
+    },
+    "braces": {
+      "severity": "high",
+      "range": "*",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "deepmerge-ts": {
+      "severity": "high",
+      "range": "<8.0.0",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.12.0",
+        "isSemVerMajor": true
+      }
+    },
+    "expo": {
+      "severity": "high",
+      "range": ">=45.0.0-beta.1",
+      "isDirect": true,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "metro": {
+      "severity": "high",
+      "range": ">=0.71.0",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "metro-config": {
+      "severity": "high",
+      "range": ">=0.71.0",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "metro-file-map": {
+      "severity": "high",
+      "range": "*",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "metro-transform-worker": {
+      "severity": "high",
+      "range": ">=0.71.0",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "micromatch": {
+      "severity": "high",
+      "range": ">=0.2.0",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "node-forge": {
+      "severity": "high",
+      "range": "*",
+      "isDirect": false,
+      "fixAvailable": {
+        "name": "expo",
+        "version": "44.0.6",
+        "isSemVerMajor": true
+      }
+    },
+    "prisma": {
+      "severity": "high",
+      "range": "6.13.0-dev.1 - 8.1.0-dev.4",
+      "isDirect": true,
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.12.0",
+        "isSemVerMajor": true
+      }
+    },
+    "react-native": {
+      "severity": "high",
+      "range": ">=0.73.0-nightly-20230506-1af868c52",
+      "isDirect": true,
+      "fixAvailable": {
+        "name": "react-native",
+        "version": "0.72.17",
+        "isSemVerMajor": true
+      }
+    },
+    "react-native-reanimated": {
+      "severity": "high",
+      "range": "3.20.0-nightly-20250722-b6c8b9a3c - 4.0.0-nightly-20250309-9ce9085cb || 4.1.7 - 4.2.0-nightly-20251017-235c127fd || >=4.2.3",
+      "isDirect": true,
+      "fixAvailable": {
+        "name": "react-native-reanimated",
+        "version": "4.2.2",
+        "isSemVerMajor": true
+      }
+    },
+    "react-native-worklets": {
+      "severity": "high",
+      "range": ">=0.8.0-bundle-mode-preview-1",
+      "isDirect": true,
+      "fixAvailable": {
+        "name": "react-native-worklets",
+        "version": "0.7.4",
+        "isSemVerMajor": true
+      }
+    },
+    "shell-quote": {
+      "severity": "critical",
+      "range": "1.8.4 - 1.10.0",
+      "isDirect": false,
+      "fixAvailable": true
+    },
+    "source-map-js": {
+      "severity": "high",
+      "range": "1.0.0 - 1.2.1",
+      "isDirect": false,
+      "fixAvailable": true
+    }
+  },
+  "scope": "Existing dependency findings: manifests and lockfile unchanged from base. Separate remediation recommended; no automatic force upgrade."
+}

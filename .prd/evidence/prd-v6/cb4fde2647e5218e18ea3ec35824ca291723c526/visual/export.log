@@ -1,0 +1,68 @@
+npm notice run leaf-check-ai-workspace@1.0.0 npx
+npm notice run 'expo' export --platform web --output-dir /tmp/leafcheck-v6-evaluation-web
+React Compiler enabled
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+Static rendering is enabled. Learn more: https://docs.expo.dev/router/web/static-rendering/
+| (node:163785) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:163785) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:163785) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+λ Bundled 4496ms node_modules/@expo/cli/node_modules/@expo/router-server/node/render.js (1047 modules)
+Web Bundled 4909ms node_modules/expo-router/entry.js (1049 modules)
+
+› web bundles (2):
+_expo/static/js/web/entry-8b7c156b9461bd2027b9a3d662cec857.js (2MB)
+_expo/static/js/web/index-f01d0c8cf234a72e07a0de19c784d1c7.js (45KB)
+
+› Static routes (45):
+/ (index) (20KB)
+/login (20KB)
+/modal (20KB)
+/terms (20KB)
+/tasks (20KB)
+/splash (20KB)
+/camera (20KB)
+/garden (20KB)
+/search (20KB)
+/spaces (20KB)
+/profile (20KB)
+/explore (20KB)
+/scanner (20KB)
+/archives (20KB)
+/register (20KB)
+/settings (20KB)
+/_sitemap (19KB)
+/onboarding (20KB)
+/+not-found (19KB)
+/setup/care (20KB)
+/setup/plant (20KB)
+/setup/space (20KB)
+/(tabs) (20KB)
+/space-detail (20KB)
+/(tabs)/tasks (20KB)
+/plant-profile (20KB)
+/(tabs)/camera (20KB)
+/(tabs)/garden (20KB)
+/notifications (20KB)
+/(tabs)/search (20KB)
+/(tabs)/spaces (20KB)
+/(tabs)/explore (20KB)
+/(tabs)/scanner (20KB)
+/forgot-password (20KB)
+/otp-verification (20KB)
+/setup/experience (20KB)
+/(tabs)/space-detail (20KB)
+/setup/sensor-choice (20KB)
+/(tabs)/notifications (20KB)
+/device-connection (20KB)
+/device-connection/manage (20KB)
+/device-connection/scanner (20KB)
+/device-connection/success (20KB)
+/device-connection/selection (20KB)
+/device-connection/assignment (20KB)
+
+Exported: /tmp/leafcheck-v6-evaluation-web

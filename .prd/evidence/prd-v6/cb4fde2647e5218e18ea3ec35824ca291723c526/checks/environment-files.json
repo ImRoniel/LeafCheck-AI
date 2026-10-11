@@ -1,0 +1,16 @@
+{
+  "result": "passed",
+  "method": "git ls-files filtered to .env/.env.* basenames; git check-ignore --quiet on root/native/web representative paths",
+  "tracked": [
+    "frontend/.env.example"
+  ],
+  "unexpected_tracked": [],
+  "ignored": [
+    ".env",
+    ".env.production",
+    "backend/.env",
+    "frontend/.env.production",
+    "frontend/.env.local"
+  ],
+  "example_unignored": true
+}

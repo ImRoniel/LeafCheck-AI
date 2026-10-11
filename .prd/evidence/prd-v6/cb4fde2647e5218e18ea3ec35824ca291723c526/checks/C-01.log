@@ -1,0 +1,69 @@
+── C-01 candidate cb4fde2 (declared in .prd/coverage/prd-v6.json) ──
+  $ set -euo pipefail
+  $ test ! -e frontend/modules/install-onboarding
+  $ test ! -e frontend/services/install-onboarding-storage.native.ts
+  $ test ! -e frontend/tests/install-onboarding-native-contract.test.ts
+  $ (cd frontend && node --import tsx --test --test-concurrency=1 tests/install-onboarding-storage.test.ts tests/install-onboarding-asyncstorage.test.ts)
+  $ npm run typecheck --workspace=frontend
+  $ 
+TAP version 13
+# Subtest: one shared adapter ignores legacy keys and writes a durable boolean only
+ok 1 - one shared adapter ignores legacy keys and writes a durable boolean only
+  ---
+  duration_ms: 98.407375
+  type: 'test'
+  ...
+# Subtest: shared adapter failures and invalid booleans remain recoverable without overwrites
+ok 2 - shared adapter failures and invalid booleans remain recoverable without overwrites
+  ---
+  duration_ms: 19.888793
+  type: 'test'
+  ...
+# Subtest: missing marker starts splash, persists completion and reloads without repeating intro
+ok 3 - missing marker starts splash, persists completion and reloads without repeating intro
+  ---
+  duration_ms: 2.410781
+  type: 'test'
+  ...
+# Subtest: strict records reject malformed, unsupported and unexpected fields without overwriting
+ok 4 - strict records reject malformed, unsupported and unexpected fields without overwriting
+  ---
+  duration_ms: 1.681583
+  type: 'test'
+  ...
+# Subtest: read and write failures expose generic recovery and preserve incomplete state
+ok 5 - read and write failures expose generic recovery and preserve incomplete state
+  ---
+  duration_ms: 0.715382
+  type: 'test'
+  ...
+# Subtest: concurrent loads and final taps coalesce; listeners observe completion only after durable write
+ok 6 - concurrent loads and final taps coalesce; listeners observe completion only after durable write
+  ---
+  duration_ms: 0.654684
+  type: 'test'
+  ...
+# Subtest: synchronously throwing platform methods remain retryable
+ok 7 - synchronously throwing platform methods remain retryable
+  ---
+  duration_ms: 0.479183
+  type: 'test'
+  ...
+# Subtest: boolean flags accept only true and false; missing is incomplete
+ok 8 - boolean flags accept only true and false; missing is incomplete
+  ---
+  duration_ms: 0.373987
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1107.989564
+npm notice run leaf-check-ai-frontend@1.0.0 typecheck
+npm notice run tsc --noEmit
+✓ C-01 passed — attempt 000212-20261011T030253Z-31077e (source b666c6af84d8, logs .pincer/runtime/attempts/000212-20261011T030253Z-31077e/)

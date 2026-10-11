@@ -1,27 +1,26 @@
 ---
-prd: .prd/prd-v4.md
-base: 50fa92d1730fb9ebda86890f871299fb0f25992b
-candidate: 2e7ea469da43b134d5ce80938fc5b95490e33b89
-evidence: .prd/evidence/prd-v4/2e7ea469da43b134d5ce80938fc5b95490e33b89/manifest.json
+prd: .prd/prd-v6.md
+base: 55c2dc313e69f3eb02eeed93016c8d2d97d0c846
+candidate: cb4fde2647e5218e18ea3ec35824ca291723c526
+evidence: .prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/manifest.json
+report: .prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/report.json
+status: blocked
 ---
-# PRD v4 evaluation
 
-Installation onboarding gates session-dependent navigation: missing completion shows splash and every intro slide before login or authenticated setup/Home. Completion persists independently of accounts; failures remain retryable and cannot unlock routes early. Production native storage uses the local backup-excluded Expo module. Refresh tokens remain in SecureStore, access tokens in memory and web refresh in HttpOnly cookies.
+# PRD v6 evaluation — BLOCKED
 
-The authorized Expo Go preview update uses AsyncStorage only in StoreClient, with a separate key that never migrates into production completion. Standalone, development and unknown runtimes still require the native module. The Gradle cache ignore entry and lifecycle completion are committed in this candidate. The authorization basis is the existing current A-08 plus the user's request to reopen for “Added Expo Go fallback storage for local testing” and to re-verify/evaluate/release. No new dependency or architecture decisions were introduced.
+The AsyncStorage MVP is implemented and all three tickets are done. Independent review found no high-confidence source defect. Candidate checks C-01, C-02 and C-05 passed, including 336 frontend tests, 94 backend tests and frontend TypeScript. A five-scenario browser matrix passed with screenshots, persisted boolean completion and no page errors. No scope was cut or deferred.
 
-Fresh evaluation records 337 frontend tests, 94 backend tests, both TypeScript checks, behavioral ticket checks, a bounded redacting history scan and browser observations. No new high-confidence implementation findings. Anonymous and mocked restored-session browser flows showed splash and all three slides, then login or pending setup; reload skipped completed intro with no page errors. Invalid API requests returned clean 403/413 without stack traces. All command outcomes and provenance are in the manifest; a release audit follows the committed evaluation and is not predeclared here.
+Required real Expo Go C-04 is **unverified**; S-02/S-11/S-14 and R-01/R-04/R-05 therefore remain blocked. R-02 and R-03 have adequate automated evidence. The strict exporter rejected `REVIEW_MISSING`, so the manifest path above is intentionally absent: this is a blocked review report, not validated candidate evidence. The saved report/draft/logs preserve the work without manufacturing a PASS or evaluation locator.
 
-Ten agreed scenarios are delivered. R-01 is delivered; R-02/R-03 retain deferred dispositions because they include S-06/S-07/S-11, explicitly deferred under user-resolved D-01. C-05/C-06 remain unverified. Original full delivery is incomplete; agreed delivery is complete. Native builds, backup/transfer, reinstall lifecycle, native accessibility and Android Back are deferred to the future sprint. Browser fixtures and JavaScript adapter tests do not prove actual Expo Go device or production-native outcomes.
+Security checks: only frontend/.env.example is tracked among environment files; representative secret env paths remain ignored. A bounded redacting history scan found no suspect credentials (dedicated scanner unavailable). Live local Express middleware tests rejected malformed JSON with 400 and oversized bodies with 413. Routes/database were mocked; no production API was contacted.
 
-Known issues: npm audit reports 1 critical and 23 high records in the unchanged dependency tree, including shell-quote at package-lock.json:12954; C-09 honestly remains failed and optional under the agreed map. Recommend a separate dependency-remediation ticket, since upgrades are outside PRD v4. Existing final-slide CTA contains a garbled apostrophe at frontend/components/onboarding-slider.tsx:136; record a separate copy-fix ticket. Dedicated secret-scanner tooling is unavailable; the bounded byte-safe scanner found no matching credentials. T-18 protects the existing one-hop proxy policy and T-19 protects binary-safe history inspection.
+`npm audit --omit=dev` reports one critical (shell-quote 1.9.0) and 23 high existing dependency entries. Dependency manifests and lockfile are unchanged by this MVP. Record these as existing security issues requiring a separate compatibility-reviewed remediation ticket; no force fix or stack downgrade applied.
 
 ## Handover
 
-Read this document first, then .prd/prd-v4.md and the candidate manifest. Read frontend/tests/INSTALL_ONBOARDING_MANUAL_CHECKS.md and .prd/frontend-install-verification-v4.md for deferred acceptance. Trace frontend/app/_layout.tsx → installation provider/store → platform adapter/local Expo module. Root NOTES is the human summary; .prd/evidence/changes/prd-v4.json is the change's evaluation authority.
+Read .prd/prd-v6.md first, then frontend/services/install-onboarding-storage.ts, install-onboarding-store.ts and app/_layout.tsx. The shared AsyncStorage dependency stores only @leafcheck_onboarding_complete as a JSON boolean string. Existing expo-secure-store keeps native refresh credentials; access JWTs remain in memory. Expo Router owns protected navigation; React hooks own the two-second startup timer. No dependency was added.
 
-Expo Router provides guarded navigation; every root route must be explicitly declared to prevent automatic route registration from bypassing intro. Expo Modules Core binds the local Swift/Kotlin module to production JavaScript. SecureStore remains the credential boundary. AsyncStorage serves account garden state and isolated Expo Go preview state; browser completion uses localStorage. expo-constants identifies StoreClient explicitly, so missing modules alone never enable weaker storage. Existing dependencies earned their place through these platform boundaries; no packages were added or upgraded.
+The least-tested path is real Expo Go/native lifecycle behavior. Ordinary app backup/restore isolation is no longer guaranteed; old markers are ignored and may cause a one-time intro replay. Browser tests use controlled API fixtures and cannot certify real auth/network/device operation. Follow frontend/tests/INSTALL_ONBOARDING_MANUAL_CHECKS.md, record actual device/runtime/reset method and results in .prd/frontend-mvp-verification-v6.md, then rerun pincer-evaluate to create fresh candidate-bound evidence. A changed tracked handoff requires a new candidate and rerun checks. Resolve existing dependency findings separately.
 
-The riskiest aging assumptions are native backup exclusions, module build integration, marker-schema compatibility, runtime identification and SecureStore device-only settings. Native device acceptance is the least-tested path. Rebuild production/development binaries to include the module; OTA alone cannot supply it. Expo Go supports local preview only. Preserve production failure recovery, isolated keys and credential options when upgrading Expo. Adding a root route requires updating guards. Production deployment assumes one trusted proxy hop; revisit it when network topology changes.
-
-Next: perform deferred native build/device tests and separately remediate dependency vulnerabilities and CTA copy. Local evaluation commits are authorized; publishing, pushing and merging remain outside this work.
+Run pincer-release for an artifact audit; it will currently fail because no valid manifest/locator exists and real-device evidence is missing. Review artifacts and exact outcomes live in the report path above.

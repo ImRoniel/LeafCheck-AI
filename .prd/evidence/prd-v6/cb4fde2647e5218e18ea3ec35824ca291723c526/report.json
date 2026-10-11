@@ -1,0 +1,292 @@
+{
+  "type": "blocked-evaluation-report",
+  "prd": ".prd/prd-v6.md",
+  "base": "55c2dc313e69f3eb02eeed93016c8d2d97d0c846",
+  "candidate": "cb4fde2647e5218e18ea3ec35824ca291723c526",
+  "created": "2026-10-11T03:08:42Z",
+  "verdict": "BLOCKED",
+  "note": "This is an honest evaluation report, not a runtime-validated manifest. Strict evidence export refused REVIEW_MISSING because required C-04 is unverified. No acceptance PASS or release readiness is claimed.",
+  "checks": [
+    {
+      "id": "C-01",
+      "kind": "command",
+      "result": "passed",
+      "required": true,
+      "attempt": "000212-20261011T030253Z-31077e",
+      "command": "node scripts/pincer-runtime.cjs check C-01 --candidate cb4fde2647e5218e18ea3ec35824ca291723c526",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/C-01.log"
+    },
+    {
+      "id": "C-02",
+      "kind": "command",
+      "result": "passed",
+      "required": true,
+      "attempt": "000213-20261011T030328Z-d53911",
+      "command": "node scripts/pincer-runtime.cjs check C-02 --candidate cb4fde2647e5218e18ea3ec35824ca291723c526",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/C-02.log"
+    },
+    {
+      "id": "C-03",
+      "kind": "review",
+      "result": "passed",
+      "required": true,
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/review/guidance.md"
+    },
+    {
+      "id": "C-04",
+      "kind": "review",
+      "result": "unverified",
+      "required": true,
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/review/expo-go.md"
+    },
+    {
+      "id": "C-05",
+      "kind": "command",
+      "result": "passed",
+      "required": true,
+      "attempt": "000214-20261011T030432Z-3bad2f",
+      "command": "node scripts/pincer-runtime.cjs check C-05 --candidate cb4fde2647e5218e18ea3ec35824ca291723c526",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/C-05.log"
+    }
+  ],
+  "supplemental_checks": [
+    {
+      "id": "environment-files",
+      "kind": "command",
+      "result": "passed",
+      "method": "git ls-files and git check-ignore through Python assertions",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/environment-files.json"
+    },
+    {
+      "id": "secret-history",
+      "kind": "command",
+      "result": "passed",
+      "method": "Python redacting pattern scan across all changed blobs in base..candidate, with manual source review; no dedicated scanner",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/secret-history.json"
+    },
+    {
+      "id": "dependency-audit",
+      "kind": "command",
+      "result": "failed",
+      "command": "npm audit --omit=dev --json",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/dependency-audit.json",
+      "note": "Existing: 1 critical and 23 high. Manifests and lockfile unchanged; remediation outside MVP scope."
+    },
+    {
+      "id": "http-rejection",
+      "kind": "command",
+      "result": "passed",
+      "command": "cd backend && node --import tsx/esm --experimental-test-module-mocks --test tests/security.test.mjs",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/http-rejection.log",
+      "note": "Real local Express server: malformed JSON returns 400 INVALID_JSON; oversized auth body returns 413 BODY_TOO_LARGE. DB/routes mocked; application parser/error handling exercised."
+    },
+    {
+      "id": "web-export",
+      "kind": "command",
+      "result": "passed",
+      "command": "EXPO_PUBLIC_API_URL=http://127.0.0.1:8097 npx expo export --platform web --output-dir /tmp/leafcheck-v6-evaluation-web",
+      "cwd": "frontend",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/export.log"
+    },
+    {
+      "id": "browser-matrix",
+      "kind": "command",
+      "result": "passed",
+      "command": "node /tmp/leafcheck-v6-browser.cjs",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/browser.log",
+      "note": "Harness saved under visual/browser-check.cjs. Browser fixture evidence cannot establish Expo Go operation."
+    },
+    {
+      "id": "code-quality",
+      "kind": "review",
+      "result": "passed",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/review/code-quality.md",
+      "note": "Independent reviewer reported no high-confidence source findings."
+    },
+    {
+      "id": "visual",
+      "kind": "review",
+      "result": "passed",
+      "artifact": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/review.md",
+      "note": "Browser visual review only; physical-device obligation remains unverified."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "R-01",
+      "disposition": "blocked",
+      "reason": "S-02 requires unverified C-04; automated removal/shared storage and documentation checks passed."
+    },
+    {
+      "id": "R-02",
+      "disposition": "delivered",
+      "reason": "C-01/C-02 prove boolean persistence, rejection, durable completion and independence."
+    },
+    {
+      "id": "R-03",
+      "disposition": "delivered",
+      "reason": "C-02 verifies all destinations and auth/guest isolation; browser corroborates fixtures."
+    },
+    {
+      "id": "R-04",
+      "disposition": "blocked",
+      "reason": "S-11 requires unverified C-04; precise timer/race/cleanup tests passed."
+    },
+    {
+      "id": "R-05",
+      "disposition": "blocked",
+      "reason": "S-13 automated workspace gate passed; S-14 real Expo Go remains unverified."
+    }
+  ],
+  "adequacy": {
+    "verdict": "adequate",
+    "note": "The declared checks and reviews are adequate to establish their mapped scenarios when performed. Missing required C-04 is explicitly a delivery blocker; planned review coverage is not treated as observed evidence."
+  },
+  "scope_dispositions": [],
+  "findings": [
+    {
+      "severity": "critical",
+      "location": "package-lock.json:12954",
+      "description": "Existing shell-quote 1.9.0 production dependency is flagged critical by npm audit.",
+      "recommendation": "Separate dependency remediation ticket; do not force downgrade the Expo stack."
+    },
+    {
+      "severity": "high",
+      "location": "package-lock.json",
+      "description": "23 existing high production dependency entries flagged by npm audit; exact package list saved in dependency-audit.json.",
+      "recommendation": "Separate dependency remediation after compatibility review."
+    },
+    {
+      "severity": "acceptance blocker",
+      "location": ".prd/frontend-mvp-verification-v6.md:3",
+      "description": "Real Expo Go S-14/C-04 unverified; blocks S-02/S-11/S-14 acceptance.",
+      "recommendation": "Perform the documented matrix on a real Expo Go device and rerun evaluation; no scope waiver inferred."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/C-01.log",
+      "sha256": "af5e2b745761ae9c9f466f32a2feafbbb3f6afe549328e17e704460e51b514b0"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/C-02.log",
+      "sha256": "2b20e92de06c94fb9c52cadc167872fb46277275956a9b2bfa6c2c5c08fc4f7f"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/C-05.log",
+      "sha256": "c69b39c644a81d4622eb7dc3baf5887cf875ceaa064aec2d7c002537f435bf38"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/dependency-audit.json",
+      "sha256": "3f8b71eceb0697f11d07b073704548b1d3e6098e0f6b99f433c44a4525e56696"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/environment-files.json",
+      "sha256": "65b0e3b60ef12d464deed043431ae1bcd997d188fb7dc6554b8d6d094e04742f"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/http-rejection.log",
+      "sha256": "9f904034a8ee91d681d918d598d94aa60df4cb17a471e0eb0f140f6ec5030606"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/checks/secret-history.json",
+      "sha256": "0cce781c88817d8dd1f4b8ab6180c238fb46c99534d718f28c0dc404f7861510"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/draft.json",
+      "sha256": "14df69fe8a323a969711325f325e3e440407f162369e1f7e5586be65f2500b17"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/review/code-quality.md",
+      "sha256": "4a0a649b98ae8eabcd9d21e40b543083da930f1e09274ddd1c3d1b4edd5e32b7"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/review/expo-go.md",
+      "sha256": "7a95a99b434d822e37bccce4cbc8e85d511fdb789b775ae70e898d0081b22f71"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/review/export-rejection.log",
+      "sha256": "2459a44c6ef02c2279f2b07ba5d260597475cfce135b1ba3aa033def9cb7ca41"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/review/guidance.md",
+      "sha256": "7a2fdd5911ce587ed22ce1db473c939e70f7f46c324109f1ffd1f6632342152b"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/browser-check.cjs",
+      "sha256": "6dfdc849f977c02126e67502a9c2b37c7fcffaa63c2e7c44f160398bf12e6e70"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/browser-observations.json",
+      "sha256": "5cf7f2971e46cb16a512bf28e449cf5e360e49a3bee557f05ebd018949f2c6c3"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/browser.log",
+      "sha256": "b30d3836959caea665f01322b6f8ed9ddc1f6b1912aca17e00a03b2df304462d"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/export.log",
+      "sha256": "c1320a0d1acabf26f09197ec13f526433753870d156f327cb4faea616bcb0e20"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-completed-anonymous-after.png",
+      "sha256": "cf7c4b01f41e27b94c3459b5619c2c1e5625eb4b9444ebb3772ab41d3f641476"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-completed-anonymous-splash.png",
+      "sha256": "2fc52a6728341bf20dda5838dd551f5db62be23b950f3a4f8ccd3ff253e00f82"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-completed-restored-after.png",
+      "sha256": "ce960794e2c40292673aaf759f4497fa209b635726521fb0f4d89306b3b31454"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-completed-restored-splash.png",
+      "sha256": "2fc52a6728341bf20dda5838dd551f5db62be23b950f3a4f8ccd3ff253e00f82"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-false-restored-after.png",
+      "sha256": "ce960794e2c40292673aaf759f4497fa209b635726521fb0f4d89306b3b31454"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-false-restored-intro.png",
+      "sha256": "3d996b046ffc40599e97712fe48e31b684ddd5a5a99ff2e37dedb5e0834e5152"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-false-restored-splash.png",
+      "sha256": "2fc52a6728341bf20dda5838dd551f5db62be23b950f3a4f8ccd3ff253e00f82"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-fresh-anonymous-after.png",
+      "sha256": "cf7c4b01f41e27b94c3459b5619c2c1e5625eb4b9444ebb3772ab41d3f641476"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-fresh-anonymous-intro.png",
+      "sha256": "3d996b046ffc40599e97712fe48e31b684ddd5a5a99ff2e37dedb5e0834e5152"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-fresh-anonymous-splash.png",
+      "sha256": "2fc52a6728341bf20dda5838dd551f5db62be23b950f3a4f8ccd3ff253e00f82"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-fresh-restored-after.png",
+      "sha256": "ce960794e2c40292673aaf759f4497fa209b635726521fb0f4d89306b3b31454"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-fresh-restored-intro.png",
+      "sha256": "3d996b046ffc40599e97712fe48e31b684ddd5a5a99ff2e37dedb5e0834e5152"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/leafcheck-v6-fresh-restored-splash.png",
+      "sha256": "2fc52a6728341bf20dda5838dd551f5db62be23b950f3a4f8ccd3ff253e00f82"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/preview-server.cjs",
+      "sha256": "e9411ebe34c58b25f7fa39ab4405f2a2f0a452dcf254a79978b3ba8abe944dff"
+    },
+    {
+      "path": ".prd/evidence/prd-v6/cb4fde2647e5218e18ea3ec35824ca291723c526/visual/review.md",
+      "sha256": "909ff87b4bd1903dc39d0f46c757611ea9a1a505e23c79f6bfa8a2344b940ad1"
+    }
+  ]
+}
