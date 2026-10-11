@@ -56,7 +56,7 @@ export function scannerHarness() {
   let validations = 0;
   let refreshes = 0;
   let canGoBack = true;
-  const navigation: string[] = [];
+  const navigation: (string | {pathname: string; params?: Record<string, string>})[] = [];
   const requests: ScanRequest[] = [];
   const signals: AbortSignal[] = [];
   const validationSignals: AbortSignal[] = [];
@@ -128,7 +128,7 @@ export function scannerHarness() {
     canGoBack: () => canGoBack,
     back: () => { navigation.push("back"); pathname = "/"; dirty = true; },
     replace: (path: string) => { navigation.push(path); pathname = path; dirty = true; },
-    push: (path: string) => { navigation.push(path); pathname = path; dirty = true; },
+    push: (path: string | {pathname: string; params?: Record<string, string>}) => { navigation.push(path); pathname = typeof path === "string" ? path : path.pathname; dirty = true; },
   };
   const native = {
     AppState: app, Linking: { openSettings: () => behavior.permission() },
@@ -152,6 +152,7 @@ export function scannerHarness() {
         createOscillator() { return { frequency: { setValueAtTime() {} }, connect() {}, start() {}, stop() {} }; }
         createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; }
       } },
+      setTimeout, clearTimeout,
       require(name: string): unknown {
         if (name === "react") return hooks;
         if (name === "react/jsx-runtime") return requireModule(name);
@@ -218,6 +219,7 @@ export function scannerHarness() {
     get preview() { return preview; },
     get stats() { return { mounts, unmounts, captures, validations, haptics, chimes, refreshes, writesAfterDispose }; },
     get text() { return rendered.filter((n) => (n.type as unknown) === "Text").map(text).join(" "); },
+    get diagnosticLines() { return rendered.filter(node => (node.type as unknown) === "Text" && node.props.children === flow.getState().report?.diagnostic.rawAnalysisText).map(node => node.props.numberOfLines); },
     get images() { return rendered.filter((n) => (n.type as unknown) === "Image"); },
     button: findButton,
     press(label: string) {

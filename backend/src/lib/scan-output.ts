@@ -13,10 +13,14 @@ const taskTypes = ["WATERING", "FERTILIZING", "PRUNING", "REPOTTING", "PEST_CONT
 export function validateScanEnvelope(value: unknown): asserts value is GeminiReportOutput {
   if (
     !record(value) ||
-    typeof value.healthStatus !== "string" || !["healthy", "warning", "critical"].includes(value.healthStatus) ||
+    !["living_plant", "artificial_plant", "non_plant"].includes(String(value.subjectKind)) ||
+    typeof value.healthStatus !== "string" ||
+    !(value.subjectKind === "living_plant" ? ["healthy", "warning", "critical"] : ["unknown"]).includes(value.healthStatus) ||
     !text(value.diagnosticReport, 50_000) ||
-    !record(value.notification) || !date(value.notification.notifyAt) ||
-    !text(value.notification.reason, 2000)
+    (value.subjectKind === "living_plant"
+      ? !record(value.notification) || !date(value.notification.notifyAt) || !text(value.notification.reason, 2000)
+      : value.notification !== null)
+
   ) {
     throw new HttpError(502, "SCAN_AI_UNAVAILABLE", "We couldn't complete your plant analysis. Please try again later.");
   }
@@ -25,7 +29,7 @@ export function validateScanEnvelope(value: unknown): asserts value is GeminiRep
 export function validateScanOutput(value: unknown): asserts value is GeminiStructuredOutput {
   validateScanEnvelope(value);
   if (
-    !('careTasks' in value) || !Array.isArray(value.careTasks) || value.careTasks.length < 1 || value.careTasks.length > 5 ||
+    !('careTasks' in value) || !Array.isArray(value.careTasks) || (value.subjectKind === "living_plant" ? value.careTasks.length < 1 || value.careTasks.length > 5 : value.careTasks.length !== 0) ||
     value.careTasks.some((task: unknown) =>
       !record(task) || !text(task.title, 200) || !text(task.description, 5000) ||
       typeof task.taskType !== "string" || !taskTypes.includes(task.taskType) ||

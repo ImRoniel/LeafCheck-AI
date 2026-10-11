@@ -1,3 +1,4 @@
+import { DiagnosticReport } from "./DiagnosticReport";
 import { api } from "@/services/api";
 import { selectPlantGuidance, telemetryGuidance } from "@/services/plant-guidance";
 import { usePollingResource } from "@/services/use-polling-resource";
@@ -41,7 +42,7 @@ export function PlantCareSummary({ plant, telemetry, telemetryError = false, lin
       {latest ? <>
         <Text style={ui.heading}>Latest scan: {latest.healthStatus}</Text>
         <Text style={ui.text}>{new Date(latest.createdAt).toLocaleString()}</Text>
-        <Text style={ui.text} numberOfLines={8}>{latest.rawAnalysisText || "No diagnostic text was saved."}</Text>
+        <DiagnosticReport key={latest.id} text={latest.rawAnalysisText || "No diagnostic text was saved."} />
       </> : !resource.loading && !resource.error && <Text style={ui.text}>{isPaired ? freshTelemetry ? "Live telemetry is active. Monitoring environment." : "Sensor paired. Waiting for a current environment reading." : "No saved diagnosis yet. Scan this plant to get care guidance."}</Text>}
       {tasks.length > 0 && <Text accessibilityRole="header" style={ui.heading}>Saved care actions</Text>}
       {tasks.slice(0, 3).map((task) => <View key={task.id} style={{ gap: 4, marginTop: 12 }}>

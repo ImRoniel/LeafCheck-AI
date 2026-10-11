@@ -24,6 +24,7 @@ export default function PlantProfile() {
   const [failure, setFailure] = useState<{ id: string; generation: number; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
@@ -61,9 +62,10 @@ export default function PlantProfile() {
       {plant && plant.id === id && (
         <>
           <View style={[ui.card, { alignItems: "center" }]}>
-            {plant.imageUrl ? (
+            {plant.imageUrl && plant.imageUrl !== failedImageUrl ? (
               <Image
                 source={{ uri: plant.imageUrl }}
+                onError={() => setFailedImageUrl(plant.imageUrl ?? null)}
                 style={{ width: "100%", height: 230, borderRadius: 20 }}
               />
             ) : (

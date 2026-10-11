@@ -13,6 +13,7 @@
 //   7. Return saved report and tasks for garden/task-screen synchronization
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { randomUUID } from "node:crypto";
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { geminiError, geminiModel } from "../lib/gemini.js";
@@ -25,6 +26,7 @@ import { prisma } from "../lib/prisma.js";
 import { validateScanImage } from "../lib/scan-input.js";
 import { validateScanEnvelope, validateScanOutput } from "../lib/scan-output.js";
 import { reportCareTasks } from "../lib/report-care-tasks.js";
+import { storeScanImage, discardScanImage, type StoredScanImage } from "../lib/scan-image-storage.js";
 import { persistScan } from "../lib/scan-persistence.js";
 import type { Prisma } from "../generated/postgres-client/index.js";
 import type { ScanRequest } from "../types/scan.js";
@@ -86,7 +88,13 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     const model = geminiModel();
     // ── Step 1: Identify species via Pl@ntNet ─────────────────────────────
     console.log("[Scan] Step 1: Identifying species via Pl@ntNet...");
-    const identification = await identifyPlant(imageBase64);
+    let identified = true;
+    const identification = await identifyPlant(imageBase64).catch((error: unknown) => {
+      // Pl@ntNet can reject artificial plants/objects before Gemini sees the photo.
+      if (!(error instanceof HttpError) || error.code !== "NO_PLANT_DETECTED") throw error;
+      identified = false;
+      return { speciesName: "Unidentified subject", commonName: null, confidence: 0, rawResponse: null };
+    });
     console.log(
       "[Scan] Identified: %s (%s) — confidence: %s%%",
       identification.speciesName,
@@ -128,6 +136,7 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     const [specs, latestReading] = await Promise.all([
       // 4a. PlantSpecCache lookup (with Perenual fallback)
       (async () => {
+        if (!identified) return null;
         let cached = await prismaPg.plantSpecCache.findUnique({
           where: { speciesName: identification.speciesName },
         });
@@ -251,11 +260,15 @@ Identification Confidence: ${(identification.confidence * 100).toFixed(1)}%
 ${specsBlock}
 ${telemetryBlock}
 
-Analyze the provided plant image along with the environmental data. Compare actual sensor readings against ideal species requirements where available.
+First classify the image as living_plant, artificial_plant, or non_plant. Visual evidence takes precedence over the suggested species identity.
+For artificial_plant, return exactly "This appears to be an artificial plant. No biological care is needed!" as diagnosticReport, healthStatus "unknown", and notification null. Do not include Care actions or biological recommendations.
+For non_plant, return "This doesn't appear to be a living plant. Please take a photo of a real plant to get care guidance." as diagnosticReport, healthStatus "unknown", and notification null. Do not include Care actions.
+For living_plant, compare the environmental data with ideal requirements. Keep the assessment brief: at most three short sentences before Care actions. Avoid essays and repeated advice.
 
 You MUST respond with a valid JSON object with exactly this structure (no markdown, no code fences, just raw JSON):
 {
-  "healthStatus": "healthy" | "warning" | "critical",
+  "subjectKind": "living_plant" | "artificial_plant" | "non_plant",
+  "healthStatus": "healthy" | "warning" | "critical" | "unknown",
   "diagnosticReport": "A personalized report as a single string with health assessment, diagnoses with confidence/severity, environmental assessment and care recommendations. Finish with exactly one Care actions section as specified below.",
   "notification": {
     "notifyAt": "ISO 8601 date-time for when the user should be notified to check on this plant next, based on your diagnosis",
@@ -263,10 +276,11 @@ You MUST respond with a valid JSON object with exactly this structure (no markdo
   }
 }
 
-In diagnosticReport, put the heading "Care actions:" on its own line, followed by 1 to 5 dash bullets. Each bullet must contain one short English manual action beginning with a verb (Check, Inspect, Water, Move, Review, etc.). Preserve conditions: prefer "Check soil moisture; water only if dry" over unconditional watering when moisture is unknown. Include "on YYYY-MM-DD at HH:mm UTC" using a realistic absolute future date based on the Current UTC Time above. Optional urgency is written "Urgency: routine", "Urgency: immediate" or "Urgency: urgent". For example: "- Inspect the undersides of leaves on YYYY-MM-DD at HH:mm UTC. Urgency: routine" (replace placeholders with real dates).
+For living_plant only, in diagnosticReport, put the heading "Care actions:" on its own line, followed by 1 to 5 dash bullets. Each bullet must contain one short English manual action beginning with a verb (Check, Inspect, Water, Move, Review, etc.). Preserve conditions: prefer "Check soil moisture; water only if dry" over unconditional watering when moisture is unknown. Include "on YYYY-MM-DD at HH:mm UTC" using a realistic absolute future date based on the Current UTC Time above. Optional urgency is written "Urgency: routine", "Urgency: immediate" or "Urgency: urgent". For example: "- Inspect the undersides of leaves on YYYY-MM-DD at HH:mm UTC. Urgency: routine" (replace placeholders with real dates).
 Use no nested bullets, recurrence syntax, tags, or separate careTasks JSON field. Keep each title short and each action self-contained, with no diagnosis prose under Care actions. Never turn an instruction not to treat into an affirmative treatment.
-For the notification, determine the optimal time to remind the user to re-check based on the overall health status and most urgent concern.
-If sensor data is stale or unavailable, note this limitation in your assessment.`;
+For living_plant only, for the notification, determine the optimal time to remind the user to re-check based on the overall health status and most urgent concern.
+For living_plant only, if sensor data is stale or unavailable, briefly note this limitation.
+For artificial_plant and non_plant, notification must be null, overriding the example structure above.`;
 
     console.log("[Scan] Step 6: Sending to Gemini...");
 
@@ -289,7 +303,6 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
 
     // Parse the structured JSON from Gemini
     let geminiOutput: unknown;
-    let structuredReport = true;
     try {
       // Strip markdown code fences if Gemini wraps them
       const cleaned = rawText
@@ -298,45 +311,56 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
         .trim();
       geminiOutput = JSON.parse(cleaned);
     } catch {
-      structuredReport = false;
-      // Fallback: extract from the raw text heuristically
-      console.warn(
-        "[Scan] Gemini did not return valid JSON. Using heuristic fallback.",
-      );
-      const lower = rawText.toLowerCase();
-      geminiOutput = {
-        healthStatus: lower.includes("critical")
-          ? "critical"
-          : lower.includes("warning") ||
-              lower.includes("disease") ||
-              lower.includes("pest") ||
-              lower.includes("deficien")
-            ? "warning"
-            : "healthy",
-        diagnosticReport: rawText,
-        notification: {
-          notifyAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-          reason: "Routine follow-up check recommended.",
+      // An unstructured response cannot safely determine whether a plant is real.
+      throw new HttpError(502, "SCAN_AI_UNAVAILABLE", "We couldn't complete your plant analysis. Please try again later.");
+    }
+
+    if (geminiOutput !== null && typeof geminiOutput === "object" && "subjectKind" in geminiOutput &&
+      (geminiOutput.subjectKind === "artificial_plant" || geminiOutput.subjectKind === "non_plant")) {
+      const subjectKind = geminiOutput.subjectKind;
+      // Normalize nonliving outcomes; never persist or generate tasks from them.
+      res.status(200).json({
+        success: true, subjectKind, plant: null, identification: null,
+        diagnostic: {
+          id: randomUUID(), healthStatus: "unknown",
+          rawAnalysisText: subjectKind === "artificial_plant"
+            ? "This appears to be an artificial plant. No biological care is needed!"
+            : "This doesn't appear to be a living plant. Please take a photo of a real plant to get care guidance.",
+          telemetryFreshness: "Environmental monitoring is intended for living plants.",
         },
-      };
+        telemetry: null, careTasks: [], notification: null,
+      });
+      return;
     }
 
     validateScanEnvelope(geminiOutput);
+    if (!identified) throw new HttpError(422, "NO_PLANT_DETECTED", "Please take a clearer photo of a living plant.");
     // Ignore any provider careTasks field: the report is the sole task source.
     const output = {
+      subjectKind: geminiOutput.subjectKind,
       healthStatus: geminiOutput.healthStatus,
       diagnosticReport: geminiOutput.diagnosticReport,
       notification: geminiOutput.notification,
-      careTasks: reportCareTasks(structuredReport ? geminiOutput.diagnosticReport : "Unstructured report requires review.", scanTime),
+      careTasks: reportCareTasks(geminiOutput.diagnosticReport, scanTime),
     };
     validateScanOutput(output);
     const healthStatus = output.healthStatus;
+    let storedImage: StoredScanImage | undefined;
+    let photoSaveFailed = false;
+    try {
+      storedImage = await storeScanImage(imageBase64, userId);
+      photoSaveFailed = storedImage.uploadFailed ?? false;
+    } catch {
+      // Storage errors can expose token-bearing URLs; log only a safe message.
+      photoSaveFailed = true;
+      console.error("[Scan] Profile photo could not be saved.");
+    }
     const saved = await persistScan(prismaPg, {
       userId, plantId,
       name: identification.commonName ?? identification.speciesName.split(" ")[0],
       species: identification.speciesName,
       location: location?.trim() || undefined,
-      scanTime, output,
+      scanTime, output, imageUrl: storedImage?.imageUrl,
       identification: {
         speciesName: identification.speciesName,
         commonName: identification.commonName,
@@ -347,6 +371,9 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
         ? JSON.parse(JSON.stringify(latestReading)) as Prisma.InputJsonValue : undefined,
       idealSpecs: specs
         ? JSON.parse(JSON.stringify(specs)) as Prisma.InputJsonValue : undefined,
+    }).catch(async (error: unknown) => {
+      if (storedImage) await discardScanImage(storedImage);
+      throw error;
     });
     plant = saved.plant;
     const analysis = saved.analysis;
@@ -355,10 +382,13 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
     // ── Step 10: Return to client ─────────────────────────────────────────
     res.status(201).json({
       success: true,
+      subjectKind: "living_plant",
+      photoSaveFailed,
       plant: {
         id: plant.id,
         name: plant.name,
         species: identification.speciesName,
+        deviceId: plant.deviceId,
       },
       identification: {
         speciesName: identification.speciesName,
@@ -382,8 +412,8 @@ If sensor data is stale or unavailable, note this limitation in your assessment.
         : null,
       careTasks: validTasks,
       notification: {
-        notifyAt: output.notification.notifyAt,
-        reason: output.notification.reason,
+        notifyAt: output.notification!.notifyAt,
+        reason: output.notification!.reason,
       },
     });
   } catch (error: unknown) {

@@ -128,3 +128,16 @@ test("missing measurements render unavailable while real zero values remain vali
   assert.deepEqual(elements(flow.renderTelemetry(flow.render())).filter(child => child.type === "MetricCard").map(child => child.props.value), [0, 0, "Unavailable", "Unavailable"]);
   assert.throws(() => parsePlantTelemetry({paired: true, device, telemetry: {...zero, deviceId: device.macAddress}}));
 });
+
+test("profile displays saved photo and falls back after an image load error", async (t) => {
+  const flow = profileHarness(async () => ({paired: false, device: null, telemetry: null}));
+  t.after(flow.dispose);
+  flow.metadata({plants: [{...testPlant, imageUrl: "data:image/jpeg;base64,/9j/2Q=="}]});
+  const image = elements(flow.render()).find(child => child.type === "Image");
+  assert.ok(image);
+  assert.equal((image.props.source as {uri: string}).uri, "data:image/jpeg;base64,/9j/2Q==");
+  (image.props.onError as () => void)();
+  assert.equal(elements(flow.render()).find(child => child.type === "Image"), undefined);
+  flow.metadata({plants: [{...testPlant, imageUrl: "https://example.com/new.jpg"}]});
+  assert.ok(elements(flow.render()).find(child => child.type === "Image"));
+});

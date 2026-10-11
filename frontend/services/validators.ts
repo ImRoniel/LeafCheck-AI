@@ -222,43 +222,27 @@ export const parseAnalysis = parse<AIDiagnosisResponse>(
     error: optional(text),
   }),
 );
-export const parseScan = parse<ScanResponse>(
-  object({
-    success: enumeration(true),
-    plant: object({
-      id: nonempty,
-      name: text,
-      species: text,
-    }),
-    identification: object({
-      speciesName: nonempty,
-      commonName: nullable(text),
-      confidence: range(0, 1),
-    }),
-    diagnostic: object({
-      id: nonempty,
-      healthStatus: health,
-      rawAnalysisText: text,
-      telemetryFreshness: text,
-    }),
-    telemetry: nullable(object(snapshot)),
-    careTasks: array(
-      object({
-        title: text,
-        taskType: text,
-        description: text,
-        urgency: enumeration("routine", "immediate", "urgent"),
-        dueDate: text,
-      }),
-    ),
-    notification: nullable(
-      object({
-        notifyAt: text,
-        reason: text,
-      }),
-    ),
-  }),
-);
+const scanCheck = object({
+  success: enumeration(true),
+  subjectKind: optional(enumeration("living_plant", "artificial_plant", "non_plant")),
+  photoSaveFailed: optional(boolean),
+  plant: nullable(object({ id: nonempty, name: text, species: text, deviceId: optional(nullable(uuid)) })),
+  identification: nullable(object({ speciesName: nonempty, commonName: nullable(text), confidence: range(0, 1) })),
+  diagnostic: object({ id: nonempty, healthStatus: health, rawAnalysisText: text, telemetryFreshness: text }),
+  telemetry: nullable(object(snapshot)),
+  careTasks: array(object({ title: text, taskType: text, description: text, urgency: enumeration("routine", "immediate", "urgent"), dueDate: text })),
+  notification: nullable(object({ notifyAt: text, reason: text })),
+});
+export function parseScan(value: unknown): ScanResponse {
+  const result = parse<ScanResponse>(scanCheck)(value);
+  if (result.subjectKind === "artificial_plant" || result.subjectKind === "non_plant") {
+    if (result.plant !== null || result.identification !== null || result.telemetry !== null ||
+      result.careTasks.length !== 0 || result.notification !== null || result.diagnostic.healthStatus !== "unknown") fail("response.nonliving");
+  } else if (!result.plant || !result.identification || result.diagnostic.healthStatus === "unknown") {
+    fail("response.living_plant");
+  }
+  return result;
+}
 
 const plantSummary = object({
   id: nonempty,

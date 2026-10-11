@@ -62,3 +62,55 @@ test("provider failure cannot display a saved-task result", async () => {
   assert.equal(h.button("Open Care Tasks"), undefined);
   h.unmount();
 });
+
+test("diagnostic report can expand and collapse", async () => {
+  const h = scannerHarness();
+  h.ready(); h.press("Capture and scan plant"); await h.settle();
+  assert.ok(h.button("Read More"));
+  assert.deepEqual(h.diagnosticLines, [3]);
+  h.press("Read More"); assert.ok(h.button("Read Less"));
+  assert.deepEqual(h.diagnosticLines, [undefined]);
+  h.press("Read Less"); assert.ok(h.button("Read More"));
+  assert.deepEqual(h.diagnosticLines, [3]);
+  h.unmount();
+});
+
+test("unpaired results enter pairing with the saved plant ID", async () => {
+  const h = scannerHarness();
+  h.behavior.scan = async () => ({...report, plant: {...report.plant!, deviceId: null}});
+  h.ready(); h.press("Capture and scan plant"); await h.settle();
+  h.press("Pair Sensor");
+  assert.deepEqual(JSON.parse(JSON.stringify(h.navigation)), [{pathname: "/device-connection/scanner", params: {targetType: "plant", targetId: report.plant!.id}}]);
+  h.unmount();
+});
+
+test("paired plants without telemetry do not offer pairing again", async () => {
+  const h = scannerHarness();
+  h.behavior.scan = async () => ({...report, plant: {...report.plant!, deviceId: "22222222-2222-4222-8222-222222222222"}, telemetry: null});
+  h.ready(); h.press("Capture and scan plant"); await h.settle();
+  assert.equal(h.button("Pair Sensor"), undefined);
+  h.unmount();
+});
+
+for (const subjectKind of ["artificial_plant", "non_plant"] as const) {
+  test(`${subjectKind} shows information without saving, tasks or pairing`, async () => {
+    const h = scannerHarness();
+    h.behavior.scan = async () => ({...report, subjectKind, plant: null, identification: null, diagnostic: {...report.diagnostic, healthStatus: "unknown", rawAnalysisText: "No biological care is needed!"}, careTasks: [], notification: null});
+    h.ready(); h.press("Capture and scan plant"); await h.settle();
+    assert.match(h.text, /INFORMATION/);
+    assert.match(h.text, /No biological care is needed/);
+    assert.doesNotMatch(h.text, /Plant saved|Upcoming Care Tasks|Next Check-in/);
+    assert.equal(h.button("Pair Sensor"), undefined);
+    assert.equal(h.stats.refreshes, 0);
+    h.unmount();
+  });
+}
+
+test("photo failure shows a toast while the saved scan stays successful", async () => {
+  const h = scannerHarness();
+  h.behavior.scan = async () => ({...report, photoSaveFailed: true});
+  h.ready(); h.press("Capture and scan plant"); await h.settle();
+  assert.match(h.text, /Profile photo could not be saved/);
+  assert.match(h.text, /Plant saved/);
+  h.unmount();
+});

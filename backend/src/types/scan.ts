@@ -25,11 +25,14 @@ export interface NotificationOutput {
   reason: string;
 }
 
+export type SubjectKind = "living_plant" | "artificial_plant" | "non_plant";
+
 /** Structured JSON output expected from Gemini */
 export interface GeminiReportOutput {
-  healthStatus: "healthy" | "warning" | "critical";
+  subjectKind: SubjectKind;
+  healthStatus: "healthy" | "warning" | "critical" | "unknown";
   diagnosticReport: string;
-  notification: NotificationOutput;
+  notification: NotificationOutput | null;
 }
 
 /** Validated report with application-derived tasks, not a provider task array. */
@@ -40,16 +43,19 @@ export interface GeminiStructuredOutput extends GeminiReportOutput {
 /** Top-level response from POST /api/scan */
 export interface ScanResponse {
   success: boolean;
+  subjectKind: SubjectKind;
+  photoSaveFailed?: boolean;
   plant: {
     id: string;
     name: string;
     species: string;
-  };
+    deviceId: string | null;
+  } | null;
   identification: {
     speciesName: string;
     commonName: string | null;
     confidence: number;
-  };
+  } | null;
   diagnostic: {
     id: string;
     healthStatus: string;
@@ -59,7 +65,7 @@ export interface ScanResponse {
   telemetry: {
     temperature: number;
     humidity: number;
-    soilMoisture: number;
+    soilMoisture: number | null;
     lightLevel: number | null;
     timestamp: string;
   } | null;

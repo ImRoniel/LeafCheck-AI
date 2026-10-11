@@ -36,6 +36,7 @@ let identificationWrites;
 let healthWrites;
 let writeOrder;
 let writeFailure;
+let imageFailure, imageWrites, discardedImages, noPlantIdentification;
 const captureWrite = (stage, data) => {
   writeOrder.push(stage);
   if (writeFailure === stage) throw new Error("private persistence detail");
@@ -126,7 +127,7 @@ before(async () => {
   });
   mock.module(new URL("../src/lib/plantnet.js", import.meta.url).href, {
     namedExports: {
-      identifyPlant: async () => { identifications++; return ({
+      identifyPlant: async () => { identifications++; if (noPlantIdentification) { const {HttpError} = await import("../src/lib/http.ts"); throw new HttpError(422, "NO_PLANT_DETECTED", "No plant"); } return ({
         speciesName,
         commonName: "Basil",
         confidence: 0.99,
@@ -157,6 +158,12 @@ before(async () => {
       },
     },
   });
+  mock.module(new URL("../src/lib/scan-image-storage.js", import.meta.url).href, {
+    namedExports: {
+      storeScanImage: async () => { imageWrites++; if (imageFailure) return {imageUrl: "data:image/jpeg;base64,/9j/2Q==", uploadFailed: true}; return {imageUrl: "https://example.com/plant.jpg", cloudinaryPublicId: "plant-photos/owner/test"}; },
+      discardScanImage: async () => { discardedImages++; },
+    },
+  });
   const { scanRouter } = await import("../src/routes/scan.ts");
   const app = express();
   app.use(express.json({ limit: "10mb" }));
@@ -181,7 +188,8 @@ beforeEach(() => {
   plantOwned = true;
   latestReading = null;
   telemetryReads = 0;
-  responseText = "healthy";
+  responseText = JSON.stringify({subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "healthy", notification: {notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up"}});
+  imageFailure = false; imageWrites = 0; discardedImages = 0; noPlantIdentification = false;
   guidanceQueries = [];
   taskWrites = [];
   identificationWrites = [];
@@ -231,7 +239,7 @@ test("cache hit skips Perenual and insertion", async () => {
 
 test("saved task fields match the public response and trusted scan ownership", async () => {
   const diagnosticReport = "Inspect leaves.\nCare actions:\n- Inspect leaves on 2027-01-01 at 09:00 UTC\n- Check soil moisture; water only if dry on 2027-01-02 at 10:00 UTC";
-  responseText = JSON.stringify({ healthStatus: "warning", diagnosticReport, careTasks: [{ title: "Contradictory provider task" }], notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" } });
+  responseText = JSON.stringify({ subjectKind: "living_plant", healthStatus: "warning", diagnosticReport, careTasks: [{ title: "Contradictory provider task" }], notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" } });
   const result = await scan(true);
   assert.equal(result.status, 201);
   assert.equal(result.body.careTasks.length, 2);
@@ -254,7 +262,7 @@ test("saved task fields match the public response and trusted scan ownership", a
 });
 
 test("report without actions always writes one review task regardless of provider task array", async () => {
-  responseText = JSON.stringify({ healthStatus: "healthy", diagnosticReport: "Healthy plant.", careTasks: [], notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" } });
+  responseText = JSON.stringify({ subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "Healthy plant.", careTasks: [], notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" } });
   assert.equal((await scan()).status, 201);
   assert.equal(taskWrites.length, 1);
   assert.equal(taskWrites[0].title, "Review plant health");
@@ -343,7 +351,7 @@ test("owned device telemetry and stale context are preserved with diagnostic tex
 
 test("malformed AI structures fail safely before creating plants or analyses", async () => {
   const valid = {
-    healthStatus: "warning", diagnosticReport: "Inspect the leaves.", careTasks: [],
+    subjectKind: "living_plant", healthStatus: "warning", diagnosticReport: "Inspect the leaves.", careTasks: [],
     notification: { notifyAt: new Date().toISOString(), reason: "Follow up" },
   };
   for (const output of [null, [], {}, { ...valid, healthStatus: ["healthy"] },
@@ -519,5 +527,57 @@ test("invalid runtime credential fails before cache work and recovers after repl
     assert.equal((await scan(true)).status, 201);
   } finally {
     process.env.GEMINI_API_KEY = key;
+  }
+});
+
+for (const subjectKind of ["artificial_plant", "non_plant"]) {
+  for (const newPlant of [false, true]) {
+    test(`${subjectKind} returns a short message without plant or image persistence (${newPlant ? "new" : "existing"})`, async () => {
+      responseText = JSON.stringify({subjectKind, healthStatus: "critical", diagnosticReport: "A very long incorrect essay", notification: {reason: "Treat this plant"}});
+      const result = await scan(newPlant);
+      assert.equal(result.status, 200);
+      assert.equal(result.body.plant, null);
+      assert.equal(result.body.identification, null);
+      assert.equal(result.body.notification, null);
+      assert.deepEqual(result.body.careTasks, []);
+      assert.equal(result.body.diagnostic.healthStatus, "unknown");
+      assert.ok(result.body.diagnostic.rawAnalysisText.length < 160);
+      assert.equal(plantCreates, 0); assert.equal(healthWrites.length, 0);
+      assert.equal(analyses.length, 0); assert.equal(taskWrites.length, 0);
+      assert.equal(identificationWrites.length, 0); assert.equal(imageWrites, 0);
+    });
+  }
+}
+test("Pl@ntNet no-match still allows Gemini to identify a nonliving object", async () => {
+  noPlantIdentification = true;
+  responseText = JSON.stringify({subjectKind: "non_plant"});
+  const result = await scan(true);
+  assert.equal(result.status, 200); assert.equal(result.body.subjectKind, "non_plant");
+  assert.equal(fetches, 0); assert.equal(plantCreates, 0);
+});
+test("living scan saves its profile photo and returns the paired device ID", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  const result = await scan();
+  assert.equal(result.status, 201);
+  assert.equal(healthWrites[0].imageUrl, "https://example.com/plant.jpg");
+  assert.equal(result.body.plant.deviceId, linkedDevice);
+  assert.equal(result.body.photoSaveFailed, false);
+});
+test("photo upload failure preserves diagnosis and signals a frontend toast", async () => {
+  imageFailure = true;
+  const result = await scan(true);
+  assert.equal(result.status, 201); assert.equal(result.body.photoSaveFailed, true);
+  assert.equal(healthWrites[0].imageUrl, "data:image/jpeg;base64,/9j/2Q=="); assert.equal(analyses.length, 1);
+});
+test("failed scan persistence cleans up its newly uploaded photo", async () => {
+  writeFailure = "analysis";
+  const result = await scan(true);
+  assert.equal(result.status, 500); assert.equal(discardedImages, 1);
+});
+test("unclassified and malformed AI reports cannot create plants", async () => {
+  for (const response of ["healthy", JSON.stringify({subjectKind: "invalid"}), JSON.stringify({healthStatus: "healthy"})]) {
+    responseText = response;
+    const result = await scan(true);
+    assert.equal(result.status, 502); assert.equal(plantCreates, 0);
   }
 });

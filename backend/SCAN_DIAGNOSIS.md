@@ -56,3 +56,32 @@ The local secret was not modified. An otherwise well-formed **AQ.** key no longe
 The backend build initially encountered a Windows engine-file lock. Retrying after the lock cleared successfully regenerated the declared Prisma 6.19.3 clients, compiled TypeScript, and packaged the PostgreSQL client. This also addressed the stale installed client encountered during the first test run; no Prisma upgrade or schema change was made for this fix.
 
 Final verification: backend build **passed**; standalone TypeScript checking **passed**; full backend test suite **51 passed, 0 failed**. Backend source/test whitespace checks passed (Git reported only line-ending conversion warnings). Successful scan-route tests use mocked providers and storage; the live read-only probe reproduced the credential rejection, not a successful production diagnosis.
+
+## Scan result classification and profile photos
+
+Gemini returns `subjectKind`: `living_plant`, `artificial_plant`, or `non_plant`.
+Artificial/non-plant results return a short informational message with `plant: null`,
+no identification, no care tasks and no notification. They do not save a plant,
+change an existing plant, upload a profile photo or synchronize garden state.
+Pl@ntNet no-match results still reach Gemini for visual classification; provider
+outages remain errors. Unstructured/unclassified Gemini output is rejected.
+
+Living-plant scans save the JPEG as the plant profile picture. The main scans/plants
+backend runs on Render; the teammate's Vercel IoT project is separate and is not
+used for image storage. Configure server-only `CLOUDINARY_CLOUD_NAME`,
+`CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` on Render (or in `backend/.env`
+for local development). The Cloudinary Node.js SDK uploads the JPEG data URI and
+PostgreSQL `Plant.imageUrl` stores its HTTPS `secure_url`. Credentials never go
+to the frontend.
+
+Missing Cloudinary configuration uses the temporary UI-testing fallback: a JPEG
+data URL stored in PostgreSQL. Upload failures also save that fallback, logging
+only a fixed message and returning `photoSaveFailed: true`; the scan still saves
+normally and the UI shows a small four-second message. A later successful scan
+replaces the temporary image with a Cloudinary URL.
+
+Newly uploaded Cloudinary assets are removed by public ID if scan persistence
+fails. Fallback data URLs need no remote cleanup. Superseded profile photos are
+retained; automatic deletion needs an image-reference retention policy. Scan
+results include the saved plant's `deviceId` so pairing is based on the relational
+link, rather than the presence of telemetry.

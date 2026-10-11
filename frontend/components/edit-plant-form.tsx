@@ -18,7 +18,7 @@ export function EditPlantForm({
     name: plant.name,
     species: plant.species,
     location: plant.location ?? "",
-    imageUrl: plant.imageUrl ?? "",
+    imageUrl: plant.imageUrl?.startsWith("data:") ? "" : plant.imageUrl ?? "",
     minMoisture: String(plant.minMoisture ?? 30),
     maxMoisture: String(plant.maxMoisture ?? 80),
   });
@@ -34,7 +34,8 @@ export function EditPlantForm({
       if (!fields.minMoisture.trim() || !fields.maxMoisture.trim())
         throw new Error("Enter both moisture thresholds (0–100).");
       const updated = await updatePlant(plant.id, {
-        ...fields,
+        name: fields.name, species: fields.species, location: fields.location,
+        ...(fields.imageUrl !== (plant.imageUrl?.startsWith("data:") ? "" : plant.imageUrl ?? "") ? { imageUrl: fields.imageUrl } : {}),
         minMoisture: Number(fields.minMoisture),
         maxMoisture: Number(fields.maxMoisture),
       });

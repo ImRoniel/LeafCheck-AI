@@ -23,12 +23,14 @@ export interface NotificationOutput {
 
 export interface ScanResponse {
   success: true;
-  plant: { id: string; name: string; species: string };
+  subjectKind?: "living_plant" | "artificial_plant" | "non_plant";
+  photoSaveFailed?: boolean;
+  plant: { id: string; name: string; species: string; deviceId?: string | null } | null;
   identification: {
     speciesName: string;
     commonName: string | null;
     confidence: number;
-  };
+  } | null;
   diagnostic: {
     id: string;
     healthStatus: HealthStatus;
@@ -38,7 +40,7 @@ export interface ScanResponse {
   telemetry: {
     temperature: number;
     humidity: number;
-    soilMoisture: number;
+    soilMoisture: number | null;
     lightLevel: number | null;
     timestamp: string;
   } | null;

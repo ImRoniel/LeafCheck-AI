@@ -17,7 +17,7 @@ test("pinned library ESM parses task title and date; adapter extracts only actio
   assert.match(tasks[1].title, /only if the soil is dry/);
   assert.equal(tasks[1].taskType, "WATERING");
   assert.equal(tasks[1].dueDate, "2027-01-02T10:00:00.000Z");
-  validateScanOutput({ healthStatus: "healthy", diagnosticReport: "Saved report", careTasks: tasks, notification: { notifyAt: "2027-01-01T10:00:00Z", reason: "Follow up" } });
+  validateScanOutput({ subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "Saved report", careTasks: tasks, notification: { notifyAt: "2027-01-01T10:00:00Z", reason: "Follow up" } });
 });
 
 test("missing, repeated, empty and unusable sections use a bounded review fallback", () => {

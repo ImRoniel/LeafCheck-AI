@@ -6,6 +6,9 @@
 // ESP32 telemetry, Gemini diagnostics + task generation).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { Ionicons } from "@expo/vector-icons";
+import { ProfilePhotoToast } from "@/components/ProfilePhotoToast";
+import { DiagnosticReport } from "@/components/DiagnosticReport";
 import { ScanViewfinder } from "@/components/scan-viewfinder";
 import { Notice, Screen } from "@/components/screen";
 import { measurement } from "@/components/telemetry-history";
@@ -171,8 +174,8 @@ export default function Camera() {
 
   const refreshPlants = data.refresh;
   useEffect(() => {
-    if (flow.phase === "complete" && enabledRef.current) void refreshPlants();
-  }, [flow.phase, refreshPlants]);
+    if (flow.phase === "complete" && flow.plant && enabledRef.current) void refreshPlants();
+  }, [flow.phase, flow.plant, refreshPlants]);
 
   // ── Capture ─────────────────────────────────────────────────────────────
   const capture = async () => {
@@ -275,7 +278,7 @@ export default function Camera() {
     return (
       <Screen title="AI Camera" back>
         <View style={s.gateContainer}>
-          <Text style={s.gateIcon}>📷</Text>
+          <Ionicons name="camera-outline" size={48} color="#278448" style={{ marginBottom: 16 }} />
           <Text style={s.gateTitle}>Sign in to scan plants</Text>
           <Text style={s.gateSubtitle}>
             Sign in to identify your plant, check its health, and save your
@@ -362,17 +365,17 @@ export default function Camera() {
       {/* ── Scan Report ──────────────────────────────────────────────────── */}
       {report && (
         <View style={s.reportCard}>
+          {report.photoSaveFailed && <ProfilePhotoToast key={report.diagnostic.id} />}
           <View style={s.reportHeader}>
-            <Text style={s.reportBadge}>
-              {report.diagnostic.healthStatus === "healthy"
-                ? "✅"
-                : report.diagnostic.healthStatus === "warning"
-                  ? "⚠️"
-                  : "🔴"}{" "}
-              {report.diagnostic.healthStatus.toUpperCase()}
-            </Text>
+            <Ionicons
+              name={report.diagnostic.healthStatus === "healthy" ? "checkmark-circle-outline" : report.diagnostic.healthStatus === "critical" ? "alert-circle-outline" : report.diagnostic.healthStatus === "warning" ? "warning-outline" : "information-circle-outline"}
+              size={24}
+              color={report.diagnostic.healthStatus === "healthy" ? "#278448" : report.diagnostic.healthStatus === "critical" ? "#C62828" : report.diagnostic.healthStatus === "warning" ? "#8B6914" : "#5A6B5E"}
+            />
+            <Text style={s.reportBadge}>{(report.subjectKind === "artificial_plant" || report.subjectKind === "non_plant" ? "INFORMATION" : report.diagnostic.healthStatus.toUpperCase())}</Text>
           </View>
 
+          {report.identification ? <>
           <Text style={s.reportSpecies}>
             {report.identification.commonName ??
               report.identification.speciesName}
@@ -383,21 +386,26 @@ export default function Camera() {
           <Text style={s.reportConfidence}>
             Confidence: {(report.identification.confidence * 100).toFixed(1)}%
           </Text>
+          </> : <Text style={s.reportSpecies}>{report.subjectKind === "artificial_plant" ? "Artificial plant" : "Not a living plant"}</Text>}
 
           <View style={s.divider} />
 
           <Text style={s.reportSectionTitle}>Diagnostic Report</Text>
-          <Text selectable style={s.reportBody}>
-            {report.diagnostic.rawAnalysisText ||
-              "No analysis text was returned."}
-          </Text>
+          <DiagnosticReport key={report.diagnostic.id} text={report.diagnostic.rawAnalysisText || "No analysis text was returned."} />
 
+          {report.plant && <>
           <View style={s.divider} />
 
-          <Text style={s.reportSectionTitle}>Telemetry</Text>
-          <Text style={s.reportMeta}>
-            {report.diagnostic.telemetryFreshness}
-          </Text>
+          <View style={s.sectionHeading}><Ionicons name="pulse-outline" size={20} color="#278448" /><Text style={s.reportSectionTitle}>Telemetry</Text></View>
+          <View style={s.telemetryHeader}>
+            <Text style={[s.reportMeta, { flex: 1 }]}>{report.diagnostic.telemetryFreshness}</Text>
+            {report.plant && !report.plant.deviceId && <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              style={s.secondaryButton}
+              onPress={() => router.push({ pathname: "/device-connection/scanner", params: { targetType: "plant", targetId: report.plant!.id } })}
+            ><Text style={s.secondaryButtonText}>Pair Sensor</Text></Pressable>}
+          </View>
           {report.telemetry ? (
             <View style={s.telemetryGrid}>
               <View style={s.telemetryItem}>
@@ -428,12 +436,13 @@ export default function Camera() {
           ) : (
             <Notice>No sensor telemetry was included in this scan.</Notice>
           )}
+          </>}
 
           {/* ── Care Tasks ──────────────────────────────────────────────── */}
           {report.careTasks.length > 0 && (
             <>
               <View style={s.divider} />
-              <Text style={s.reportSectionTitle}>📋 Upcoming Care Tasks</Text>
+              <View style={s.sectionHeading}><Ionicons name="clipboard-outline" size={20} color="#278448" /><Text style={s.reportSectionTitle}>Upcoming Care Tasks</Text></View>
               {report.careTasks.map((task, i) => (
                 <View key={i} style={s.taskCard}>
                   <View style={s.taskHeader}>
@@ -464,7 +473,7 @@ export default function Camera() {
             <>
               <View style={s.divider} />
               <View style={s.notifCard}>
-                <Text style={s.notifTitle}>🔔 Next Check-in</Text>
+                <View style={s.sectionHeading}><Ionicons name="notifications-outline" size={20} color="#8B6914" /><Text style={s.notifTitle}>Next Check-in</Text></View>
                 <Text style={s.notifTime}>
                   {new Date(report.notification.notifyAt).toLocaleString()}
                 </Text>
@@ -489,7 +498,7 @@ export default function Camera() {
               </Pressable>
             </>
           )}
-          {flow.phase === "complete" && (
+          {flow.phase === "complete" && report.plant && (
             <>
               <View style={s.successBanner}>
                 <Text style={s.successText}>
@@ -587,9 +596,12 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  sectionHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
+  telemetryHeader: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12 },
   reportHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
     marginBottom: 12,
   },
   reportBadge: { fontSize: 18, fontWeight: "700" },

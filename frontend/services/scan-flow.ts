@@ -106,6 +106,13 @@ export function createScanFlow(
         const report = await client.scanPlant(request, { signal });
         if (token !== generation)
           throw new ApiError("cancelled", "Scan cancelled");
+        if (report.subjectKind === "artificial_plant" || report.subjectKind === "non_plant") {
+          if (report.plant !== null || report.careTasks.length || report.notification !== null) {
+            throw new ApiError("validation", "Invalid nonliving scan result");
+          }
+          publish({ report, phase: "complete", plant: null });
+          return report;
+        }
         if (!report.plant?.id || (plantId && report.plant.id !== plantId))
           throw new ApiError("validation", "The scan response does not match the requested plant");
         // Extract the plant ID from the scan response (for auto-created plants)

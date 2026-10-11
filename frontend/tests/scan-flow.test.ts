@@ -40,7 +40,7 @@ test("cancelled scan suppresses late completion and never patches",async()=>{
 test("a scan for the wrong plant is rejected before any state mutation", async () => {
   let patches = 0;
   const flow = createScanFlow({
-    scanPlant: async () => ({ ...report, plant: { ...report.plant, id: "other" } }),
+    scanPlant: async () => ({ ...report, plant: { ...report.plant!, id: "other" } }),
     updatePlantHealth: async () => { patches++; return { id: "p", healthStatus: "healthy" }; },
     fetchPlant: async () => plant,
   });
@@ -119,4 +119,15 @@ for (const stage of ["scan", "update", "fetch"] as const) {
       assert.equal(patches, stage === "scan" ? 1 : 2);
     });
   }
+}
+
+for (const subjectKind of ["artificial_plant", "non_plant"] as const) {
+  test(`${subjectKind} completes without updating health or fetching a plant`, async () => {
+    const response: ScanResponse = {...report, subjectKind, plant: null, identification: null, careTasks: [], notification: null, diagnostic: {...report.diagnostic, healthStatus: "unknown"}};
+    const flow = createScanFlow({scanPlant: async () => response, updatePlantHealth: async () => assert.fail("must not patch"), fetchPlant: async () => assert.fail("must not fetch")});
+    await flow.scan({plantId: "p", imageBase64: "abc"});
+    assert.equal(flow.getState().phase, "complete");
+    assert.equal(flow.getState().plant, null);
+    assert.equal(flow.getState().report, response);
+  });
 }

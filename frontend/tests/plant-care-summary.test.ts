@@ -27,6 +27,7 @@ function render(props: Props, hasReport = true) {
     exports,
     require(name: string) {
       if (name === "react/jsx-runtime") return loadModule(name);
+      if (name === "./DiagnosticReport") return { DiagnosticReport: ({text}: {text: string}) => React.createElement(web.Text, null, text) };
       if (name === "react-native") return web;
       if (name === "expo-router") return { useRouter: () => ({ push: () => {} }) };
       if (name === "@/services/api") return { api: {} };

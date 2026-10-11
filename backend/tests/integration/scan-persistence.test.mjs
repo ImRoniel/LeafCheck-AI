@@ -16,7 +16,7 @@ const now = new Date("2026-10-04T12:00:00Z");
 const diagnosticReport = "Healthy plant.\nCare actions:\n- Check soil on 2027-01-01 at 09:00 UTC\n- Inspect leaves on 2027-01-02 at 09:00 UTC";
 const input = (plantId) => ({ userId, plantId, name: "Basil", species: "Ocimum basilicum", scanTime: now,
   identification: { speciesName: "Ocimum basilicum", confidence: 0.95, rawResponse: {} },
-  output: { healthStatus: "warning", diagnosticReport, careTasks: reportCareTasks(diagnosticReport, now), notification: { notifyAt: "2027-01-03T09:00:00Z", reason: "Review progress" } } });
+  output: { subjectKind: "living_plant", healthStatus: "warning", diagnosticReport, careTasks: reportCareTasks(diagnosticReport, now), notification: { notifyAt: "2027-01-03T09:00:00Z", reason: "Review progress" } } });
 
 before(async () => {
   await client.user.createMany({ data: [{ id: userId, email: `${userId}@test.invalid`, password: "unused" }, { id: outsider, email: `${outsider}@test.invalid`, password: "unused" }] });

@@ -9,6 +9,7 @@ export interface ScanPersistenceInput {
   name: string;
   species: string;
   location?: string;
+  imageUrl?: string;
   scanTime: Date;
   output: GeminiStructuredOutput;
   identification: Omit<Prisma.PlantIdentificationUncheckedCreateInput, "plantId">;
@@ -19,12 +20,15 @@ export interface ScanPersistenceInput {
 /** All scan-owned relational writes commit together; providers run before this. */
 export async function persistScan(client: Pick<PrismaClient, "$transaction">, input: ScanPersistenceInput) {
   validateScanOutput(input.output);
+  if (input.output.subjectKind !== "living_plant") {
+    throw new HttpError(400, "INVALID_INPUT", "Only living plant scans can be saved.");
+  }
   return client.$transaction(async (tx) => {
     const select = { id: true, name: true, species: true, deviceId: true } as const;
     const plant = input.plantId
       ? await tx.plant.findFirst({ where: { id: input.plantId, userId: input.userId }, select })
       : await tx.plant.create({ data: {
-        name: input.name, species: input.species, location: input.location,
+        name: input.name, species: input.species, location: input.location, imageUrl: input.imageUrl,
         userId: input.userId, healthStatus: "unknown", lastScannedAt: input.scanTime,
       }, select });
     if (!plant) throw new HttpError(404, "NOT_FOUND", "Plant not found.");
@@ -34,8 +38,8 @@ export async function persistScan(client: Pick<PrismaClient, "$transaction">, in
       plantId: plant.id, userId: input.userId, healthStatus: input.output.healthStatus,
       diagnoses: [], recommendations: [], rawAnalysisText: input.output.diagnosticReport,
       speciesName: input.species, telemetrySnapshot: input.telemetrySnapshot, idealSpecs: input.idealSpecs,
-      notificationTime: new Date(input.output.notification.notifyAt),
-      notificationReason: input.output.notification.reason, isArchived: true, archivedAt: input.scanTime,
+      notificationTime: new Date(input.output.notification!.notifyAt),
+      notificationReason: input.output.notification!.reason, isArchived: true, archivedAt: input.scanTime,
     } });
     const careTasks: CareTaskOutput[] = [];
     // At most five tasks; individual inserts keep report order and return the
@@ -56,6 +60,7 @@ export async function persistScan(client: Pick<PrismaClient, "$transaction">, in
     }
     await tx.plant.update({ where: { id: plant.id, userId: input.userId }, data: {
       healthStatus: input.output.healthStatus, lastScannedAt: input.scanTime, species: input.species,
+      ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
     } });
     return { plant, analysis, careTasks };
   });
