@@ -19,10 +19,11 @@ model SensorReading {
   deviceId        String
   temperature     Float
   humidity        Float
-  soilMoisture    Float
+  soilMoisture    Float?
   soilMoistureRaw Int?
   lightLevel      Float?
   timestamp       DateTime @default(now())
 
   @@index([deviceId, timestamp(sort: Desc)])
+  @@map("sensorReadings")
 }

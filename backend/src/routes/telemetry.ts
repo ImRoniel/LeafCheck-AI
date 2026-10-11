@@ -31,7 +31,7 @@ interface TelemetryBody {
   deviceId: string;
   temperature: number;
   humidity: number;
-  soilMoisture: number;
+  soilMoisture?: number | null;
   soilMoistureRaw?: number;
   lightLevel?: number;
 }
@@ -59,7 +59,7 @@ function validateTelemetryPayload(body: unknown): string[] {
   }
 
   // Required numeric fields
-  const requiredNumbers = ["temperature", "humidity", "soilMoisture"] as const;
+  const requiredNumbers = ["temperature", "humidity"] as const;
   for (const field of requiredNumbers) {
     if (typeof b[field] !== "number" || !Number.isFinite(b[field] as number)) {
       errors.push(`${field} must be a finite number.`);
@@ -67,7 +67,7 @@ function validateTelemetryPayload(body: unknown): string[] {
   }
 
   // Optional numeric fields
-  const optionalNumbers = ["soilMoistureRaw", "lightLevel"] as const;
+  const optionalNumbers = ["soilMoisture", "soilMoistureRaw", "lightLevel"] as const;
   for (const field of optionalNumbers) {
     if (b[field] !== undefined && b[field] !== null) {
       if (
@@ -156,7 +156,7 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
         deviceId,
         temperature,
         humidity,
-        soilMoisture,
+        soilMoisture: soilMoisture ?? null,
         soilMoistureRaw: soilMoistureRaw ?? null,
         lightLevel: lightLevel ?? null,
         timestamp: new Date(), // Server-authoritative
@@ -197,21 +197,25 @@ telemetryRouter.get(
         deviceId: reading.deviceId,
         timestamp: reading.timestamp.toISOString(),
         soilMoisture: {
-          percentage: reading.soilMoisture,
-          rawAnalogValue: reading.soilMoistureRaw ?? 0,
+          percentage: reading.soilMoisture ?? null,
+          rawAnalogValue: reading.soilMoistureRaw ?? null,
           status:
-            reading.soilMoisture > 70
+            reading.soilMoisture == null
+              ? "unavailable"
+              : reading.soilMoisture > 70
               ? "overwatered"
               : reading.soilMoisture < 30
                 ? "dry"
                 : "optimal",
         },
         lightLevel: {
-          lux: reading.lightLevel ?? 0,
+          lux: reading.lightLevel ?? null,
           status:
-            (reading.lightLevel ?? 0) < 500
+            reading.lightLevel == null
+              ? "unavailable"
+              : reading.lightLevel < 500
               ? "insufficient"
-              : (reading.lightLevel ?? 0) > 50_000
+              : reading.lightLevel > 50_000
                 ? "excessive"
                 : "optimal",
         },

@@ -172,26 +172,26 @@ plantsRouter.get(
       return;
     }
     const device = await ownedDevice(plant.deviceId, res.locals.auth.user.id);
-    // PostgreSQL IDs identify owned resources; hardware uses its MAC in MongoDB.
+    // Ingestion and retrieval both use the PostgreSQL device UUID.
     const reading = await prisma.sensorReading.findFirst({
-      where: { deviceId: device.macAddress },
+      where: { deviceId: device.id },
       orderBy: { timestamp: "desc" },
     });
     let telemetry: TelemetryPayload | null = null;
     if (reading) {
-      const lux = reading.lightLevel ?? 0;
+      const lux = reading.lightLevel ?? null;
       telemetry = {
         deviceId: reading.deviceId,
         timestamp: reading.timestamp.toISOString(),
         soilMoisture: {
-          percentage: reading.soilMoisture,
-          rawAnalogValue: reading.soilMoistureRaw ?? 0,
-          status: reading.soilMoisture > plant.maxMoisture ? "overwatered"
+          percentage: reading.soilMoisture ?? null,
+          rawAnalogValue: reading.soilMoistureRaw ?? null,
+          status: reading.soilMoisture == null ? "unavailable" : reading.soilMoisture > plant.maxMoisture ? "overwatered"
             : reading.soilMoisture < plant.minMoisture ? "dry" : "optimal",
         },
         lightLevel: {
           lux,
-          status: lux < 500 ? "insufficient" : lux > 50_000 ? "excessive" : "optimal",
+          status: lux == null ? "unavailable" : lux < 500 ? "insufficient" : lux > 50_000 ? "excessive" : "optimal",
         },
         environment: {
           temperatureCelsius: reading.temperature,

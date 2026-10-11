@@ -8,7 +8,7 @@ import { ScrollView, Text, View } from "react-native";
 import { Action, Notice, ui } from "./screen";
 
 export const measurement = (value: number | null | undefined, unit: string) =>
-  value == null ? "Not measured" : `${value} ${unit}`;
+  value == null ? "Unavailable" : `${value} ${unit}`;
 const metrics = [
   { key: "soilMoisture", title: "Moisture", unit: "%", max: 100 },
   { key: "temperature", title: "Temperature", unit: "°C", max: 40 },
@@ -55,7 +55,7 @@ export function TelemetryHistory({ deviceId }: { deviceId: string }) {
               <Text style={ui.text}>
                 {values.length
                   ? `Range: ${Math.min(...values)}–${Math.max(...values)} ${metric.unit}`
-                  : "Not measured"}
+                  : "Unavailable"}
               </Text>
               <ScrollView
                 horizontal

@@ -27,7 +27,6 @@ export default function PlantProfile() {
   const [editing, setEditing] = useState(false);
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
-    setSensor(null);
     setEditing(false);
     setFailure(null);
     setLoading(false);
@@ -46,6 +45,7 @@ export default function PlantProfile() {
   const payload = sensor !== null && sensor.id === id && sensor.generation === auth.generation ? sensor.payload : null;
   const error = failure !== null && failure.id === id && failure.generation === auth.generation ? failure.message : null;
   const retrySensor = () => setAttempt((value) => value + 1);
+  const isPaired = payload?.paired ?? Boolean(plant?.deviceId);
   const pairSensor = () => router.push({ pathname: "/device-connection/scanner", params: { targetType: "plant", targetId: typeof id === "string" ? id : "" } });
   return (
     <Screen
@@ -99,7 +99,7 @@ export default function PlantProfile() {
             Moisture thresholds: {plant.minMoisture ?? 30}% –{" "}
             {plant.maxMoisture ?? 80}%
           </Text>
-          <Action
+          {!isPaired && <Action
             label="Scan this plant"
             onPress={() =>
               router.push({
@@ -107,8 +107,13 @@ export default function PlantProfile() {
                 params: { plantId: plant.id },
               })
             }
-          />
+          />}
           {auth.status === "authenticated" ? <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} /> : <><PlantCareSummary key={plant.id} plant={plant} telemetry={null} linked={false} /><Notice>Sign in to connect a sensor.</Notice></>}
+          {isPaired && <View style={ui.card}>
+            <Text accessibilityRole="header" style={ui.heading}>AI Disease Diagnosis</Text>
+            <Text style={ui.text}>Take a photo to check for visible disease symptoms.</Text>
+            <Action label="Scan this plant" onPress={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id } })} />
+          </View>}
           {!editing && (
             <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} />
           )}

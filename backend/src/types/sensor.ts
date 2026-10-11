@@ -1,12 +1,12 @@
 export interface SoilMoisture {
-  percentage: number;
-  rawAnalogValue: number;
-  status: "optimal" | "dry" | "overwatered";
+  percentage: number | null;
+  rawAnalogValue: number | null;
+  status: "optimal" | "dry" | "overwatered" | "unavailable";
 }
 
 export interface LightLevel {
-  lux: number;
-  status: "insufficient" | "optimal" | "excessive";
+  lux: number | null;
+  status: "insufficient" | "optimal" | "excessive" | "unavailable";
 }
 
 export interface EnvironmentalReadings {

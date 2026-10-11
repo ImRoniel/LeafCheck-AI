@@ -6,7 +6,7 @@ import { parsePlantTelemetry } from "../services/validators";
 import { elements, press, profileHarness, plantId, accountId, testPlant } from "./helpers/plant-telemetry-harness";
 
 const device = { id: "22222222-2222-4222-8222-222222222222", name: "Bedroom sensor", macAddress: "LC-A50528", userId: accountId, status: "ONLINE" as const, createdAt: testPlant.createdAt, updatedAt: testPlant.updatedAt };
-const zero = { deviceId: device.macAddress, timestamp: testPlant.createdAt, environment: { temperatureCelsius: 0, humidityPercentage: 0 }, soilMoisture: { percentage: 0, rawAnalogValue: 0, status: "dry" as const }, lightLevel: { lux: 0, status: "insufficient" as const } };
+const zero = { deviceId: device.id, timestamp: testPlant.createdAt, environment: { temperatureCelsius: 0, humidityPercentage: 0 }, soilMoisture: { percentage: 0, rawAnalogValue: 0, status: "dry" as const }, lightLevel: { lux: 0, status: "insufficient" as const } };
 test("profile sibling identity remains unique while editing and changes with the plant", async (t) => {
   const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
   t.after(flow.dispose);
@@ -45,7 +45,7 @@ for (const payload of [{ paired: false, device: null, telemetry: null }, { paire
       else assert.deepEqual(elements(node).filter((child) => child.type === "MetricCard").map((child) => child.props.value), [0, 0, 0, 0]);
       press(node, "Show reading history");
       const history = elements(flow.renderTelemetry(flow.render())).find((child) => child.type === "TelemetryHistory");
-      assert.equal(history?.props.deviceId, device.macAddress);
+      assert.equal(history?.props.deviceId, device.id);
     }
     flow.metadata({ plants: [{ ...testPlant, name: "New name" }] }); flow.render(); assert.equal(reads, 1);
     flow.dispose();
@@ -104,4 +104,27 @@ test("guest metadata retains scanning and care without BFF reads", async () => {
   assert.doesNotMatch(JSON.stringify(node), /Missing or invalid plant ID/);
   assert.match(JSON.stringify(node), /Sign in to connect a sensor|PlantCareSummary/);
   press(node, "Scan this plant"); assert.equal(reads, 0); flow.dispose();
+});
+
+test("paired profile keeps scanning secondary and preserves metrics during refresh", async (t) => {
+  const flow = profileHarness(async () => ({paired: true, device, telemetry: zero}));
+  t.after(flow.dispose);
+  flow.render(); await nextTurn();
+  assert.match(JSON.stringify(flow.render()), /AI Disease Diagnosis/);
+  assert.equal(elements(flow.render()).filter(child => child.props.label === "Scan this plant").length, 1);
+  press(flow.renderTelemetry(flow.render()), "Refresh latest reading");
+  flow.render();
+  const refreshing = flow.renderTelemetry(flow.render());
+  assert.match(JSON.stringify(refreshing), /Updating sensor readings/);
+  assert.equal(elements(refreshing).filter(child => child.type === "MetricCard").length, 4);
+});
+
+test("missing measurements render unavailable while real zero values remain valid", async (t) => {
+  const telemetry = {...zero, soilMoisture: {percentage: null, rawAnalogValue: null, status: "unavailable" as const}, lightLevel: {lux: null, status: "unavailable" as const}};
+  const payload = parsePlantTelemetry({paired: true, device, telemetry});
+  const flow = profileHarness(async () => payload);
+  t.after(flow.dispose);
+  flow.render(); await nextTurn();
+  assert.deepEqual(elements(flow.renderTelemetry(flow.render())).filter(child => child.type === "MetricCard").map(child => child.props.value), [0, 0, "Unavailable", "Unavailable"]);
+  assert.throws(() => parsePlantTelemetry({paired: true, device, telemetry: {...zero, deviceId: device.macAddress}}));
 });

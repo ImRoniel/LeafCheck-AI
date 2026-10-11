@@ -31,7 +31,7 @@ export async function ensureTTLIndex(): Promise<void> {
 
   try {
     await prisma.$runCommandRaw({
-      createIndexes: "SensorReading",
+      createIndexes: "sensorReadings",
       indexes: [
         {
           key: { timestamp: 1 },

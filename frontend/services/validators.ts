@@ -121,13 +121,13 @@ export const telemetryCheck = object({
   deviceId: nonempty,
   timestamp: date,
   soilMoisture: object({
-    percentage: range(0, 100),
-    rawAnalogValue: integer(0),
-    status: enumeration("optimal", "dry", "overwatered"),
+    percentage: nullable(range(0, 100)),
+    rawAnalogValue: nullable(integer(0)),
+    status: enumeration("optimal", "dry", "overwatered", "unavailable"),
   }),
   lightLevel: object({
-    lux: range(0),
-    status: enumeration("insufficient", "optimal", "excessive"),
+    lux: nullable(range(0)),
+    status: enumeration("insufficient", "optimal", "excessive", "unavailable"),
   }),
   environment: object({
     temperatureCelsius: number,
@@ -137,7 +137,7 @@ export const telemetryCheck = object({
 const snapshot = {
   temperature: number,
   humidity: range(0, 100),
-  soilMoisture: range(0, 100),
+  soilMoisture: nullable(range(0, 100)),
   lightLevel: nullable(range(0)),
   timestamp: date,
 };
@@ -188,7 +188,7 @@ export function parsePlantTelemetry(value: unknown): PlantTelemetry {
   }
   const device = parseDevice(payload.device);
   const telemetry = payload.telemetry === null ? null : parseTelemetry(payload.telemetry);
-  if (telemetry && telemetry.deviceId !== device.macAddress) fail("response.telemetry.deviceId");
+  if (telemetry && telemetry.deviceId !== device.id) fail("response.telemetry.deviceId");
   return { paired: true, device, telemetry };
 }
 export function parsePairedPlant(value: unknown): Plant {

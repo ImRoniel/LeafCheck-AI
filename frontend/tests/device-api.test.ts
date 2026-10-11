@@ -7,7 +7,7 @@ const deviceId = "22222222-2222-4222-8222-222222222222";
 const timestamp = "2026-10-05T00:00:00.000Z";
 const device = { id: deviceId, userId: plantId, name: "Sensor", macAddress: "LC-A50528", status: "OFFLINE", createdAt: timestamp, updatedAt: timestamp };
 const plant = { id: plantId, deviceId, name: "Fern", species: "Fern", healthStatus: "healthy", createdAt: timestamp, updatedAt: timestamp };
-const telemetry = { deviceId: device.macAddress, timestamp, environment: { temperatureCelsius: 0, humidityPercentage: 0 }, soilMoisture: { percentage: 0, rawAnalogValue: 0, status: "dry" }, lightLevel: { lux: 0, status: "insufficient" } };
+const telemetry = { deviceId, timestamp, environment: { temperatureCelsius: 0, humidityPercentage: 0 }, soilMoisture: { percentage: 0, rawAnalogValue: 0, status: "dry" }, lightLevel: { lux: 0, status: "insufficient" } };
 const validation = (error: unknown) => error instanceof ApiError && error.kind === "validation";
 test("empty successful responses reject when contracts require a payload", async () => {
   const api = createApiClient({ fetch: async () => new Response(null, { status: 204 }) });
@@ -53,7 +53,7 @@ test("conflicts and malformed successful responses never become success", async 
   const api = (body: unknown, status = 200) => createApiClient({ fetch: async () => Response.json(body, { status }) });
   await assert.rejects(api({ error: "Already claimed" }, 409).claimDevice(device.macAddress), (e: unknown) => e instanceof ApiError && e.status === 409);
   for (const body of [{}, { ...device, id: device.macAddress }, { ...device, status: "fake" }]) await assert.rejects(api(body).claimDevice(device.macAddress), validation);
-  for (const body of [{ paired: false, device, telemetry: null }, { paired: true, device: null, telemetry: null }, { paired: true, device }, { paired: true, device, telemetry: { ...telemetry, deviceId } }, { paired: true, device, telemetry: { ...telemetry, environment: null } }]) await assert.rejects(api(body).fetchPlantTelemetry(plantId), validation);
+  for (const body of [{ paired: false, device, telemetry: null }, { paired: true, device: null, telemetry: null }, { paired: true, device }, { paired: true, device, telemetry: { ...telemetry, deviceId: device.macAddress } }, { paired: true, device, telemetry: { ...telemetry, environment: null } }]) await assert.rejects(api(body).fetchPlantTelemetry(plantId), validation);
   await assert.rejects(api({ ...plant, id: "mock" }).pairDeviceToPlant(plantId, deviceId), validation);
 });
 test("new routes refresh once and respect cancellation and timeout", async () => {

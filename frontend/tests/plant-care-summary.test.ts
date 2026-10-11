@@ -74,3 +74,18 @@ test("plant care view labels stale readings and does not invent a diagnosis for 
   assert.match(empty, /No saved diagnosis yet/);
   assert.doesNotMatch(empty, /Latest scan:|Check soil/);
 });
+
+test("paired care summary promotes monitoring only with current readings", () => {
+  const telemetry: TelemetryPayload = {
+    deviceId: "d", timestamp: new Date().toISOString(),
+    soilMoisture: {percentage: null, rawAnalogValue: null, status: "unavailable"},
+    lightLevel: {lux: null, status: "unavailable"},
+    environment: {temperatureCelsius: 25, humidityPercentage: 60},
+  };
+  const active = render({plant, telemetry}, false);
+  assert.match(active, /Live telemetry is active. Monitoring environment./);
+  assert.doesNotMatch(active, /Scan this plant to get care guidance/);
+  const waiting = render({plant, telemetry: null}, false);
+  assert.match(waiting, /Sensor paired. Waiting for a current environment reading./);
+  assert.doesNotMatch(waiting, /Live telemetry is active|Scan this plant to get care guidance/);
+});

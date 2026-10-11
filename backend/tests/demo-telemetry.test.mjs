@@ -284,6 +284,19 @@ test("demo seeding cannot reuse a device belonging to another owner or plant", a
   }
 });
 
+test("environment-only hardware readings preserve unavailable soil and light", async () => {
+  const hardwareId = randomUUID();
+  devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "physical" });
+  const response = await request("/api/telemetry", null, "POST", {deviceId: hardwareId, temperature: 25, humidity: 60});
+  assert.equal(response.status, 201);
+  const reading = await response.json();
+  assert.equal(reading.soilMoisture, null);
+  assert.equal(reading.lightLevel, null);
+  const latest = await (await request(`/api/telemetry/${hardwareId}/latest`)).json();
+  assert.equal(latest.soilMoisture.percentage, null);
+  assert.equal(latest.lightLevel.lux, null);
+});
+
 test("hardware ingestion accepts sensor boundaries and rejects invalid input before writes", async () => {
   const hardwareId = randomUUID();
   devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "physical" });

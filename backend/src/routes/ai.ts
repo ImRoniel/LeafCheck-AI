@@ -42,17 +42,17 @@ aiRouter.post(
         "status",
       ]);
       if (
-        typeof soil.percentage !== "number" ||
-        !Number.isFinite(soil.percentage) ||
-        !["dry", "optimal", "overwatered"].includes(String(soil.status))
+        (soil.percentage !== null && (typeof soil.percentage !== "number" ||
+        !Number.isFinite(soil.percentage))) ||
+        !["dry", "optimal", "overwatered", "unavailable"].includes(String(soil.status))
       )
         throw new HttpError(400, "INVALID_INPUT", "Invalid telemetry.");
       if (t.lightLevel !== undefined) {
         const light = bodyObject(t.lightLevel, ["lux", "status"]);
         if (
-          typeof light.lux !== "number" ||
-          !Number.isFinite(light.lux) ||
-          !["insufficient", "optimal", "excessive"].includes(
+          (light.lux !== null && (typeof light.lux !== "number" ||
+          !Number.isFinite(light.lux))) ||
+          !["insufficient", "optimal", "excessive", "unavailable"].includes(
             String(light.status),
           )
         )
@@ -93,8 +93,8 @@ aiRouter.post("/analyze", async (req: Request, res: Response) => {
 
     const telemetrySummary = request.telemetry
       ? `Associated Sensor Telemetry:
-  - Soil Moisture: ${request.telemetry.soilMoisture.percentage.toFixed(1)}% (${request.telemetry.soilMoisture.status})
-  ${request.telemetry.lightLevel ? `- Light Level: ${request.telemetry.lightLevel.lux.toFixed(1)} lux (${request.telemetry.lightLevel.status})` : ""}
+  - Soil Moisture: ${request.telemetry.soilMoisture.percentage == null ? "Unavailable" : `${request.telemetry.soilMoisture.percentage.toFixed(1)}%`} (${request.telemetry.soilMoisture.status})
+  ${request.telemetry.lightLevel ? `- Light Level: ${request.telemetry.lightLevel.lux == null ? "Unavailable" : `${request.telemetry.lightLevel.lux.toFixed(1)} lux`} (${request.telemetry.lightLevel.status})` : ""}
   ${request.telemetry.environment ? `- Temperature: ${request.telemetry.environment.temperatureCelsius}°C, Humidity: ${request.telemetry.environment.humidityPercentage}%` : ""}`
       : "";
 
