@@ -122,7 +122,7 @@ export const telemetryCheck = object({
   timestamp: date,
   soilMoisture: object({
     percentage: nullable(range(0, 100)),
-    rawAnalogValue: nullable(integer(0)),
+    rawAnalogValue: nullable(integer(0, 4095)),
     status: enumeration("optimal", "dry", "overwatered", "unavailable"),
   }),
   lightLevel: object({
@@ -147,7 +147,7 @@ const history = object({
       ...snapshot,
       id: nonempty,
       deviceId: nonempty,
-      soilMoistureRaw: nullable(integer(0)),
+      soilMoistureRaw: nullable(integer(0, 4095)),
     }),
   ),
   pagination: object({

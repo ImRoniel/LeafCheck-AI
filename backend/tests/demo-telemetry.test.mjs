@@ -57,7 +57,12 @@ const pg = {
       const d = devices.get(where.id);
       return d?.userId === where.userId ? d : null;
     },
-    findUnique: async ({ where }) => devices.get(where.id),
+    findUnique: async ({ where }) => {
+      if (where.macAddress !== undefined) {
+        return [...devices.values()].find(device => device.macAddress === where.macAddress) ?? null;
+      }
+      return devices.get(where.id);
+    },
   },
   $transaction: async (callback) => {
     const pending = queue.then(() => callback(pg));
@@ -248,7 +253,7 @@ test("hardware ingestion cannot contaminate demo data; hardware links are preser
         soilMoisture: 50,
       })
     ).status,
-    403,
+    400,
   );
   const demo = plant.deviceId;
   plant.deviceId = randomUUID();
@@ -284,32 +289,41 @@ test("demo seeding cannot reuse a device belonging to another owner or plant", a
   }
 });
 
-test("environment-only hardware readings preserve unavailable soil and light", async () => {
+test("hardware MAC resolves to UUID and raw ADC is never classified as a percentage", async () => {
   const hardwareId = randomUUID();
-  devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "physical" });
-  const response = await request("/api/telemetry", null, "POST", {deviceId: hardwareId, temperature: 25, humidity: 60});
+  devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "LC-A50528" });
+  const response = await request("/api/telemetry", null, "POST", {
+    deviceId: "lc-a50528", temperature: 25, humidity: 60, soilMoisture: 2024,
+    soilMoistureRaw: 2024, lightLux: 1200,
+  });
   assert.equal(response.status, 201);
   const reading = await response.json();
+  assert.equal(reading.deviceId, hardwareId);
   assert.equal(reading.soilMoisture, null);
-  assert.equal(reading.lightLevel, null);
+  assert.equal(reading.soilMoistureRaw, 2024);
+  assert.equal(reading.lightLevel, 1200);
+  assert.equal(rows.at(-1).deviceId, hardwareId);
   const latest = await (await request(`/api/telemetry/${hardwareId}/latest`)).json();
-  assert.equal(latest.soilMoisture.percentage, null);
-  assert.equal(latest.lightLevel.lux, null);
+  assert.deepEqual(latest.soilMoisture, { percentage: null, rawAnalogValue: 2024, status: "unavailable" });
+  assert.equal(latest.lightLevel.lux, 1200);
 });
 
 test("hardware ingestion accepts sensor boundaries and rejects invalid input before writes", async () => {
   const hardwareId = randomUUID();
-  devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "physical" });
-  const valid = { deviceId: hardwareId, temperature: 25, humidity: 60, soilMoisture: 50 };
+  devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "LC-000001" });
+  const valid = { deviceId: "LC-000001", temperature: 25, humidity: 60, soilMoisture: 2024, lightLux: 1200 };
   for (const extra of [
-    { temperature: -40, humidity: 0, soilMoisture: 0, soilMoistureRaw: 0, lightLevel: 0 },
-    { temperature: 125, humidity: 100, soilMoisture: 100, soilMoistureRaw: 4095 },
-    { soilMoistureRaw: null, lightLevel: null },
+    { temperature: -40, humidity: 0, soilMoisture: 0, soilMoistureRaw: 0, lightLux: 0 },
+    { temperature: 125, humidity: 100, soilMoisture: 4095, soilMoistureRaw: 4095 },
+    { soilMoistureRaw: null },
   ]) {
     const response = await request("/api/telemetry", null, "POST", { ...valid, ...extra });
     assert.equal(response.status, 201);
     const reading = await response.json();
     assert.equal(reading.deviceId, hardwareId);
+    assert.equal(reading.soilMoisture, null);
+    assert.equal(reading.soilMoistureRaw, extra.soilMoistureRaw ?? extra.soilMoisture ?? valid.soilMoisture);
+    assert.equal(reading.lightLevel, extra.lightLux ?? valid.lightLux);
     assert.ok(Number.isFinite(Date.parse(reading.timestamp)));
   }
   const count = writes;
@@ -317,27 +331,27 @@ test("hardware ingestion accepts sensor boundaries and rejects invalid input bef
   for (const body of [
     [], {},
     ...[
-      { deviceId: "not-a-uuid" }, { deviceId: "" }, { deviceId: null },
+      { deviceId: "not-a-mac" }, { deviceId: hardwareId }, { deviceId: "" }, { deviceId: null },
       { temperature: "25" }, { temperature: null }, { temperature: -41 }, { temperature: 126 },
-      { humidity: -1 }, { humidity: 101 }, { soilMoisture: -1 }, { soilMoisture: 101 },
+      { humidity: -1 }, { humidity: 101 }, { soilMoisture: -1 }, { soilMoisture: 4096 }, { soilMoisture: 1.5 }, { soilMoisture: null }, { soilMoisture: undefined },
       { soilMoistureRaw: -1 }, { soilMoistureRaw: 4096 }, { soilMoistureRaw: 1.5 },
-      { lightLevel: -1 }, { lightLevel: "10" }, { userId: "other" },
+      { lightLux: -1 }, { lightLux: "10" }, { lightLux: null }, { lightLux: undefined }, { lightLevel: 10 }, { userId: "other" },
       { timestamp: new Date().toISOString() },
     ].map((extra) => ({ ...valid, ...extra })),
   ]) {
     assert.equal((await request("/api/telemetry", null, "POST", body)).status, 400);
   }
   // JSON numeric overflow reaches the validator as Infinity; literal NaN is invalid JSON.
-  for (const field of ["temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLevel"]) {
+  for (const field of ["temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLux"]) {
     const body = JSON.stringify({ ...valid, [field]: "overflow" }).replace('"overflow"', "1e400");
     const response = await fetch(base + "/api/telemetry", {
       method: "POST", headers: { "Content-Type": "application/json" }, body,
     });
     assert.equal(response.status, 400);
   }
-  const unknown = await request("/api/telemetry", null, "POST", { ...valid, deviceId: randomUUID() });
+  const unknown = await request("/api/telemetry", null, "POST", { ...valid, deviceId: "LC-FFFFFF" });
   assert.equal(unknown.status, 404);
-  assert.deepEqual(await unknown.json(), { error: "Device not found." });
+  assert.deepEqual(await unknown.json(), { error: "Device not found. Claim this Device ID in the app before sending telemetry." });
   assert.equal(writes, count);
   assert.equal(rows.length, samples);
   failMongo = true;

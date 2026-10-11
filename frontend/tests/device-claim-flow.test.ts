@@ -25,7 +25,7 @@ test("manual input validates visibly, ownership conflict stays and retry succeed
   const flow = claimHarness();
   flow.permission(false);
   flow.press("Claim device");
-  assert.match(flow.text, /Enter a valid device MAC/);
+  assert.match(flow.text, /Enter a valid Device ID/);
   assert.equal(flow.claims.length, 0);
   flow.enter("{\"macAddress\":\"LC-A50528\"}");
   flow.press("Claim device");

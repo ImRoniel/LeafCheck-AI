@@ -1,3 +1,13 @@
+/** ESP32 ingestion fields; soil moisture is uncalibrated 12-bit ADC data. */
+export interface HardwareTelemetryPayload {
+  deviceId: string;
+  temperature: number;
+  humidity: number;
+  soilMoisture: number;
+  soilMoistureRaw?: number | null;
+  lightLux: number;
+}
+
 export interface SoilMoisture {
   percentage: number | null;
   rawAnalogValue: number | null;
@@ -15,8 +25,7 @@ export interface EnvironmentalReadings {
 }
 
 /**
- * TelemetryPayload — canonical payload shape shared across:
- *   - ESP32 firmware HTTP POST  (hardware/firmware/src/main.cpp)
+ * TelemetryPayload — normalized application response shape shared across:
  *   - Backend GET /api/telemetry/:deviceId/latest response
  *   - Frontend useSensorData hook
  *

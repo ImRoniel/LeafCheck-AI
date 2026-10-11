@@ -33,9 +33,10 @@ export function PlantTelemetry({ plant, payload, loading, error, onRefresh, onPa
         <View style={ui.row}>
           <MetricCard title="Temperature" value={telemetry.environment.temperatureCelsius} unit="°C" />
           <MetricCard title="Humidity" value={telemetry.environment.humidityPercentage} unit="%" />
-          <MetricCard title="Soil moisture" value={telemetry.soilMoisture.percentage ?? "Unavailable"} unit={telemetry.soilMoisture.percentage == null ? undefined : "%"} />
+          <MetricCard title="Soil Moisture (Raw)" value={telemetry.soilMoisture.rawAnalogValue ?? "Unavailable"} unit={telemetry.soilMoisture.rawAnalogValue == null ? undefined : "ADC"} />
           <MetricCard title="Light" value={telemetry.lightLevel.lux ?? "Unavailable"} unit={telemetry.lightLevel.lux == null ? undefined : "lux"} />
         </View>
+        <Text style={ui.text}>Soil moisture is a raw ADC reading from 0–4095. A percentage requires calibration.</Text>
       </>}
       <Action label="Show reading history" onPress={() => setHistoryDeviceId(payload.device.id)} />
       {historyDeviceId === payload.device.id && <TelemetryHistory key={historyDeviceId} deviceId={historyDeviceId} />}

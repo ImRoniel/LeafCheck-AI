@@ -47,7 +47,10 @@ before(async () => {
             where.id === deviceId && where.userId === "owner"
               ? { id: deviceId }
               : null,
-          findUnique: async () => ({ id: deviceId }),
+          findUnique: async ({ where }) => {
+            assert.deepEqual(where, { macAddress: "LC-A50528" });
+            return { id: deviceId, macAddress: "LC-A50528" };
+          },
         },
       },
     },
@@ -180,10 +183,11 @@ test("owner reads succeed and firmware ingestion still accepts no user JWT", asy
   assert.equal(
     (
       await request("/telemetry", null, {
-        deviceId,
+        deviceId: "LC-A50528",
         temperature: 25,
         humidity: 50,
-        soilMoisture: 40,
+        soilMoisture: 2048,
+        lightLux: 1200,
       })
     ).status,
     201,

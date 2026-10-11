@@ -12,10 +12,10 @@ import { asyncRoute } from "../lib/http.js";
 import { ownedDevice } from "../lib/ownership.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
-import { TelemetryPayload } from "../types/sensor.js";
+import type { HardwareTelemetryPayload, TelemetryPayload } from "../types/sensor.js";
 
 export const telemetryRouter = Router();
-// Only reads require user authentication. Firmware POST remains unchanged.
+// Only reads require user authentication. Firmware POST uses the hardware MAC address.
 telemetryRouter.get(
   ["/:deviceId/latest", "/:deviceId/history"],
   requireAuth,
@@ -26,15 +26,6 @@ telemetryRouter.get(
 );
 
 // ─── Validation ───────────────────────────────────────────────────────────────
-
-interface TelemetryBody {
-  deviceId: string;
-  temperature: number;
-  humidity: number;
-  soilMoisture?: number | null;
-  soilMoistureRaw?: number;
-  lightLevel?: number;
-}
 
 /**
  * Validates the incoming telemetry payload from the ESP32.
@@ -48,18 +39,18 @@ function validateTelemetryPayload(body: unknown): string[] {
     return ["Request body must be a JSON object."];
   }
 
-  const fields = ["deviceId", "temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLevel"];
+  const fields = ["deviceId", "temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLux"];
   if (Object.keys(b).some((key) => !fields.includes(key))) {
     errors.push("Unexpected telemetry fields.");
   }
 
-  // deviceId — required non-empty string
-  if (typeof b.deviceId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.deviceId)) {
-    errors.push("deviceId must be a valid resource ID.");
+  // deviceId — hardware identifier accepted by the app claim route
+  if (typeof b.deviceId !== "string" || !/^(?:LC-[0-9a-f]{6}|[0-9a-f]{2}(?::[0-9a-f]{2}){5}|[0-9a-f]{2}(?:-[0-9a-f]{2}){5})$/i.test(b.deviceId)) {
+    errors.push("deviceId must be a valid sensor MAC address, such as LC-A50528.");
   }
 
   // Required numeric fields
-  const requiredNumbers = ["temperature", "humidity"] as const;
+  const requiredNumbers = ["temperature", "humidity", "soilMoisture", "lightLux"] as const;
   for (const field of requiredNumbers) {
     if (typeof b[field] !== "number" || !Number.isFinite(b[field] as number)) {
       errors.push(`${field} must be a finite number.`);
@@ -67,7 +58,7 @@ function validateTelemetryPayload(body: unknown): string[] {
   }
 
   // Optional numeric fields
-  const optionalNumbers = ["soilMoisture", "soilMoistureRaw", "lightLevel"] as const;
+  const optionalNumbers = ["soilMoistureRaw"] as const;
   for (const field of optionalNumbers) {
     if (b[field] !== undefined && b[field] !== null) {
       if (
@@ -83,7 +74,7 @@ function validateTelemetryPayload(body: unknown): string[] {
   for (const [field, min, max] of [
     ["temperature", -40, 125],
     ["humidity", 0, 100],
-    ["soilMoisture", 0, 100],
+    ["soilMoisture", 0, 4095],
     ["soilMoistureRaw", 0, 4095],
   ] as const) {
     const value = b[field];
@@ -91,11 +82,13 @@ function validateTelemetryPayload(body: unknown): string[] {
       errors.push(`${field} must be between ${min} and ${max}.`);
     }
   }
-  if (typeof b.soilMoistureRaw === "number" && !Number.isInteger(b.soilMoistureRaw)) {
-    errors.push("soilMoistureRaw must be an integer.");
+  for (const field of ["soilMoisture", "soilMoistureRaw"] as const) {
+    if (typeof b[field] === "number" && !Number.isInteger(b[field])) {
+      errors.push(`${field} must be an integer.`);
+    }
   }
-  if (typeof b.lightLevel === "number" && b.lightLevel < 0) {
-    errors.push("lightLevel must be non-negative.");
+  if (typeof b.lightLux === "number" && b.lightLux < 0) {
+    errors.push("lightLux must be non-negative.");
   }
 
   return errors;
@@ -107,7 +100,7 @@ function validateTelemetryPayload(body: unknown): string[] {
  * Ingest a new SensorReading from the ESP32 firmware.
  *
  * 1. Validate payload structure and numeric values.
- * 2. Cross-DB check: verify deviceId exists in PostgreSQL.
+ * 2. Cross-DB check: resolve the hardware MAC address to a PostgreSQL device UUID.
  * 3. Insert into MongoDB with server-authoritative timestamp.
  */
 telemetryRouter.post("/", async (req: Request, res: Response) => {
@@ -125,19 +118,19 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     humidity,
     soilMoisture,
     soilMoistureRaw,
-    lightLevel,
-  } = req.body as TelemetryBody;
+    lightLux,
+  } = req.body as HardwareTelemetryPayload;
 
   try {
     // Step 2: Cross-DB device verification (PostgreSQL)
     const device = await prismaPg.device.findUnique({
-      where: { id: deviceId },
+      where: { macAddress: deviceId.toUpperCase() },
     });
 
     if (!device) {
       console.warn("[Telemetry] Rejected telemetry for an unknown device.");
       res.status(404).json({
-        error: "Device not found.",
+        error: "Device not found. Claim this Device ID in the app before sending telemetry.",
       });
       return;
     }
@@ -153,12 +146,13 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     // Step 3: Insert into MongoDB with server-authoritative timestamp
     const reading = await prisma.sensorReading.create({
       data: {
-        deviceId,
+        deviceId: device.id,
         temperature,
         humidity,
-        soilMoisture: soilMoisture ?? null,
-        soilMoistureRaw: soilMoistureRaw ?? null,
-        lightLevel: lightLevel ?? null,
+        // Keep calibrated percentage unavailable until calibration exists.
+        soilMoisture: null,
+        soilMoistureRaw: soilMoistureRaw ?? soilMoisture,
+        lightLevel: lightLux,
         timestamp: new Date(), // Server-authoritative
       },
     });

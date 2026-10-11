@@ -49,7 +49,7 @@ export default function DeviceScanner() {
     if (!active || auth.status !== "authenticated" || work.current) return;
     let normalized: string;
     try { normalized = normalizeMac(value); }
-    catch { setError("Enter a valid device MAC, such as LC-A50528 or AA:BB:CC:DD:EE:FF."); return; }
+    catch { setError("Enter a valid Device ID, such as LC-A50528 or AA:BB:CC:DD:EE:FF."); return; }
     const abort = new AbortController();
     work.current = abort;
     setBusy(true);
@@ -63,7 +63,7 @@ export default function DeviceScanner() {
       if (current(abort)) {
         const failure = asApiError(cause);
         setError(failure.status === 409
-          ? "This device belongs to another account. Check the MAC and try again."
+          ? "This device belongs to another account. Check the Device ID and try again."
           : `${failure.message} Try again when you are ready.`);
       }
     } finally {
@@ -75,7 +75,7 @@ export default function DeviceScanner() {
   };
   return (
     <DeviceConnectionScreen title="Claim your device" step={1} onCancel={cancel}
-      description="Claim your physical sensor using its printed MAC. Pair it to a plant next; live readings require incoming telemetry.">
+      description="Set up your sensor using its Wi-Fi hotspot, then claim its printed Device ID and link it to your plant.">
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         {auth.status !== "authenticated" ? (
           <View style={{ gap: 12 }}>
@@ -84,8 +84,16 @@ export default function DeviceScanner() {
           </View>
         ) : (
           <View style={{ gap: 16 }}>
-            <Text style={s.text}>Enter the MAC printed on your sensor, or scan a barcode or QR code containing that MAC.</Text>
-            <TextInput accessibilityLabel="Device MAC" style={ui.input} value={mac}
+            <View style={ui.card}>
+              <Text accessibilityRole="header" style={ui.heading}>How to set up your sensor</Text>
+              <Text style={s.text}>1. Plug in the sensor.</Text>
+              <Text style={s.text}>2. Press and hold the PAIR button for 3 seconds.</Text>
+              <Text style={s.text}>3. Connect to "LeafCheck-XXXX" in your phone's Wi-Fi settings.</Text>
+              <Text style={s.text}>4. Go to http://192.168.4.1 and enter your home Wi-Fi password.</Text>
+              <Text style={s.text}>5. Enter the Device ID below to link it to your plant.</Text>
+            </View>
+            <Text style={s.text}>Enter the Device ID printed on your sensor, or scan a barcode or QR code containing that ID.</Text>
+            <TextInput accessibilityLabel="Device ID" style={ui.input} value={mac}
               onChangeText={(value) => { setMac(value); scanning.current = true; }}
               autoCapitalize="characters" autoCorrect={false} editable={!busy}
               placeholder="LC-A50528" onSubmitEditing={() => void submit(mac)} />
@@ -101,7 +109,7 @@ export default function DeviceScanner() {
                   void submit(value);
                 }} />
             ) : (
-              <Notice>Camera access is optional. You can enter the device MAC manually.</Notice>
+              <Notice>Camera access is optional. You can enter the Device ID manually.</Notice>
             )}
             {!permission?.granted && permission?.canAskAgain && (
               <Action label="Allow camera scanning" disabled={busy || !active} onPress={() => {
@@ -110,7 +118,7 @@ export default function DeviceScanner() {
                   const snapshot = session.snapshot();
                   if (boundary === lifecycle.current && latest.current.active &&
                     snapshot.generation === auth.generation && snapshot.user?.id === auth.user?.id)
-                    setError("Camera access is unavailable. Enter the MAC manually.");
+                    setError("Camera access is unavailable. Enter the Device ID manually.");
                 });
               }} />
             )}
