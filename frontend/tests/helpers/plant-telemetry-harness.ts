@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm";
 import * as React from "react";
 import ts from "typescript";
 import { diagnosisPresentation } from "../../services/plant-profile-guidance";
-import type { Plant, PlantTelemetry } from "../../types";
+import type { Plant, PlantTelemetry, ArchiveEntry, ScanRequest, ScanResponse } from "../../types";
 
 const requireModule = createRequire(import.meta.url);
 type ElementProps = { children?: React.ReactNode; label?: string; onPress?: () => void; value?: number; deviceId?: string; [key: string]: unknown };
@@ -25,6 +25,9 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
   let appData = { plants: [testPlant], loaded: true, loading: false, error: null as string | null, devices: { [plantId]: "local-demo" } };
   let collectionReads = 0;
   const navigations: unknown[] = [];
+  let savedGuidance: ArchiveEntry | null = null;
+  let scanHandler: (request: ScanRequest, options?: { signal?: AbortSignal }) => Promise<ScanResponse> = async () => { throw new Error("Unexpected scan"); };
+  let guidanceRefreshes = 0;
   const profileSlots: unknown[] = [];
   let slots = profileSlots;
   const callbacks = new Map<number, { deps: unknown[]; value: unknown }>();
@@ -32,6 +35,11 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
   let focus: (() => void | (() => void)) | undefined;
   let cleanup: (() => void) | undefined;
   const hooks = {
+    useRef(initial: unknown) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = { current: initial };
+      return slots[index];
+    },
     useState(initial: unknown) {
       const index = cursor++;
       if (!(index in slots)) slots[index] = initial;
@@ -58,13 +66,13 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
         if (name === "@/components/screen" || name === "./screen") return { Screen: "Screen", Action: "Action", Notice: "Notice", ui: {} };
         if (name === "@/context/app-data") return { useAppData: () => appDataSource?.() ?? ({ ...appData, refresh: async () => { collectionReads++; } }) };
         if (name === "@/context/auth") return { useAuth: () => auth };
-        if (name === "@/hooks/use-plant-profile-guidance") return { usePlantProfileGuidance: () => ({ data: null, loading: false, error: null, refresh: async () => undefined }) };
+        if (name === "@/hooks/use-plant-profile-guidance") return { usePlantProfileGuidance: () => ({ data: { latest: savedGuidance, pending: [] }, loading: false, error: null, refresh: async () => { guidanceRefreshes++; } }) };
         if (name === "@/services/plant-profile-guidance") return { diagnosisPresentation };
         if (name === "./DiagnosticReport") return { DiagnosticReport: "DiagnosticReport" };
         for (const component of ["PlantProfileHeader", "PlantDiagnosisCard", "PlantCareTasksCard"]) {
           if (name.endsWith(component)) return { [component]: component };
         }
-        if (name === "@/services/api") return { fetchPlantTelemetry };
+        if (name === "@/services/api") return { fetchPlantTelemetry, scanPlant: (request: ScanRequest, options?: { signal?: AbortSignal }) => scanHandler(request, options) };
         if (name === "@expo/vector-icons") return { Ionicons: "Icon" };
         if (name === "expo-router") return { useLocalSearchParams: () => ({ id }), useRouter: () => ({ push: (route: unknown) => navigations.push(route) }), useFocusEffect: (callback: () => void | (() => void)) => { if (callback !== focus) { cleanup?.(); focus = callback; cleanup = callback() || undefined; } } };
         if (name === "./metric-card") return { MetricCard: "MetricCard" };
@@ -99,6 +107,9 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
   }
   return {
     navigations, collectionReads: () => collectionReads,
+    guidance: (latest: ArchiveEntry | null) => { savedGuidance = latest; },
+    scan: (handler: typeof scanHandler) => { scanHandler = handler; },
+    guidanceRefreshes: () => guidanceRefreshes,
     metadata: (value: Partial<typeof appData>) => { appData = { ...appData, ...value }; },
     target: (value: unknown) => { id = value; },
     session: (generation: number, status = "authenticated") => { auth = { generation, status }; },

@@ -7,11 +7,11 @@ import { PlantCareTasksCard } from "@/components/PlantCareTasksCard";
 import { usePlantProfileGuidance } from "@/hooks/use-plant-profile-guidance";
 import { Action, Notice, Screen } from "@/components/screen";
 import { useAppData } from "@/context/app-data";
-import { fetchPlantTelemetry } from "@/services/api";
+import { fetchPlantTelemetry, scanPlant } from "@/services/api";
 import { useAuth } from "@/context/auth";
-import type { PlantTelemetry as SensorState } from "@/types";
+import type { ArchiveEntry, PlantTelemetry as SensorState } from "@/types";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 export default function PlantProfile() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
@@ -28,12 +28,18 @@ export default function PlantProfile() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const guidance = usePlantProfileGuidance(typeof id === "string" ? id : "", validId && Boolean(plant) && auth.status === "authenticated");
   const [editing, setEditing] = useState<string | null>(null);
+  const reevaluation = useRef<AbortController | null>(null);
+  const [reevaluating, setReevaluating] = useState(false);
+  const [reevaluationError, setReevaluationError] = useState<string | null>(null);
+  const [updatedDiagnosis, setUpdatedDiagnosis] = useState<{ id: string; generation: number; latest: ArchiveEntry } | null>(null);
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
     setEditing(null);
     setDeleting(null);
     setFailure(null);
     setLoading(false);
+    setReevaluating(false);
+    setReevaluationError(null);
     if (!validId || typeof id !== "string" || auth.status !== "authenticated") return () => controller.abort();
     setLoading(true);
     Promise.resolve().then(() => fetchPlantTelemetry(id, { signal: controller.signal }))
@@ -44,13 +50,48 @@ export default function PlantProfile() {
         if (!controller.signal.aborted) setFailure({ id, generation: auth.generation, message: cause instanceof Error ? cause.message : "Unable to load sensor readings." });
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      reevaluation.current?.abort();
+      reevaluation.current = null;
+    };
   }, [id, auth.generation, auth.status, attempt]));
   const payload = sensor !== null && sensor.id === id && sensor.generation === auth.generation ? sensor.payload : null;
   const error = failure !== null && failure.id === id && failure.generation === auth.generation ? failure.message : null;
   const retrySensor = () => setAttempt(value => value + 1);
   const pairSensor = () => router.push({ pathname: "/device-connection/scanner", params: { targetType: "plant", targetId: typeof id === "string" ? id : "" } });
   const retryGuidance = () => { void guidance.refresh().catch(() => undefined); };
+  const savedLatest = guidance.data?.latest ?? null;
+  const localLatest = updatedDiagnosis && updatedDiagnosis.id === id && updatedDiagnosis.generation === auth.generation ? updatedDiagnosis.latest : null;
+  const latest = localLatest && (!savedLatest || Date.parse(localLatest.createdAt) >= Date.parse(savedLatest.createdAt)) ? localLatest : savedLatest;
+  const reevaluate = async () => {
+    if (!plant || auth.status !== "authenticated" || reevaluation.current) return;
+    const controller = new AbortController();
+    reevaluation.current = controller;
+    setReevaluating(true);
+    setReevaluationError(null);
+    try {
+      const report = await scanPlant({ plantId: plant.id, reusePreviousImage: true }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (report.plant?.id !== plant.id || !report.identification) throw new Error("The saved photo could not produce a plant diagnosis.");
+      setUpdatedDiagnosis({ id: plant.id, generation: auth.generation, latest: {
+        id: report.diagnostic.id, plantId: plant.id, userId: null,
+        healthStatus: report.diagnostic.healthStatus, rawAnalysisText: report.diagnostic.rawAnalysisText,
+        speciesName: report.identification.speciesName,
+        notificationTime: report.notification?.notifyAt ?? null, notificationReason: report.notification?.reason ?? null,
+        createdAt: report.diagnostic.createdAt ?? new Date().toISOString(),
+        plant: { id: plant.id, name: report.plant.name, species: report.plant.species },
+      } });
+      await Promise.allSettled([guidance.refresh(), refresh()]);
+    } catch (cause: unknown) {
+      if (!controller.signal.aborted) setReevaluationError(cause instanceof Error ? cause.message : "Re-evaluation failed. Please try again.");
+    } finally {
+      if (reevaluation.current === controller) {
+        reevaluation.current = null;
+        setReevaluating(false);
+      }
+    }
+  };
   return (
     <Screen refresh={() => { retrySensor(); retryGuidance(); }} loading={loading || collectionLoading}>
       {(!validRoute || (auth.status === "authenticated" && !validId)) && <Notice>Missing or invalid plant ID</Notice>}
@@ -65,7 +106,7 @@ export default function PlantProfile() {
         {editing === plant.id && <EditPlantForm key={`edit:${plant.id}`} plant={plant} onCancel={() => setEditing(null)} onSaved={() => setEditing(null)} />}
         {deleting === plant.id && <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} initiallyConfirming onCancel={() => setDeleting(null)} />}
         <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} authenticated={auth.status === "authenticated"} />
-        <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={guidance.data?.latest ?? null} loading={guidance.loading} error={Boolean(guidance.error)} hasSensor={Boolean(plant.deviceId)} onRetry={retryGuidance}
+        <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={latest} loading={guidance.loading} error={Boolean(guidance.error)} hasSensor={Boolean(plant.deviceId)} canReuseImage={Boolean(plant.imageUrl)} telemetryTimestamp={payload?.paired ? payload.telemetry?.timestamp : undefined} reevaluating={reevaluating} reevaluationError={reevaluationError} onReevaluate={() => { void reevaluate(); }} onRetry={retryGuidance}
           onScan={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id, ...(plant.deviceId ? { deviceId: plant.deviceId } : {}) } })}
           onHistory={() => router.push("/archives")} />
         <PlantCareTasksCard key={`tasks:${plant.id}`} tasks={guidance.data?.pending ?? []} loading={guidance.loading} error={Boolean(guidance.error)} onViewAll={() => router.push("/(tabs)/tasks")} />

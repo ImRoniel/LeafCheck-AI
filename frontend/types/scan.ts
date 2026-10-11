@@ -2,7 +2,8 @@ import type { HealthStatus } from "./plant";
 
 /** Request body: plantId is now optional for scan-first flow */
 export interface ScanRequest {
-  imageBase64: string;
+  imageBase64?: string;
+  reusePreviousImage?: boolean;
   plantId?: string;
   deviceId?: string;
   location?: string;
@@ -36,6 +37,7 @@ export interface ScanResponse {
     healthStatus: HealthStatus;
     rawAnalysisText: string;
     telemetryFreshness: string;
+    createdAt?: string;
   };
   telemetry: {
     temperature: number;

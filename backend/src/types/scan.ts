@@ -4,7 +4,8 @@
 
 /** Request body for POST /api/scan (scan-first: no plantId required) */
 export interface ScanRequest {
-  imageBase64: string;
+  imageBase64?: string;
+  reusePreviousImage?: boolean;
   plantId?: string;
   deviceId?: string;
   location?: string;
@@ -61,6 +62,7 @@ export interface ScanResponse {
     healthStatus: string;
     rawAnalysisText: string;
     telemetryFreshness: string;
+    createdAt?: string;
   };
   telemetry: {
     temperature: number;

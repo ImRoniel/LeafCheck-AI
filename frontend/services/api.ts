@@ -382,7 +382,11 @@ export function createApiClient(
       );
     },
     scanPlant: (body: ScanRequest, options?: RequestOptions) => {
-      v.object({ imageBase64: v.nonempty })(body, "scan");
+      v.object({})(body, "scan");
+      if (body.reusePreviousImage !== undefined && typeof body.reusePreviousImage !== "boolean")
+        throw new ApiError("validation", "reusePreviousImage must be a boolean");
+      if (body.reusePreviousImage === true) v.uuid(body.plantId, "plantId");
+      else v.nonempty(body.imageBase64, "imageBase64");
       if (body.plantId !== undefined) v.nonempty(body.plantId, "plantId");
       if (body.deviceId !== undefined) v.nonempty(body.deviceId, "deviceId");
       return request("/api/scan", v.parseScan, options, "POST", body);

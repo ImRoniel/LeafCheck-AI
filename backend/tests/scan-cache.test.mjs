@@ -30,6 +30,7 @@ let plantOwned;
 let latestReading;
 let telemetryReads;
 let telemetryQueries, sensorMac;
+let savedImageUrl, sentImages;
 let responseText;
 let guidanceQueries;
 let taskWrites;
@@ -83,6 +84,7 @@ before(async () => {
             name: "Basil",
             species: speciesName,
             deviceId: linkedDevice,
+            imageUrl: savedImageUrl,
           }) : null,
           update: async ({ data }) => {
             healthWrites.push(captureWrite("health", data));
@@ -108,7 +110,7 @@ before(async () => {
           findMany: async (query) => { guidanceQueries.push(query); return analyses.map((data, index) => ({ id: `analysis-${index + 1}`, ...data })); },
           create: async ({ data }) => {
             analyses.push(captureWrite("analysis", data));
-            return { id: `analysis-${analyses.length}` };
+            return { id: `analysis-${analyses.length}`, createdAt: new Date() };
           },
         },
         careTask: {
@@ -155,6 +157,7 @@ before(async () => {
             generateContent: async (contents) => {
               if (generationError) throw generationError;
               prompts.push(contents[0]);
+              sentImages.push(contents[1].inlineData.data);
               return { response: { text: () => responseText } };
             },
           };
@@ -193,6 +196,7 @@ beforeEach(() => {
   latestReading = null;
   telemetryReads = 0;
   telemetryQueries = []; sensorMac = "LC-A50528";
+  savedImageUrl = "data:image/jpeg;base64,/9j/2Q=="; sentImages = [];
   responseText = JSON.stringify({subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "healthy", notification: {notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up"}});
   imageFailure = false; imageWrites = 0; discardedImages = 0; noPlantIdentification = false;
   guidanceQueries = [];
@@ -209,6 +213,35 @@ beforeEach(() => {
   };
   lookup = async () => null;
   insert = async ({ data }) => ({ id: "created", ...data });
+});
+
+test("re-evaluation reuses the owned saved photo, fresh MAC telemetry and normal persistence without uploading", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 32.19, humidity: 76.34,
+    soilMoistureRaw: 2625, lightLux: 0.83 };
+  const result = await scan(false, { imageBase64: undefined, reusePreviousImage: true });
+  assert.equal(result.status, 201);
+  assert.deepEqual(sentImages, ["/9j/2Q=="]);
+  assert.match(prompts[0], /Raw ADC: 2625/);
+  assert.deepEqual(telemetryQueries[0].where, { deviceId: sensorMac });
+  assert.equal(imageWrites, 0);
+  assert.equal(discardedImages, 0);
+  assert.equal(healthWrites[0].imageUrl, undefined);
+  assert.equal(analyses.length, 1);
+  assert.equal(taskWrites.length, 1);
+  assert.ok(Number.isFinite(Date.parse(result.body.diagnostic.createdAt)));
+});
+
+test("reusing photos requires an owned plant, a saved image and a boolean flag before providers", async () => {
+  assert.equal((await scan(true, { reusePreviousImage: true })).status, 400);
+  assert.equal((await scan(false, { reusePreviousImage: "true" })).status, 400);
+  savedImageUrl = null;
+  assert.equal((await scan(false, { imageBase64: undefined, reusePreviousImage: true })).body.code, "NO_SAVED_IMAGE");
+  plantOwned = false;
+  assert.equal((await scan(false, { reusePreviousImage: true })).status, 404);
+  assert.equal(identifications, 0);
+  assert.equal(telemetryReads, 0);
+  assert.equal(imageWrites, 0);
 });
 
 after(async () => {

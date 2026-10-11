@@ -24,6 +24,7 @@ import { identifyPlant } from "../lib/plantnet.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import { validateScanImage } from "../lib/scan-input.js";
+import { previousScanImage } from "../lib/previous-scan-image.js";
 import { validateScanEnvelope, validateScanOutput } from "../lib/scan-output.js";
 import { reportCareTasks } from "../lib/report-care-tasks.js";
 import { storeScanImage, discardScanImage, type StoredScanImage } from "../lib/scan-image-storage.js";
@@ -44,10 +45,19 @@ scanRouter.post(
       "plantId",
       "deviceId",
       "location",
+      "reusePreviousImage",
     ]);
+    if (data.reusePreviousImage !== undefined && typeof data.reusePreviousImage !== "boolean") {
+      throw new HttpError(400, "INVALID_INPUT", "reusePreviousImage must be a boolean.");
+    }
+    if (data.reusePreviousImage === true && data.plantId === undefined) {
+      throw new HttpError(400, "INVALID_INPUT", "A plant ID is required to reuse a saved photo.");
+    }
+    let savedImageUrl: string | null = null;
     // plantId is now optional (scan-first)
     if (data.plantId !== undefined) {
       const plant = await ownedPlant(data.plantId, res.locals.auth.user.id);
+      savedImageUrl = plant.imageUrl;
       if (data.deviceId !== undefined && plant.deviceId !== data.deviceId) {
         throw new HttpError(
           404,
@@ -60,10 +70,12 @@ scanRouter.post(
     } else if (data.deviceId !== undefined) {
       await ownedDevice(data.deviceId, res.locals.auth.user.id);
     }
-    validateScanImage(data.imageBase64);
     if (data.location !== undefined && (typeof data.location !== "string" || data.location.trim().length > 100)) {
       throw new HttpError(400, "INVALID_INPUT", "Location must be a string of at most 100 characters.");
     }
+    const image = data.reusePreviousImage === true ? await previousScanImage(savedImageUrl) : data.imageBase64;
+    validateScanImage(image);
+    res.locals.scanImage = image;
     next();
   }),
 );
@@ -73,7 +85,8 @@ scanRouter.post(
 // ─── POST /api/scan ───────────────────────────────────────────────────────────
 
 scanRouter.post("/", async (req: Request, res: Response) => {
-  const { imageBase64, plantId, deviceId, location } = req.body as ScanRequest;
+  const { plantId, deviceId, location, reusePreviousImage } = req.body as ScanRequest;
+  const imageBase64: string = res.locals.scanImage;
   const userId = res.locals.auth.user.id;
 
   // ── Input Validation ──────────────────────────────────────────────────────
@@ -363,8 +376,10 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
     let storedImage: StoredScanImage | undefined;
     let photoSaveFailed = false;
     try {
-      storedImage = await storeScanImage(imageBase64, userId);
-      photoSaveFailed = storedImage.uploadFailed ?? false;
+      if (!reusePreviousImage) {
+        storedImage = await storeScanImage(imageBase64, userId);
+        photoSaveFailed = storedImage.uploadFailed ?? false;
+      }
     } catch {
       // Storage errors can expose token-bearing URLs; log only a safe message.
       photoSaveFailed = true;
@@ -415,6 +430,7 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
         healthStatus,
         rawAnalysisText: output.diagnosticReport,
         telemetryFreshness: freshnessContext,
+        createdAt: analysis.createdAt.toISOString(),
       },
       telemetry,
       careTasks: validTasks,
