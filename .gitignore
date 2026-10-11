@@ -113,3 +113,4 @@ frontend/modules/install-onboarding/android/build/
 !frontend/modules/install-onboarding/ios/
 !frontend/modules/install-onboarding/ios/*.swift
 !frontend/modules/install-onboarding/ios/*.podspec
+frontend/modules/install-onboarding/android/.gradle/
