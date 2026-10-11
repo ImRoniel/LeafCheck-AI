@@ -6,7 +6,7 @@ import { after, before, beforeEach, mock, test } from "node:test";
 const plantId = randomUUID(), deviceId = randomUUID();
 let server, base, plant, device, readings, queries, deviceQueries, failPlant, failDevice, failMongo;
 const now = new Date("2026-10-05T00:00:00.000Z");
-const sample = (extra = {}) => ({deviceId,timestamp:now,soilMoisture:50,soilMoistureRaw:2024,lightLevel:1200,temperature:25.5,humidity:61,...extra});
+const sample = (extra = {}) => ({deviceId:"LC-A50528",timestamp:now,soilMoisture:2652,lightLux:10.83,temperature:33.99,humidity:65.18,...extra});
 before(async () => {
   mock.module(new URL("../src/lib/auth.js", import.meta.url).href,{namedExports:{requireAuth(req,res,next) {
     const user = req.get("authorization"); if (!user) return res.status(401).json({code:"UNAUTHORIZED"});
@@ -37,28 +37,29 @@ test("unpaired plant returns explicit empty state without device or Mongo querie
   plant.deviceId=null; const response=await request(); assert.equal(response.status,200);
   assert.deepEqual(await response.json(),{paired:false,device:null,telemetry:null}); assert.equal(queries.length,0); assert.equal(deviceQueries,0);
 });
-test("paired plant joins device UUID and returns newest reading in the canonical payload",async () => {
+test("paired plant queries the MAC and maps the Vercel document into raw ADC and lux",async () => {
   readings.push(sample({timestamp:new Date(now.getTime()-1000),soilMoisture:1}));
   readings.push(sample({deviceId:"LC-000001",timestamp:new Date(now.getTime()+1000),soilMoisture:99}));
   const response=await request(); assert.equal(response.status,200); const body=await response.json();
-  assert.deepEqual(queries,[{where:{deviceId},orderBy:{timestamp:"desc"}}]);
+  assert.deepEqual(queries,[{where:{deviceId:"LC-A50528"},orderBy:{timestamp:"desc"}}]);
   assert.deepEqual(body,{paired:true,device:{id:deviceId,userId:"owner",name:"Window",macAddress:"LC-A50528",status:"OFFLINE",createdAt:now.toISOString(),updatedAt:now.toISOString()},telemetry:{
-    deviceId,timestamp:now.toISOString(),soilMoisture:{percentage:50,rawAnalogValue:2024,status:"optimal"},lightLevel:{lux:1200,status:"optimal"},environment:{temperatureCelsius:25.5,humidityPercentage:61},
+    deviceId,timestamp:now.toISOString(),soilMoisture:{percentage:null,rawAnalogValue:2652,status:"unavailable"},lightLevel:{lux:10.83,status:"insufficient"},environment:{temperatureCelsius:33.99,humidityPercentage:65.18},
   }});
 });
 test("soil classification uses custom plant bounds including both inclusive boundaries",async () => {
+  device.macAddress = "DEMO:test";
   for(const [moisture,status] of [[39.99,"dry"],[40,"optimal"],[50,"optimal"],[60,"optimal"],[60.01,"overwatered"]]) {
-    readings=[sample({soilMoisture:moisture})]; const response=await request(); assert.equal(response.status,200); assert.equal((await response.json()).telemetry.soilMoisture.status,status);
+    readings=[sample({deviceId,soilMoisture:moisture})]; const response=await request(); assert.equal(response.status,200); assert.equal((await response.json()).telemetry.soilMoisture.status,status);
   }
 });
 test("nullable sensors remain unavailable and light thresholds retain inclusive optimal boundaries",async () => {
-  for(const [lightLevel,status] of [[null,"unavailable"],[0,"insufficient"],[499,"insufficient"],[500,"optimal"],[50000,"optimal"],[50001,"excessive"]]) {
-    readings=[sample({lightLevel,soilMoistureRaw:null})]; const body=await (await request()).json();
-    assert.equal(body.telemetry.lightLevel.lux,lightLevel); assert.equal(body.telemetry.lightLevel.status,status); assert.equal(body.telemetry.soilMoisture.rawAnalogValue,null);
+  for(const [lightLux,status] of [[null,"unavailable"],[0,"insufficient"],[499,"insufficient"],[500,"optimal"],[50000,"optimal"],[50001,"excessive"]]) {
+    readings=[sample({lightLux,soilMoisture:null,soilMoistureRaw:null})]; const body=await (await request()).json();
+    assert.equal(body.telemetry.lightLevel.lux,lightLux); assert.equal(body.telemetry.lightLevel.status,status); assert.equal(body.telemetry.soilMoisture.rawAnalogValue,null);
   }
 });
-test("no UUID reading returns paired device with null telemetry; MAC readings are not a fallback",async () => {
-  for(const rows of [[],[sample({deviceId:"LC-A50528"})]]) {
+test("physical sensor never falls back to UUID documents",async () => {
+  for(const rows of [[],[sample({deviceId})]]) {
     readings=rows; const response=await request(); assert.equal(response.status,200); const body=await response.json();
     assert.equal(body.paired,true); assert.equal(body.device.id,deviceId); assert.equal(body.telemetry,null);
   }
@@ -78,9 +79,9 @@ test("failures from either database are sanitized and do not leak storage detail
 });
 
 test("missing soil and light remain unavailable without losing environment readings", async () => {
-  readings = [sample({soilMoisture: null, soilMoistureRaw: null, lightLevel: null})];
+  readings = [sample({soilMoisture: null, soilMoistureRaw: null, lightLux: null})];
   const body = await (await request()).json();
   assert.deepEqual(body.telemetry.soilMoisture, {percentage: null, rawAnalogValue: null, status: "unavailable"});
   assert.deepEqual(body.telemetry.lightLevel, {lux: null, status: "unavailable"});
-  assert.equal(body.telemetry.environment.temperatureCelsius, 25.5);
+  assert.equal(body.telemetry.environment.temperatureCelsius, 33.99);
 });

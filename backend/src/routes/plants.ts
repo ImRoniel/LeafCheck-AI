@@ -172,21 +172,24 @@ plantsRouter.get(
       return;
     }
     const device = await ownedDevice(plant.deviceId, res.locals.auth.user.id);
-    // Ingestion and retrieval both use the PostgreSQL device UUID.
+    // Vercel stores physical sensor readings under the printed MAC address.
+    // Virtual demo sensors retain their UUID and calibrated percentage contract.
+    const isDemo = device.macAddress.startsWith("DEMO:");
     const reading = await prisma.sensorReading.findFirst({
-      where: { deviceId: device.id },
+      where: { deviceId: isDemo ? device.id : device.macAddress },
       orderBy: { timestamp: "desc" },
     });
     let telemetry: TelemetryPayload | null = null;
     if (reading) {
-      const lux = reading.lightLevel ?? null;
+      const lux = isDemo ? reading.lightLevel ?? null : reading.lightLux ?? null;
       telemetry = {
-        deviceId: reading.deviceId,
+        // Keep the app response tied to the authorized relational device.
+        deviceId: device.id,
         timestamp: reading.timestamp.toISOString(),
         soilMoisture: {
-          percentage: reading.soilMoisture ?? null,
-          rawAnalogValue: reading.soilMoistureRaw ?? null,
-          status: reading.soilMoisture == null ? "unavailable" : reading.soilMoisture > plant.maxMoisture ? "overwatered"
+          percentage: isDemo ? reading.soilMoisture ?? null : null,
+          rawAnalogValue: isDemo ? reading.soilMoistureRaw ?? null : reading.soilMoistureRaw ?? reading.soilMoisture ?? null,
+          status: !isDemo || reading.soilMoisture == null ? "unavailable" : reading.soilMoisture > plant.maxMoisture ? "overwatered"
             : reading.soilMoisture < plant.minMoisture ? "dry" : "optimal",
         },
         lightLevel: {

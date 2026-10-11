@@ -22,6 +22,7 @@ model SensorReading {
   soilMoisture    Float?
   soilMoistureRaw Int?
   lightLevel      Float?
+  lightLux        Float?
   timestamp       DateTime @default(now())
 
   @@index([deviceId, timestamp(sort: Desc)])

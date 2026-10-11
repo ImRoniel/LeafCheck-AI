@@ -145,7 +145,7 @@ test("profile displays saved photo and falls back after an image load error", as
 test("raw hardware soil and lux render without presenting ADC as a percentage", async (t) => {
   const payload: PlantTelemetry = {
     paired: true, device,
-    telemetry: { ...zero, soilMoisture: { percentage: null, rawAnalogValue: 2024, status: "unavailable" }, lightLevel: { lux: 1200, status: "optimal" } },
+    telemetry: { ...zero, soilMoisture: { percentage: null, rawAnalogValue: 2652, status: "unavailable" }, lightLevel: { lux: 10.83, status: "insufficient" } },
   };
   const flow = profileHarness(async () => parsePlantTelemetry(payload));
   t.after(flow.dispose);
@@ -153,7 +153,7 @@ test("raw hardware soil and lux render without presenting ADC as a percentage", 
   await nextTurn();
   const cards = elements(flow.renderTelemetry(flow.render())).filter(child => child.type === "MetricCard");
   assert.deepEqual(cards.map(child => [child.props.title, child.props.value, child.props.unit]), [
-    ["Temperature", 0, "°C"], ["Humidity", 0, "%"], ["Soil Moisture (Raw)", 2024, "ADC"], ["Light", 1200, "lux"],
+    ["Temperature", 0, "°C"], ["Humidity", 0, "%"], ["Soil Moisture (Raw)", 2652, "ADC"], ["Light", 10.83, "lux"],
   ]);
   assert.throws(() => parsePlantTelemetry({ ...payload, telemetry: { ...payload.telemetry, soilMoisture: { percentage: null, rawAnalogValue: 4096, status: "unavailable" } } }));
 });
