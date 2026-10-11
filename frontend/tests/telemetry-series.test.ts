@@ -6,6 +6,31 @@ import {
     metricSeries,
 } from "../services/telemetry-series";
 
+test("hardware history uses the paired device UUID and parses all 66 normalized readings", async () => {
+  const deviceId = "00000000-0000-4000-8000-000000000002";
+  const data = Array.from({ length: 66 }, (_, index) => ({
+    id: String(index), deviceId,
+    timestamp: new Date(1800000000000 - index * 60000).toISOString(),
+    temperature: 25, humidity: 50, soilMoisture: null,
+    soilMoistureRaw: 2652, lightLevel: 10.83,
+  }));
+  const client = createApiClient({
+    baseUrl: "https://example.test",
+    fetch: async (url) => {
+      assert.equal(url, `https://example.test/api/telemetry/${deviceId}/history?limit=200&offset=0`);
+      return new Response(JSON.stringify({
+        data, pagination: { total: 66, limit: 200, offset: 0, hasMore: false },
+      }));
+    },
+  });
+  const history = await client.fetchTelemetryHistory(deviceId, { limit: 200, offset: 0 });
+  assert.deepEqual(history.data, data);
+  assert.equal(history.pagination.total, 66);
+  const ordered = chronologicalReadings(history.data);
+  assert.equal(ordered[0].id, "65");
+  assert.equal(metricSeries(ordered, "lightLevel")[0].value, 10.83);
+});
+
 test("all 193 samples are chronological without mutating API order or losing null/zero light", () => {
   const readings = Array.from({ length: 193 }, (_, i) => ({
     id: String(i),

@@ -20,7 +20,7 @@ telemetryRouter.get(
   ["/:deviceId/latest", "/:deviceId/history"],
   requireAuth,
   asyncRoute(async (req, res, next) => {
-    await ownedDevice(req.params.deviceId, res.locals.auth.user.id);
+    res.locals.device = await ownedDevice(req.params.deviceId, res.locals.auth.user.id);
     next();
   }),
 );
@@ -236,7 +236,10 @@ telemetryRouter.get(
 telemetryRouter.get(
   "/:deviceId/history",
   async (req: Request, res: Response) => {
-    const deviceId = req.params.deviceId as string;
+    const device: Awaited<ReturnType<typeof ownedDevice>> = res.locals.device;
+    const isDemo = device.macAddress.startsWith("DEMO:");
+    // Match the identity used by the plant's live telemetry query.
+    const deviceId = isDemo ? device.id : device.macAddress;
     const limit = Math.min(
       Math.max(parseInt(req.query.limit as string) || 50, 1),
       200,
@@ -255,7 +258,18 @@ telemetryRouter.get(
       ]);
 
       res.json({
-        data: readings,
+        data: readings.map((reading) => ({
+          id: reading.id,
+          deviceId: device.id,
+          timestamp: reading.timestamp.toISOString(),
+          temperature: reading.temperature,
+          humidity: reading.humidity,
+          soilMoisture: isDemo ? reading.soilMoisture ?? null : null,
+          soilMoistureRaw: isDemo
+            ? reading.soilMoistureRaw ?? null
+            : reading.soilMoistureRaw ?? reading.soilMoisture ?? null,
+          lightLevel: isDemo ? reading.lightLevel ?? null : reading.lightLux ?? null,
+        })),
         pagination: {
           total,
           limit,

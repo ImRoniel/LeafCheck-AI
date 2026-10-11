@@ -391,6 +391,7 @@ export default function Camera() {
           <View style={s.divider} />
 
           <Text style={s.reportSectionTitle}>Diagnostic Report</Text>
+          {report.plant && <Text style={s.reportMeta}>{report.telemetry ? "Sensor-Enhanced AI" : "Image-Only AI"}</Text>}
           <DiagnosticReport key={report.diagnostic.id} text={report.diagnostic.rawAnalysisText || "No analysis text was returned."} />
 
           {report.plant && <>
@@ -422,9 +423,11 @@ export default function Camera() {
               </View>
               <View style={s.telemetryItem}>
                 <Text style={s.telemetryValue}>
-                  {measurement(report.telemetry.soilMoisture, "%")}
+                  {report.telemetry.soilMoistureRaw != null
+                    ? measurement(report.telemetry.soilMoistureRaw, "ADC")
+                    : measurement(report.telemetry.soilMoisture, "%")}
                 </Text>
-                <Text style={s.telemetryLabel}>Soil Moisture</Text>
+                <Text style={s.telemetryLabel}>{report.telemetry.soilMoistureRaw != null ? "Soil Moisture · Raw ADC" : "Soil Moisture"}</Text>
               </View>
               <View style={s.telemetryItem}>
                 <Text style={s.telemetryValue}>

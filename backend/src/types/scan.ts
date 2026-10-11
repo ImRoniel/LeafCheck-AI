@@ -66,6 +66,7 @@ export interface ScanResponse {
     temperature: number;
     humidity: number;
     soilMoisture: number | null;
+    soilMoistureRaw: number | null;
     lightLevel: number | null;
     timestamp: string;
   } | null;

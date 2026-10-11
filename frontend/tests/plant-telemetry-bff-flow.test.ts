@@ -7,6 +7,21 @@ import { elements, press, profileHarness, plantId, accountId, testPlant } from "
 
 const device = { id: "22222222-2222-4222-8222-222222222222", name: "Bedroom sensor", macAddress: "LC-A50528", userId: accountId, status: "ONLINE" as const, createdAt: testPlant.createdAt, updatedAt: testPlant.updatedAt };
 const zero = { deviceId: device.id, timestamp: testPlant.createdAt, environment: { temperatureCelsius: 0, humidityPercentage: 0 }, soilMoisture: { percentage: 0, rawAnalogValue: 0, status: "dry" as const }, lightLevel: { lux: 0, status: "insufficient" as const } };
+for (const paired of [false, true]) {
+  test(`diagnosis label and scan navigation reflect ${paired ? "paired" : "unpaired"} plant context`, () => {
+    const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
+    flow.metadata({ plants: [{ ...testPlant, deviceId: paired ? device.id : undefined }] });
+    const node = flow.render();
+    const card = elements(node).find(child => child.type === "PlantDiagnosisCard");
+    assert.equal(card?.props.hasSensor, paired);
+    assert.match(JSON.stringify(card), new RegExp(paired ? "Sensor-Enhanced AI" : "Image-Only AI"));
+    press(node, "Scan Plant");
+    assert.deepEqual(JSON.parse(JSON.stringify(flow.navigations)), [{ pathname: "/(tabs)/scanner", params: {
+      plantId, ...(paired ? { deviceId: device.id } : {}),
+    } }]);
+    flow.dispose();
+  });
+}
 test("profile sibling identity remains unique while editing and changes with the plant", async (t) => {
   const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
   t.after(flow.dispose);

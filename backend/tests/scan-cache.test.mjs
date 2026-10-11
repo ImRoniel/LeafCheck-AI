@@ -29,6 +29,7 @@ let deviceOwned;
 let plantOwned;
 let latestReading;
 let telemetryReads;
+let telemetryQueries, sensorMac;
 let responseText;
 let guidanceQueries;
 let taskWrites;
@@ -88,7 +89,7 @@ before(async () => {
             return data;
           },
         },
-        device: { findFirst: async ({ where }) => deviceOwned ? { id: where.id, userId: "owner" } : null },
+        device: { findFirst: async ({ where }) => deviceOwned ? { id: where.id, userId: "owner", macAddress: sensorMac } : null },
         plantIdentification: { create: async ({ data }) => {
           identificationWrites.push(captureWrite("identification", data));
           return { id: "identification" };
@@ -122,7 +123,10 @@ before(async () => {
   });
   mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, {
     namedExports: {
-      prisma: { sensorReading: { findFirst: async () => { telemetryReads++; return latestReading; } } },
+      prisma: { sensorReading: { findFirst: async (query) => {
+        telemetryReads++; telemetryQueries.push(query);
+        return latestReading?.deviceId === query.where.deviceId ? latestReading : null;
+      } } },
     },
   });
   mock.module(new URL("../src/lib/plantnet.js", import.meta.url).href, {
@@ -188,6 +192,7 @@ beforeEach(() => {
   plantOwned = true;
   latestReading = null;
   telemetryReads = 0;
+  telemetryQueries = []; sensorMac = "LC-A50528";
   responseText = JSON.stringify({subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "healthy", notification: {notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up"}});
   imageFailure = false; imageWrites = 0; discardedImages = 0; noPlantIdentification = false;
   guidanceQueries = [];
@@ -336,8 +341,8 @@ test("foreign plants and linked devices are blocked before providers and telemet
 test("owned device telemetry and stale context are preserved with diagnostic text", async () => {
   linkedDevice = "00000000-0000-4000-8000-000000000002";
   latestReading = {
-    deviceId: linkedDevice, timestamp: new Date(Date.now() - 60 * 60_000),
-    temperature: 25, humidity: 60, soilMoisture: 50, lightLevel: 1000,
+    deviceId: sensorMac, timestamp: new Date(Date.now() - 60 * 60_000),
+    temperature: 25, humidity: 60, soilMoisture: 2652, lightLux: 1000,
   };
   const result = await scan();
   assert.equal(result.status, 201);
@@ -345,8 +350,69 @@ test("owned device telemetry and stale context are preserved with diagnostic tex
   assert.equal(result.body.diagnostic.rawAnalysisText, "healthy");
   assert.match(result.body.diagnostic.telemetryFreshness, /STALE/);
   assert.equal(result.body.telemetry.timestamp, latestReading.timestamp.toISOString());
-  assert.equal(analyses[0].telemetrySnapshot.deviceId, linkedDevice);
+  assert.equal(analyses[0].telemetrySnapshot.deviceId, sensorMac);
+  assert.match(prompts[0], /STALE/);
   assert.equal(analyses[0].userId, "owner");
+});
+
+test("paired hardware scan combines the image prompt with MAC telemetry and specific care actions", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  latestReading = {
+    deviceId: sensorMac, timestamp: new Date(), temperature: 32.19, humidity: 76.34,
+    soilMoisture: 2625, soilMoistureRaw: null, lightLux: 0.83,
+  };
+  const diagnosticReport = "Light is low.\nCare actions:\n- Move the plant to brighter indirect light on 2027-01-01 at 09:00 UTC";
+  responseText = JSON.stringify({ subjectKind: "living_plant", healthStatus: "warning", diagnosticReport,
+    notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Review light exposure" } });
+  const result = await scan();
+  assert.equal(result.status, 201);
+  assert.deepEqual(telemetryQueries, [{ where: { deviceId: sensorMac }, orderBy: { timestamp: "desc" } }]);
+  for (const pattern of [/Temperature: 32\.19°C/, /Humidity: 76\.34%/, /Raw ADC: 2625/, /Ambient Light: 0\.83 lux/,
+    /Use this environmental data together with the image/, /Do not infer dry or wet soil/, /FRESH/]) assert.match(prompts[0], pattern);
+  assert.doesNotMatch(prompts[0], /2625%/);
+  assert.deepEqual(result.body.telemetry, { temperature: 32.19, humidity: 76.34,
+    soilMoisture: null, soilMoistureRaw: 2625, lightLevel: 0.83, timestamp: latestReading.timestamp.toISOString() });
+  assert.match(result.body.careTasks[0].title, /brighter indirect light/);
+  assert.equal(taskWrites[0].analysisId, result.body.diagnostic.id);
+});
+
+test("request device identifier resolves an owned MAC even without a plant ID", async () => {
+  const deviceId = "00000000-0000-4000-8000-000000000002";
+  latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 25, humidity: 50,
+    soilMoisture: 2500, soilMoistureRaw: 0, lightLux: 0 };
+  const result = await scan(true, { deviceId });
+  assert.equal(result.status, 201);
+  assert.deepEqual(telemetryQueries[0].where, { deviceId: sensorMac });
+  assert.equal(result.body.telemetry.soilMoistureRaw, 0);
+  assert.equal(result.body.telemetry.lightLevel, 0);
+  assert.match(prompts[0], /Ambient Light: 0 lux/);
+});
+
+test("demo scans retain calibrated percentages, UUID lookup and simulated context", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002"; sensorMac = "DEMO:plant";
+  latestReading = { deviceId: linkedDevice, timestamp: new Date(), temperature: 25, humidity: 50,
+    soilMoisture: 50, lightLevel: 1000 };
+  const result = await scan();
+  assert.equal(result.status, 201);
+  assert.deepEqual(telemetryQueries[0].where, { deviceId: linkedDevice });
+  assert.match(prompts[0], /Simulated Sensor Readings/);
+  assert.match(prompts[0], /Calibrated Soil Moisture: 50%/);
+  assert.equal(result.body.telemetry.soilMoisture, 50);
+  assert.equal(result.body.telemetry.lightLevel, 1000);
+});
+
+test("unpaired scans stay image-only and paired sensors without readings disclose missing data", async () => {
+  let result = await scan();
+  assert.equal(result.status, 201);
+  assert.equal(telemetryReads, 0);
+  assert.equal(result.body.telemetry, null);
+  assert.match(prompts[0], /Environmental analysis is based on image only/);
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  result = await scan();
+  assert.equal(result.status, 201);
+  assert.equal(result.body.telemetry, null);
+  assert.match(prompts[1], /Sensor data is unavailable/);
+  assert.doesNotMatch(prompts[1], /Actual Sensor Readings/);
 });
 
 test("malformed AI structures fail safely before creating plants or analyses", async () => {

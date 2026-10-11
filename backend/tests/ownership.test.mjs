@@ -45,7 +45,7 @@ before(async () => {
         device: {
           findFirst: async ({ where }) =>
             where.id === deviceId && where.userId === "owner"
-              ? { id: deviceId }
+              ? { id: deviceId, macAddress: "LC-A50528" }
               : null,
           findUnique: async ({ where }) => {
             assert.deepEqual(where, { macAddress: "LC-A50528" });

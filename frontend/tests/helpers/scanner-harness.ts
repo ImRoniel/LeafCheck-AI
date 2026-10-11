@@ -176,7 +176,7 @@ export function scannerHarness() {
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
         if (name === "@expo/vector-icons") return { Ionicons: "Ionicons" };
         if (name === "react-native-safe-area-context") return { SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
-        if (name.endsWith("components/telemetry-history")) return { measurement: (value: unknown) => String(value) };
+        if (name.endsWith("components/telemetry-history")) return { measurement: (value: unknown, unit: string) => value == null ? "Unavailable" : `${value} ${unit}` };
         if (name.startsWith("@/")) return load(`${name.slice(2)}.${name.includes("hooks/") || name.includes("services/") ? "ts" : "tsx"}`);
         throw new Error(`Unexpected scanner import: ${name}`);
       },

@@ -229,7 +229,7 @@ const scanCheck = object({
   plant: nullable(object({ id: nonempty, name: text, species: text, deviceId: optional(nullable(uuid)) })),
   identification: nullable(object({ speciesName: nonempty, commonName: nullable(text), confidence: range(0, 1) })),
   diagnostic: object({ id: nonempty, healthStatus: health, rawAnalysisText: text, telemetryFreshness: text }),
-  telemetry: nullable(object(snapshot)),
+  telemetry: nullable(object({ ...snapshot, soilMoistureRaw: optional(nullable(integer(0, 4095))) })),
   careTasks: array(object({ title: text, taskType: text, description: text, urgency: enumeration("routine", "immediate", "urgent"), dueDate: text })),
   notification: nullable(object({ notifyAt: text, reason: text })),
 });

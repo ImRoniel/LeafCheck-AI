@@ -4,13 +4,17 @@ import { Text, View } from "react-native";
 import { DiagnosticReport } from "./DiagnosticReport";
 import { Action, ui } from "./screen";
 
-export function PlantDiagnosisCard({ latest, loading, error, onRetry, onScan, onHistory }: {
+export function PlantDiagnosisCard({ latest, loading, error, hasSensor = false, onRetry, onScan, onHistory }: {
   latest: ArchiveEntry | null; loading: boolean; error: boolean;
+  hasSensor?: boolean;
   onRetry: () => void; onScan: () => void; onHistory: () => void;
 }) {
   const report = diagnosisPresentation(latest?.rawAnalysisText ?? "");
   return <View style={ui.card}>
     <Text accessibilityRole="header" style={ui.heading}>AI Diagnosis</Text>
+    <Text style={{ alignSelf: "flex-start", backgroundColor: "#E8F5E9", color: "#278448", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, fontSize: 12 }}>
+      {hasSensor ? "Sensor-Enhanced AI" : "Image-Only AI"}
+    </Text>
     {latest ? <>
       <Text style={ui.text}>Latest scan · {new Date(latest.createdAt).toLocaleDateString()}</Text>
       <DiagnosticReport key={latest.id} text={report.text || "No diagnostic text was saved."} readMoreLabel="Read Full Diagnosis" />

@@ -65,8 +65,8 @@ export default function PlantProfile() {
         {editing === plant.id && <EditPlantForm key={`edit:${plant.id}`} plant={plant} onCancel={() => setEditing(null)} onSaved={() => setEditing(null)} />}
         {deleting === plant.id && <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} initiallyConfirming onCancel={() => setDeleting(null)} />}
         <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} authenticated={auth.status === "authenticated"} />
-        <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={guidance.data?.latest ?? null} loading={guidance.loading} error={Boolean(guidance.error)} onRetry={retryGuidance}
-          onScan={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id } })}
+        <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={guidance.data?.latest ?? null} loading={guidance.loading} error={Boolean(guidance.error)} hasSensor={Boolean(plant.deviceId)} onRetry={retryGuidance}
+          onScan={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id, ...(plant.deviceId ? { deviceId: plant.deviceId } : {}) } })}
           onHistory={() => router.push("/archives")} />
         <PlantCareTasksCard key={`tasks:${plant.id}`} tasks={guidance.data?.pending ?? []} loading={guidance.loading} error={Boolean(guidance.error)} onViewAll={() => router.push("/(tabs)/tasks")} />
       </>}

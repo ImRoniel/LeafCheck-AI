@@ -118,7 +118,6 @@ scanRouter.post("/", async (req: Request, res: Response) => {
       if (deviceId !== undefined && deviceId !== existing.deviceId) {
         throw new HttpError(404, "NOT_FOUND", "Device not associated with this plant.");
       }
-      if (existing.deviceId) await ownedDevice(existing.deviceId, userId);
       plant = existing;
     } else {
       // Defer persistence until providers have produced a diagnosis.
@@ -132,6 +131,9 @@ scanRouter.post("/", async (req: Request, res: Response) => {
 
     // ── Step 4: Concurrent fetch — specs + latest telemetry ───────────────
     const resolvedDeviceId = deviceId ?? plant.deviceId ?? undefined;
+    const sensorDevice = resolvedDeviceId ? await ownedDevice(resolvedDeviceId, userId) : null;
+    const isDemo = sensorDevice?.macAddress.startsWith("DEMO:") ?? false;
+    const queryDeviceId = sensorDevice ? (isDemo ? sensorDevice.id : sensorDevice.macAddress) : null;
     console.log("[Scan] Step 4: Fetching specs and telemetry concurrently...");
     const [specs, latestReading] = await Promise.all([
       // 4a. PlantSpecCache lookup (with Perenual fallback)
@@ -197,9 +199,9 @@ scanRouter.post("/", async (req: Request, res: Response) => {
       })(),
 
       // 4b. Latest MongoDB SensorReading
-      resolvedDeviceId
+      queryDeviceId
         ? prisma.sensorReading.findFirst({
-            where: { deviceId: resolvedDeviceId },
+            where: { deviceId: queryDeviceId },
             orderBy: { timestamp: "desc" },
           })
         : Promise.resolve(null),
@@ -239,13 +241,26 @@ Ideal Environmental Specs for ${specs.speciesName} (${specs.commonName ?? "unkno
   - Sunlight: ${specs.sunlight ?? "Unknown"}`
       : "No ideal species specs available. Provide general plant care advice for the identified species and image. Explicitly disclose the missing reference data; do not invent measured conditions or verified numeric care ranges.";
 
-    const telemetryBlock = latestReading
+    const telemetry = latestReading ? {
+      temperature: latestReading.temperature,
+      humidity: latestReading.humidity,
+      soilMoisture: isDemo ? latestReading.soilMoisture ?? null : null,
+      soilMoistureRaw: isDemo ? latestReading.soilMoistureRaw ?? null
+        : latestReading.soilMoistureRaw ?? latestReading.soilMoisture ?? null,
+      lightLevel: isDemo ? latestReading.lightLevel ?? null : latestReading.lightLux ?? null,
+      timestamp: latestReading.timestamp.toISOString(),
+    } : null;
+    const telemetryBlock = telemetry
       ? `
-Actual Sensor Readings (from ESP32 hardware):
-  - Temperature: ${latestReading.temperature}°C
-  - Humidity: ${latestReading.humidity}%
-  - Soil Moisture: ${latestReading.soilMoisture}% (raw ADC: ${latestReading.soilMoistureRaw ?? "N/A"})
-  - Ambient Light: ${latestReading.lightLevel ?? "N/A"} lux
+${isDemo ? "Simulated Sensor Readings (demo data)" : "Actual Sensor Readings (from ESP32 hardware)"}:
+  - Temperature: ${telemetry.temperature}°C
+  - Humidity: ${telemetry.humidity}%
+  - Soil Moisture Raw ADC: ${telemetry.soilMoistureRaw ?? "N/A"} (uncalibrated, 0–4095)
+  - Calibrated Soil Moisture: ${telemetry.soilMoisture == null ? "Unavailable" : `${telemetry.soilMoisture}%`}
+  - Ambient Light: ${telemetry.lightLevel ?? "N/A"} lux
+
+Use this environmental data together with the image to inform your diagnosis and generate specific care actions.
+Raw ADC is not a moisture percentage. Do not infer dry or wet soil from uncalibrated ADC alone; recommend checking soil before watering.
 
 Data Freshness: ${freshnessContext}`
       : `\n${freshnessContext}`;
@@ -401,15 +416,7 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
         rawAnalysisText: output.diagnosticReport,
         telemetryFreshness: freshnessContext,
       },
-      telemetry: latestReading
-        ? {
-            temperature: latestReading.temperature,
-            humidity: latestReading.humidity,
-            soilMoisture: latestReading.soilMoisture,
-            lightLevel: latestReading.lightLevel,
-            timestamp: latestReading.timestamp.toISOString(),
-          }
-        : null,
+      telemetry,
       careTasks: validTasks,
       notification: {
         notifyAt: output.notification!.notifyAt,

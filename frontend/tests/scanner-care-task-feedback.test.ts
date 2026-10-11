@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { report, scannerHarness } from "./helpers/scanner-harness";
 import type { ScanResponse } from "../types";
+import { parseScan } from "../services/validators";
+
+test("sensor-enhanced scan results parse and display raw ADC and lux", async () => {
+  const h = scannerHarness();
+  const telemetry = { temperature: 32.19, humidity: 76.34, soilMoisture: null,
+    soilMoistureRaw: 2625, lightLevel: 0.83, timestamp: "2026-10-12T00:00:00Z" };
+  h.behavior.scan = async () => parseScan({ ...report, telemetry });
+  h.ready(); h.press("Capture and scan plant"); await h.settle();
+  assert.match(h.text, /Sensor-Enhanced AI/);
+  assert.match(h.text, /2625 ADC/);
+  assert.match(h.text, /0\.83/);
+  assert.doesNotMatch(h.text, /2625 %/);
+  h.unmount();
+});
 
 const task: ScanResponse["careTasks"][number] = {
   title: "Check soil moisture",
@@ -89,6 +103,7 @@ test("paired plants without telemetry do not offer pairing again", async () => {
   h.behavior.scan = async () => ({...report, plant: {...report.plant!, deviceId: "22222222-2222-4222-8222-222222222222"}, telemetry: null});
   h.ready(); h.press("Capture and scan plant"); await h.settle();
   assert.equal(h.button("Pair Sensor"), undefined);
+  assert.match(h.text, /Image-Only AI/);
   h.unmount();
 });
 
