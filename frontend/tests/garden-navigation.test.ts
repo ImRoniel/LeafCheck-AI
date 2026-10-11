@@ -23,6 +23,8 @@ function load(path: string, overrides: Record<string, unknown>) {
       exports,
       require: (name: string) => {
         if (name in overrides) return overrides[name];
+      if (name === "@react-native-async-storage/async-storage") return { __esModule: true, default: { getItem: async () => "true" } };
+      if (name === "expo-secure-store") return { getItemAsync: async () => "access-fixture" };
         if (name === "react") return {
           ...React,
           useRef: (value: unknown) => ({ current: value }),

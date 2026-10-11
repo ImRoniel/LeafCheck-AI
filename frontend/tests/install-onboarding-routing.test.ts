@@ -59,6 +59,8 @@ test('all root routes are explicitly guarded, including forbidden deep-link dest
 // Exercise the actual StartupTree hooks across renders without real-time sleeps.
 function startupHarness(intro: ReturnType<typeof createIntroStore>) {
   let ready = false;
+  let stateCursor = 0;
+  const state: unknown[] = [null, null, false];
   let status = 'restoring';
   let callback: (() => void) | undefined;
   let schedules = 0, clears = 0;
@@ -69,7 +71,12 @@ function startupHarness(intro: ReturnType<typeof createIntroStore>) {
   const setReady = (value: boolean) => { ready = value; };
   const react = {
     ...React,
-    useState: () => [ready, setReady],
+    useRef: (current: unknown) => ({ current }),
+    useState() {
+      const index = stateCursor++;
+      if (index === 2) return [ready, setReady];
+      return [state[index], (value: unknown) => { state[index] = value; }];
+    },
     useEffect(effect: () => void | (() => void), deps: readonly unknown[]) {
       const index = hook++;
       const previous = dependencies[index];
@@ -83,6 +90,10 @@ function startupHarness(intro: ReturnType<typeof createIntroStore>) {
     setStatus(value: string) { status = value; },
     render() {
       hook = 0;
+      stateCursor = 0;
+      // Model the settled AsyncStorage read separately from the timer.
+      state[0] = intro.snapshot().phase === "completed";
+      state[1] = status === "authenticated";
       const root = introRoot(intro.snapshot(), status, {
         react,
         '@/context/install-onboarding': { InstallOnboardingProvider: 'IntroProvider', useInstallOnboarding: () => ({ ...intro.snapshot(), finishSplash: intro.finishSplash }) },

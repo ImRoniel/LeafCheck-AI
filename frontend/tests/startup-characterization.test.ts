@@ -18,10 +18,12 @@ test('restore and local failures expose recovery before account routes', () => {
   assert.equal(rootRoute({ status: 'authenticated' }, { ready: false, error: null, data: { onboarding: { status: 'pending' } } }).route.props.title, 'Restoring your garden');
   assert.equal(rootRoute({ status: 'authenticated' }, { ready: false, error: 'unavailable', data: { onboarding: { status: 'pending' } } }).route.props.title, 'Local setup unavailable');
 });
-test('guest navigation waits for readiness and reduced motion disables transitions', () => {
+test('guests without tokens stay on login and reduced motion disables transitions', () => {
   const guest = rootRoute({ status: 'guest', isGuest: true });
   guest.effects.forEach(effect => effect());
-  assert.deepEqual(guest.replacements, ['/(tabs)']);
+  assert.deepEqual(guest.replacements, []);
+  assert.ok(available(guest.route).includes('login'));
+  assert.ok(!available(guest.route).includes('(tabs)'));
   const loading = rootRoute({ status: 'guest', isGuest: true }, { ready: false, error: null, data: { onboarding: { status: 'pending' } } });
   loading.effects.forEach(effect => effect());
   assert.deepEqual(loading.replacements, []);

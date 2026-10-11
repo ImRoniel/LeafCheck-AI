@@ -12,6 +12,6 @@ export default function Entry() {
 
 function CompletedEntry() {
   const auth = useAuth();
-  if (auth.status === 'authenticated' || auth.isGuest) return <Redirect href="/(tabs)" />;
+  if (auth.status === 'authenticated') return <Redirect href="/(tabs)" />;
   return <Redirect href="/login" />;
 }

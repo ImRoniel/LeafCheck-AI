@@ -94,6 +94,7 @@ export function createSessionCoordinator(
   storage: TokenStorage,
   native: boolean,
   coordination: SessionCoordination,
+  accessStorage?: TokenStorage,
 ) {
   let state: SessionState = {
     status: "restoring",
@@ -133,7 +134,10 @@ export function createSessionCoordinator(
     });
   };
   const erase = async () => {
-    if (native) await store(() => storage.remove());
+    if (native) await store(async () => {
+      await accessStorage?.remove();
+      await storage.remove();
+    });
   };
   const invalidate = (message?: string) => {
     boundary("signedOut");
@@ -156,6 +160,7 @@ export function createSessionCoordinator(
       await store(async () => {
         check(generation);
         await storage.set(tokens.refreshToken!);
+        await accessStorage?.set(tokens.accessToken);
       });
     }
     check(generation);
@@ -211,6 +216,15 @@ export function createSessionCoordinator(
       publish({ status: "restoring", error: null });
       const restoreGeneration = state.generation;
       try {
+        if (native && accessStorage && !state.token) {
+          const token = await store(() => accessStorage.get());
+          check(restoreGeneration);
+          if (!token) {
+            invalidate();
+            return;
+          }
+          publish({ token });
+        }
         if (!state.token) await refresh(null);
         check(restoreGeneration);
         const generation = state.generation;

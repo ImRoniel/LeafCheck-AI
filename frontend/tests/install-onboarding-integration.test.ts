@@ -43,7 +43,7 @@ test('fresh anonymous and restored sessions traverse every slide and skip only t
     assert.equal(render().props.currentSlide, 1); render().props.onNext?.();
     assert.equal(render().props.currentSlide, 2); render().props.onLetsGo?.();
     await store.complete(); assert.equal(store.snapshot().phase, 'completed');
-    assert.equal(entry(store, status), status === 'anonymous' ? '/login' : status === 'authenticated' || status === 'guest' ? '/(tabs)' : null);
+    assert.equal(entry(store, status), status === 'authenticated' ? '/(tabs)' : status === 'error' || status === 'restoring' ? null : '/login');
     const reload = createIntroStore(disk); await reload.load();
     assert.equal(reload.snapshot().phase, 'completed');
     assert.equal(entry(reload, 'authenticated', 'pending'), '/(tabs)');
@@ -61,7 +61,7 @@ test('restore finishing on a middle slide leaves the same slide and guest/accoun
   }
   render().props.onNext?.(); render().props.onLetsGo?.(); await store.complete();
   assert.ok(available(rootRoute({ status: 'authenticated' }, { ready: true, error: null, data: { onboarding: { status: 'pending' } } }).route).includes('setup'));
-  assert.ok(available(rootRoute({ status: 'guest', isGuest: true }).route).includes('(tabs)'));
+  assert.ok(!available(rootRoute({ status: 'guest', isGuest: true }).route).includes('(tabs)'));
 });
 test('final write denial keeps the last slide and its retry; completion waits for a replacement write', async () => {
   let denied = true; let release: (() => void) | undefined; let writes = 0;
@@ -116,7 +116,7 @@ test('completed intro routes by verified native restoration, not credential pres
     assert.equal(refreshed, credential === null ? 0 : 1);
     if (credential === 'valid-fixture') {
       await session.logout(); assert.equal(entry(intro, session.snapshot().status), '/login');
-      session.enterGuest(); assert.equal(entry(intro, session.snapshot().status), '/(tabs)');
+      session.enterGuest(); assert.equal(entry(intro, session.snapshot().status), '/login');
       session.leaveGuest(); assert.equal(entry(intro, session.snapshot().status), '/login');
     }
     assert.equal(flag, 'true');

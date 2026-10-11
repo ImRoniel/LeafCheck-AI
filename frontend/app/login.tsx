@@ -36,7 +36,7 @@ export default function Login() {
   return (
     <AuthLayout
       title="Welcome to LeafCheck AI"
-      description="Sign in to your private collection or explore on this device."
+      description="Sign in to your private collection."
     >
       <View style={{ gap: 14 }}>
         {(error || auth.error) && <Notice>{error || auth.error}</Notice>}
@@ -65,16 +65,7 @@ export default function Login() {
           disabled={busy}
           onPress={() => void submit()}
         />
-        <AuthButton
-          title="Continue without an account"
-          variant="secondary"
-          disabled={busy}
-          onPress={() => {
-            auth.enterLocal();
-            router.replace("/(tabs)");
-          }}
-        />
-        <Text style={authStyles.footerText}>Local session: plants stay on this device. AI scans require sign-in.</Text>
+
       </View>
       <View style={authStyles.footer}>
         <Text style={authStyles.footerText}>New to LeafCheck?</Text>

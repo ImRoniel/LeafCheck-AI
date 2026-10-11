@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { Action, Notice, Screen } from "@/components/screen";
 import { AppDataProvider } from "@/context/app-data";
 import { AuthProvider, useAuth } from "@/context/auth";
@@ -5,22 +7,13 @@ import { LocalStateProvider, useLocalState } from "@/context/local-state";
 import { InstallOnboardingProvider, useInstallOnboarding } from "@/context/install-onboarding";
 import Splash from "./splash";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
-import { Stack, useRootNavigationState, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator } from "react-native";
-function Routes() {
+import { ActivityIndicator, Platform } from "react-native";
+function Routes({ hasToken }: { hasToken: boolean }) {
   const auth = useAuth();
   const local = useLocalState();
-  const router = useRouter();
-  const navigation = useRootNavigationState();
   const reducedMotion = useReducedMotion();
-  const enteredGuest = useRef(false);
-  useEffect(() => {
-    if (auth.isGuest && local.ready && navigation?.key && !enteredGuest.current) {
-      enteredGuest.current = true;
-      router.replace("/(tabs)");
-    }
-  }, [auth.isGuest, local.ready, navigation?.key, router]);
   if (auth.isLoading) return <Splash />;
   if (auth.status === "error")
     return (
@@ -30,11 +23,11 @@ function Routes() {
           label="Retry connection"
           onPress={() => void auth.retryRestore()}
         />
-        <Action label="Continue without an account" onPress={auth.enterLocal} />
+        <Action label="Return to login" onPress={() => void auth.logout().catch(() => {})} />
       </Screen>
     );
-  const authenticated = auth.status === "authenticated";
-  const active = authenticated || auth.isGuest;
+  const authenticated = hasToken;
+  const active = authenticated;
   if (active && !local.ready)
     return (
       <Screen
@@ -102,7 +95,7 @@ function Routes() {
     </Stack>
   );
 }
-function AccountTree() {
+function AccountTree({ hasToken }: { hasToken: boolean }) {
   const auth = useAuth();
   return (
     <LocalStateProvider
@@ -115,7 +108,7 @@ function AccountTree() {
       }
     >
       <AppDataProvider>
-        <Routes />
+        <Routes hasToken={hasToken} />
       </AppDataProvider>
     </LocalStateProvider>
   );
@@ -125,6 +118,38 @@ function StartupTree() {
   const intro = useInstallOnboarding();
   const auth = useAuth();
   const reducedMotion = useReducedMotion();
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
+  const gateError = useRef<string | null>(null);
+  const latest = useRef({ phase: intro.phase, status: auth.status });
+  latest.current = { phase: intro.phase, status: auth.status };
+  useEffect(() => {
+    let mounted = true;
+    void Promise.all([
+      AsyncStorage.getItem("@leafcheck_onboarding_complete"),
+      Platform.OS === "web" ? Promise.resolve(null) : SecureStore.getItemAsync("access_token"),
+    ]).then(([flag, token]) => {
+      if (!mounted) return;
+      setHasOnboarded(latest.current.phase === "completed" || flag === "true");
+      setHasToken(latest.current.status === "authenticated" ||
+        (latest.current.status !== "signedOut" && latest.current.status !== "guest" && Boolean(token)));
+    }).catch(() => {
+      if (mounted) {
+        gateError.current = "Startup storage could not be read. Please restart the app.";
+        setHasToken(false);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
+  // Completion is published only after AsyncStorage has durably written true.
+  useEffect(() => {
+    if (intro.phase === "completed") setHasOnboarded(true);
+  }, [intro.phase]);
+  // Login/logout and expired credentials update the gate during this app session.
+  useEffect(() => {
+    if (auth.status === "authenticated") setHasToken(true);
+    else if (auth.status === "signedOut") setHasToken(false);
+  }, [auth.status]);
   const [splashReady, setSplashReady] = useState(false);
   // This timer belongs to the startup tree, not the flag read or an account tree.
   // It runs once while both storage and session restoration proceed in parallel.
@@ -135,14 +160,16 @@ function StartupTree() {
   useEffect(() => {
     if (splashReady && intro.phase === "splash") intro.finishSplash();
   }, [splashReady, intro.phase, intro.finishSplash]);
-  if (!splashReady || intro.phase === "loading" || (intro.phase === "completed" && auth.isLoading)) return <Splash />;
+  if (gateError.current) return <Screen title="Startup unavailable"><Notice>{gateError.current}</Notice></Screen>;
+  if (hasOnboarded === null || hasToken === null || !splashReady || intro.phase === "loading" || (intro.phase === "completed" && auth.isLoading)) return <Splash />;
   if (intro.phase === "error") return (
     <Screen title="Introductory setup unavailable">
       <Notice>{intro.error}</Notice>
       <Action label="Retry local storage" onPress={() => void intro.retry()} />
     </Screen>
   );
-  if (intro.phase !== "completed") return (
+  // State 1: no AsyncStorage flag => onboarding, regardless of token presence.
+  if (!hasOnboarded || intro.phase !== "completed") return (
     <Stack initialRouteName="index" screenOptions={{ headerShown: false, animation: reducedMotion ? "none" : "slide_from_right" }}>
       <Stack.Screen name="index" />
       <Stack.Protected guard={intro.phase === "splash"}>
@@ -169,7 +196,10 @@ function StartupTree() {
       </Stack.Protected>
     </Stack>
   );
-  return <AccountTree />;
+  // State 2: completed with no token => Login. State 3: token => Dashboard.
+  const tokenAvailable = auth.status === "authenticated" ||
+    (auth.status !== "signedOut" && auth.status !== "guest" && hasToken);
+  return <AccountTree hasToken={tokenAvailable} />;
 }
 export default function Layout() {
   return (

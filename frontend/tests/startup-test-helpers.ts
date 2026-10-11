@@ -15,9 +15,11 @@ export function loadComponent(path: string, overrides: Record<string, unknown>, 
   runInNewContext(ts.transpileModule(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     exports, setTimeout, clearTimeout, ...globals, require: (name: string): unknown => {
       if (name in overrides) return overrides[name];
+      if (name === "@react-native-async-storage/async-storage") return { __esModule: true, default: { getItem: async () => "true" } };
+      if (name === "expo-secure-store") return { getItemAsync: async () => "access-fixture" };
       if (name === 'react') return { ...React, useState: () => [true, () => {}], useRef: (current: unknown) => ({ current }), useEffect: (effect: () => void) => effects.push(effect) };
       if (name === 'react/jsx-runtime') return requireModule(name);
-      if (name === 'react-native') return { ActivityIndicator: 'ActivityIndicator' };
+      if (name === 'react-native') return { ActivityIndicator: 'ActivityIndicator', Platform: { OS: 'ios' } };
       throw new Error(`Unexpected import: ${name}`);
     },
   });
@@ -31,7 +33,7 @@ export function rootRoute(auth: { status: string; isGuest?: boolean; isLoading?:
     '@/context/install-onboarding': { InstallOnboardingProvider: 'InstallOnboardingProvider', useInstallOnboarding: () => ({ phase: 'completed' }) },
     './splash': { __esModule: true, default: 'Splash' },
     '@/components/screen': { Screen: 'Screen', Notice: 'Notice', Action: 'Action' },
-    '@/context/auth': { AuthProvider: 'AuthProvider', useAuth: () => auth },
+    '@/context/auth': { AuthProvider: 'AuthProvider', useAuth: () => ({ ...auth, status: auth.status === "anonymous" ? "signedOut" : auth.status }) },
     '@/context/local-state': { LocalStateProvider: 'LocalStateProvider', useLocalState: () => local },
     '@/context/app-data': { AppDataProvider: 'AppDataProvider' },
     '@/hooks/use-reduced-motion': { useReducedMotion: () => reduced },

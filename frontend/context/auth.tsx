@@ -2,6 +2,7 @@ import { api, resolveApiBaseUrl } from "@/services/api";
 import { createBrowserCoordination } from "@/services/browser-coordination";
 import { platformOS } from "@/services/platform";
 import { createSessionCoordinator } from "@/services/session";
+import { accessTokenStorage } from "@/services/access-token-storage";
 import { tokenStorage } from "@/services/token-storage";
 import {
   createContext,
@@ -24,6 +25,7 @@ export const session = createSessionCoordinator(
     : createBrowserCoordination(
         resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_URL, platformOS),
       ),
+  native ? accessTokenStorage : undefined,
 );
 session.bind(api);
 api.bindSession(session);

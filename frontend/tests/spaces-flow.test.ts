@@ -74,6 +74,8 @@ function load(path: string, overrides: Record<string, unknown>) {
     exports, Error, AbortController, setTimeout, clearTimeout,
     require(name: string) {
       if (name in overrides) return overrides[name];
+      if (name === "@react-native-async-storage/async-storage") return { __esModule: true, default: { getItem: async () => "true" } };
+      if (name === "expo-secure-store") return { getItemAsync: async () => "access-fixture" };
       if (name === "@/services/validators") return validators;
       if (name === "react/jsx-runtime") return requireModule(name);
       if (name === "expo-font") return { useFonts: () => [true] };
@@ -160,7 +162,7 @@ test("profile photo persistence preserves names and isolates late writes across 
   assert.equal(removed.length, 1); // Keep any file that the old account's completed write references.
 });
 
-test("login offers account-free Dashboard entry without calling real sign-in", () => {
+test("login requires authentication and offers no token-free Dashboard bypass", () => {
   const state = hooks();
   let localEntries = 0;
   const routes: string[] = [];
@@ -175,10 +177,9 @@ test("login offers account-free Dashboard entry without calling real sign-in", (
   });
   const nodes = elements(module.default());
   const entry = nodes.find(node => (node.props as { title?: string }).title === "Continue without an account");
-  assert.ok(entry);
-  entry.props.onPress!();
-  assert.equal(localEntries, 1);
-  assert.deepEqual(routes, ["/(tabs)"]);
+  assert.equal(entry, undefined);
+  assert.equal(localEntries, 0);
+  assert.deepEqual(routes, []);
   assert.ok(!nodes.some(node => typeof node.props.children === "string" && /guest mode/i.test(node.props.children)));
 });
 
@@ -261,10 +262,10 @@ test("circular crop controls adjust image bounds, guard duplicate saves, keep er
   assert.equal(renders, 2);
 });
 
-test("fresh local entry opens Dashboard once, keeps setup optional, and permits later sign-in", () => {
+test("token-authenticated entry opens Dashboard and keeps setup optional", () => {
   const state = hooks();
   const replacements: string[] = [];
-  const auth = { isGuest: true, status: "guest" };
+  const auth = { isGuest: false, status: "authenticated" };
   const local = { ready: true, data: { onboarding: { status: "pending" } } };
   const Stack = Object.assign(() => null, { Protected: "Protected", Screen: "Screen" });
   const module = load("app/_layout.tsx", {
@@ -294,9 +295,9 @@ test("fresh local entry opens Dashboard once, keeps setup optional, and permits 
   const groups = React.Children.toArray(tree.props.children) as React.ReactElement<Props>[];
   assert.equal(groups[1].props.guard, true); // Guest may choose setup.
   assert.equal(groups[2].props.guard, true); // Setup does not block Spaces.
-  assert.deepEqual(replacements, ["/(tabs)"]);
+  assert.deepEqual(replacements, []);
   render();
-  assert.deepEqual(replacements, ["/(tabs)"]); // No redirect loop on later login visits.
+  assert.deepEqual(replacements, []); // No redirect loop on later login visits.
 });
 
 test("Guest cards open the selected space and its manual-add flow, persist data, and have no Garden entry", async () => {
