@@ -1,292 +1,81 @@
 import { Action, Notice, Screen, ui } from "@/components/screen";
 import { api } from "@/services/api";
+import { groupArchives } from "@/services/archive-groups";
 import { usePollingResource } from "@/services/use-polling-resource";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  LayoutAnimation,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  UIManager,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+const filters = [{ label: "Last 7 days", value: 7 }, { label: "Last 30 days", value: 30 }, { label: "All time", value: "all" }] as const;
 
 export default function Archives() {
-  const resource = usePollingResource(
-    "scan-archives",
-    (signal) => api.fetchArchives({ signal }),
-    { pollIntervalMs: 60_000 },
-  );
-  const archives = resource.data ?? [];
+  const params = useLocalSearchParams<{ plantId?: string | string[] }>();
+  const plantId = typeof params.plantId === "string" ? params.plantId : undefined;
+  const invalidFilter = params.plantId !== undefined && (!plantId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(plantId));
+  const [range, setRange] = useState<7 | 30 | "all">("all");
+  const key = JSON.stringify(["scan-archives", plantId, range]);
+  const resource = usePollingResource(invalidFilter ? "" : key, async signal => ({
+    key, entries: await api.fetchArchives({ signal, plantId, ...(range === "all" ? {} : { days: range }) }),
+  }), { enabled: !invalidFilter, pollIntervalMs: 60_000 });
+  const groups = groupArchives(resource.data?.key === key ? resource.data.entries : [], plantId);
   const { loading, error } = resource;
-  const loadArchives = () => resource.refresh().catch(() => undefined);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const reload = () => { void resource.refresh().catch(() => undefined); };
 
-  const toggleExpand = (id: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedId((prev) => (prev === id ? null : id));
-  };
-
-  const getHealthBadgeStyle = (status: string) => {
-    switch (status) {
-      case "healthy":
-        return { bg: "#E8F5E9", text: "#2E7D32", label: "HEALTHY" };
-      case "warning":
-        return { bg: "#FFF8E1", text: "#F57F17", label: "WARNING" };
-      case "critical":
-        return { bg: "#FFEBEE", text: "#C62828", label: "CRITICAL" };
-      default:
-        return { bg: "#ECEFF1", text: "#546E7A", label: status.toUpperCase() };
-    }
-  };
-
-  return (
-    <Screen
-      title="SCAN ARCHIVES"
-      back
-      refresh={() => void loadArchives()}
-      loading={loading}
-    >
-      <Notice>
-        Diagnostic history and AI plant assessments generated from your camera
-        scans.
-      </Notice>
-
-      {error && (
-        <>
-          <Notice>{error.message}</Notice>
-          <Action
-            label="Retry loading archives"
-            onPress={() => void loadArchives()}
-          />
-        </>
-      )}
-
-      {loading && archives.length === 0 && (
-        <View style={s.centerBox}>
-          <ActivityIndicator size="large" color="#2F8135" />
-          <Text style={[ui.text, { marginTop: 12 }]}>
-            Loading scan archives…
-          </Text>
-        </View>
-      )}
-
-      {!loading && archives.length === 0 && !error && (
-        <View style={[ui.card, s.emptyCard]}>
-          <Ionicons name="archive-outline" size={48} color="#888" />
-          <Text style={[ui.heading, { marginTop: 12 }]}>No Archives Yet</Text>
-          <Text style={[ui.text, { textAlign: "center", marginTop: 6 }]}>
-            When you scan plants using the AI camera, their detailed diagnostic
-            reports and care recommendations are permanently archived here.
-          </Text>
-        </View>
-      )}
-
-      {archives.map((entry) => {
-        const badge = getHealthBadgeStyle(entry.healthStatus);
-        const isExpanded = expandedId === entry.id;
-        const scanDate = new Date(entry.createdAt).toLocaleDateString(
-          undefined,
-          {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          },
-        );
-
-        return (
-          <View key={entry.id} style={[ui.card, s.archiveCard]}>
-            <View style={s.cardHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.plantName}>
-                  {entry.plant?.name ?? entry.speciesName ?? "Unknown Plant"}
-                </Text>
-                <Text style={s.speciesText}>
-                  {entry.plant?.species ??
-                    entry.speciesName ??
-                    "Unidentified species"}
-                </Text>
-              </View>
-              <View style={[s.badge, { backgroundColor: badge.bg }]}>
-                <Text style={[s.badgeText, { color: badge.text }]}>
-                  {badge.label}
-                </Text>
-              </View>
+  return <Screen title="Scan history" back refresh={reload} loading={loading}>
+    <Text style={ui.text}>{plantId ? "Saved diagnoses for this plant" : "Saved diagnoses grouped by plant"}</Text>
+    <View style={s.filters}>
+      {filters.map(filter => <Pressable key={filter.label} accessibilityRole="button"
+        accessibilityState={{ selected: range === filter.value }} style={[s.filter, range === filter.value && s.selectedFilter]}
+        onPress={() => { setRange(filter.value); setExpandedId(null); }}>
+        <Text style={[s.filterText, range === filter.value && s.selectedText]}>{filter.label}</Text>
+      </Pressable>)}
+    </View>
+    {invalidFilter && <Notice>Missing or invalid plant ID.</Notice>}
+    {error && <><Notice>{error.message}</Notice><Action label="Retry loading archives" variant="secondary" onPress={reload} /></>}
+    {loading && !groups.length && <ActivityIndicator accessibilityLabel="Loading scan history" color="#278448" />}
+    {!invalidFilter && !loading && !error && !groups.length && <Notice>No scans found for this date range.</Notice>}
+    {groups.map(group => <View key={group.plantId} style={s.group}>
+      <View style={s.groupHeader}>
+        <Text accessibilityRole="header" style={s.plantName}>{group.name}</Text>
+        <Text style={s.meta}>{group.scans.length} {group.scans.length === 1 ? "scan" : "scans"}</Text>
+      </View>
+      <Text style={s.meta}>{group.species}</Text>
+      {group.scans.map(entry => {
+        const expanded = expandedId === entry.id;
+        const color = entry.healthStatus === "critical" ? "#B42318" : entry.healthStatus === "warning" ? "#89610C" : "#278448";
+        return <View key={entry.id} style={s.scan}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${expanded ? "Hide" : "Show"} scan details for ${group.name}, ${new Date(entry.createdAt).toLocaleString()}`}
+            accessibilityState={{ expanded }} style={s.scanHeader} onPress={() => setExpandedId(expanded ? null : entry.id)}>
+            <View style={s.scanSummary}>
+              <Text style={s.date}>{new Date(entry.createdAt).toLocaleString()}</Text>
+              <Text style={[s.status, { color }]}>{entry.healthStatus}</Text>
             </View>
-
-            <View style={s.metaRow}>
-              <Ionicons name="calendar-outline" size={14} color="#666" />
-              <Text style={s.metaText}>{scanDate}</Text>
-            </View>
-
-            {entry.notificationTime && (
-              <View style={s.notificationBox}>
-                <Ionicons
-                  name="notifications-outline"
-                  size={16}
-                  color="#1565C0"
-                />
-                <View style={{ flex: 1, marginLeft: 8 }}>
-                  <Text style={s.notificationTime}>
-                    Follow-up:{" "}
-                    {new Date(entry.notificationTime).toLocaleDateString(
-                      undefined,
-                      {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
-                  </Text>
-                  {entry.notificationReason ? (
-                    <Text style={s.notificationReason}>
-                      {entry.notificationReason}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            )}
-
-            {entry.rawAnalysisText && (
-              <View style={s.reportContainer}>
-                <Pressable
-                  accessibilityRole="button"
-                  style={s.toggleButton}
-                  onPress={() => toggleExpand(entry.id)}
-                >
-                  <Text style={s.toggleButtonText}>
-                    {isExpanded
-                      ? "Hide Diagnostic Report"
-                      : "View Diagnostic Report"}
-                  </Text>
-                  <Ionicons
-                    name={isExpanded ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color="#2F8135"
-                  />
-                </Pressable>
-
-                {isExpanded && (
-                  <View style={s.reportBody}>
-                    <Text style={s.reportText}>{entry.rawAnalysisText}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        );
+            <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color="#506557" />
+          </Pressable>
+          {expanded && <View style={s.details}>
+            {entry.notificationTime && <Text style={s.meta}>Follow-up · {new Date(entry.notificationTime).toLocaleString()}{entry.notificationReason ? ` — ${entry.notificationReason}` : ""}</Text>}
+            <Text style={s.detailsHeading}>Diagnostic report</Text>
+            <Text style={s.report}>{entry.rawAnalysisText || "No diagnostic text was saved."}</Text>
+          </View>}
+        </View>;
       })}
-    </Screen>
-  );
+    </View>)}
+  </Screen>;
 }
 
 const s = StyleSheet.create({
-  centerBox: {
-    paddingVertical: 32,
-    alignItems: "center",
-  },
-  emptyCard: {
-    alignItems: "center",
-    paddingVertical: 36,
-    paddingHorizontal: 20,
-  },
-  archiveCard: {
-    padding: 16,
-    borderRadius: 16,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  plantName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1B3B2B",
-  },
-  speciesText: {
-    fontSize: 13,
-    fontStyle: "italic",
-    color: "#5C6F64",
-    marginTop: 2,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 12,
-    color: "#666",
-  },
-  notificationBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#E3F2FD",
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 10,
-  },
-  notificationTime: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#0D47A1",
-  },
-  notificationReason: {
-    fontSize: 11,
-    color: "#1565C0",
-    marginTop: 2,
-  },
-  reportContainer: {
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-    paddingTop: 10,
-  },
-  toggleButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 4,
-  },
-  toggleButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#2F8135",
-  },
-  reportBody: {
-    marginTop: 8,
-    padding: 12,
-    backgroundColor: "#F8FAF8",
-    borderRadius: 10,
-  },
-  reportText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: "#2E3D32",
-  },
+  filters: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filter: { paddingHorizontal: 12, minHeight: 44, justifyContent: "center", borderRadius: 8, backgroundColor: "#F0F3F0" },
+  selectedFilter: { backgroundColor: "#278448" },
+  filterText: { fontSize: 13, color: "#365340" }, selectedText: { color: "#FFFFFF", fontWeight: "600" },
+  group: { gap: 4, marginTop: 12 }, groupHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  plantName: { fontSize: 18, fontWeight: "600", color: "#193E27", flex: 1 },
+  meta: { fontSize: 12, lineHeight: 18, color: "#506557" },
+  scan: { borderBottomWidth: 1, borderBottomColor: "#DFE7DF" },
+  scanHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, minHeight: 44 },
+  scanSummary: { flex: 1, gap: 4 }, date: { fontSize: 14, color: "#193E27" }, status: { fontSize: 12, textTransform: "capitalize" },
+  details: { gap: 8, paddingBottom: 16 }, detailsHeading: { fontSize: 13, fontWeight: "600", color: "#193E27" },
+  report: { fontSize: 14, lineHeight: 21, color: "#365340" },
 });

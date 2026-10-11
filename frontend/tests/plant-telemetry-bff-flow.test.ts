@@ -22,6 +22,13 @@ for (const paired of [false, true]) {
     flow.dispose();
   });
 }
+
+test("plant Scan history navigation includes the current plant ID", () => {
+  const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
+  press(flow.render(), "Scan history");
+  assert.deepEqual(JSON.parse(JSON.stringify(flow.navigations)), [{ pathname: "/archives", params: { plantId } }]);
+  flow.dispose();
+});
 test("profile sibling identity remains unique while editing and changes with the plant", async (t) => {
   const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
   t.after(flow.dispose);

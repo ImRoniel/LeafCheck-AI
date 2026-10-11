@@ -61,10 +61,12 @@ test("failed re-evaluation retains the old report and allows retry", async () =>
 });
 test("button requires a paired device, saved image, previous diagnosis and newer telemetry", async () => {
   const flow = setup(); flow.render(); await nextTurn();
-  for (const change of [{ deviceId: undefined }, { imageUrl: undefined }]) {
-    flow.metadata({ plants: [{ ...testPlant, deviceId, imageUrl: "saved", ...change }] });
-    assert.doesNotMatch(JSON.stringify(flow.render()), /Re-evaluate with Sensor Data/);
-  }
+  flow.metadata({ plants: [{ ...testPlant, deviceId: undefined, imageUrl: "saved" }] });
+  assert.match(JSON.stringify(flow.render()), /Re-evaluate with Sensor Data/);
+  flow.metadata({ plants: [{ ...testPlant, deviceId, imageUrl: undefined }] });
+  const unavailable = flow.render();
+  assert.equal(elements(unavailable).find(node => node.props.label === "Re-evaluate with Sensor Data")?.props.disabled, true);
+  assert.match(JSON.stringify(unavailable), /No saved photo is available/);
   flow.metadata({ plants: [{ ...testPlant, deviceId, imageUrl: "saved" }] });
   flow.guidance({ ...latest, createdAt: readingAt });
   assert.doesNotMatch(JSON.stringify(flow.render()), /Re-evaluate with Sensor Data/);

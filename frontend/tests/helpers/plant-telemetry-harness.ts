@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import * as React from "react";
 import ts from "typescript";
-import { diagnosisPresentation } from "../../services/plant-profile-guidance";
+import { diagnosisPresentation, hasNewerTelemetry } from "../../services/plant-profile-guidance";
 import type { Plant, PlantTelemetry, ArchiveEntry, ScanRequest, ScanResponse } from "../../types";
 
 const requireModule = createRequire(import.meta.url);
@@ -67,7 +67,7 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
         if (name === "@/context/app-data") return { useAppData: () => appDataSource?.() ?? ({ ...appData, refresh: async () => { collectionReads++; } }) };
         if (name === "@/context/auth") return { useAuth: () => auth };
         if (name === "@/hooks/use-plant-profile-guidance") return { usePlantProfileGuidance: () => ({ data: { latest: savedGuidance, pending: [] }, loading: false, error: null, refresh: async () => { guidanceRefreshes++; } }) };
-        if (name === "@/services/plant-profile-guidance") return { diagnosisPresentation };
+        if (name === "@/services/plant-profile-guidance") return { diagnosisPresentation, hasNewerTelemetry };
         if (name === "./DiagnosticReport") return { DiagnosticReport: "DiagnosticReport" };
         for (const component of ["PlantProfileHeader", "PlantDiagnosisCard", "PlantCareTasksCard"]) {
           if (name.endsWith(component)) return { [component]: component };

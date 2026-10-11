@@ -399,9 +399,12 @@ export function createApiClient(
         v.telemetryCheck(body.telemetry, "telemetry");
       return request("/api/ai/analyze", v.parseAnalysis, options, "POST", body);
     },
-    fetchArchives: (options?: RequestOptions & { plantId?: string }) =>
+    fetchArchives: (options?: RequestOptions & { plantId?: string; days?: 7 | 30 }) =>
       request<import("../types").ArchiveEntry[]>(
-        `/api/scan/archives${options?.plantId ? `?plantId=${id(options.plantId)}` : ""}`,
+        `/api/scan/archives${options?.plantId || options?.days ? `?${[
+          ...(options?.plantId ? [`plantId=${id(options.plantId)}`] : []),
+          ...(options?.days ? [`days=${options.days}`] : []),
+        ].join("&")}` : ""}`,
         v.parseArchives,
         options,
         "GET",

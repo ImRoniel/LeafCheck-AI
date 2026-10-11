@@ -107,7 +107,13 @@ before(async () => {
           },
         },
         aIAnalysis: {
-          findMany: async (query) => { guidanceQueries.push(query); return analyses.map((data, index) => ({ id: `analysis-${index + 1}`, ...data })); },
+          findMany: async (query) => {
+            guidanceQueries.push(query);
+            return analyses.map((data, index) => ({ id: `analysis-${index + 1}`, createdAt: new Date(), ...data }))
+              .filter(row => row.userId === query.where.userId && row.isArchived === query.where.isArchived &&
+                (!query.where.plantId || row.plantId === query.where.plantId) &&
+                (!query.where.createdAt || row.createdAt >= query.where.createdAt.gte));
+          },
           create: async ({ data }) => {
             analyses.push(captureWrite("analysis", data));
             return { id: `analysis-${analyses.length}`, createdAt: new Date() };
@@ -321,6 +327,28 @@ for (const stage of ["plant", "identification", "analysis", "tasks", "health"]) 
     assert.equal(healthWrites.length, 0);
   });
 }
+
+test("archives return only the owned plant and apply rolling date filters before limiting", async () => {
+  const plantId = "00000000-0000-4000-8000-000000000001";
+  const now = Date.now();
+  analyses = [1, 20, 40].map(days => ({ plantId, userId: "owner", isArchived: true, createdAt: new Date(now - days * 86400000) }));
+  analyses.push({ ...analyses[0], plantId: "other-plant" }, { ...analyses[0], userId: "other-user" }, { ...analyses[0], isArchived: false });
+  for (const [days, expected] of [[undefined, 3], [7, 1], [30, 2]]) {
+    const response = await fetch(`${baseUrl}/api/scan/archives?plantId=${plantId}${days ? `&days=${days}` : ""}`);
+    assert.equal(response.status, 200);
+    const rows = await response.json();
+    assert.equal(rows.length, expected);
+    assert.ok(rows.every(row => row.plantId === plantId && row.userId === "owner"));
+    const query = guidanceQueries.at(-1);
+    assert.equal(query.where.plantId, plantId);
+    assert.equal(query.take, 50);
+    if (days) assert.ok(Math.abs(query.where.createdAt.gte.getTime() - (now - days * 86400000)) < 3000);
+    else assert.equal(query.where.createdAt, undefined);
+  }
+  const count = guidanceQueries.length;
+  assert.equal((await fetch(`${baseUrl}/api/scan/archives?days=invalid`)).status, 400);
+  assert.equal(guidanceQueries.length, count);
+});
 
 test("plant guidance is filtered by the owned plant before limiting history", async () => {
   const plantId = "00000000-0000-4000-8000-000000000001";

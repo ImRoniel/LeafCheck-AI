@@ -473,9 +473,17 @@ scanRouter.get(["/archives", "/tasks"], asyncRoute(async (req, res, next) => {
 
 scanRouter.get("/archives", async (req: Request, res: Response) => {
   const userId = res.locals.auth.user.id;
+  const plantId = typeof res.locals.guidancePlantId === "string" ? res.locals.guidancePlantId : undefined;
+  const days = req.query.days === "7" ? 7 : req.query.days === "30" ? 30 : undefined;
+  if (req.query.days !== undefined && days === undefined) {
+    res.status(400).json({ error: "Date filter must be 7 or 30 days." });
+    return;
+  }
   try {
     const archives = await prismaPg.aIAnalysis.findMany({
-      where: { userId, isArchived: true, ...(res.locals.guidancePlantId ? { plantId: res.locals.guidancePlantId as string } : {}) },
+      where: { userId, isArchived: true, ...(plantId ? { plantId } : {}),
+        ...(days ? { createdAt: { gte: new Date(Date.now() - days * 86400000) } } : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {

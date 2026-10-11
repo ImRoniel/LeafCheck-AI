@@ -1,5 +1,18 @@
 import type { CareTask } from "../types";
 
+export function timestampMillis(value: unknown): number | null {
+  const millis = value instanceof Date ? value.getTime()
+    : typeof value === "string" && value.trim() ? Date.parse(value)
+    : typeof value === "number" ? value : NaN;
+  return Number.isFinite(millis) ? millis : null;
+}
+
+export function hasNewerTelemetry(telemetryTimestamp: unknown, diagnosisTimestamp: unknown): boolean {
+  const reading = timestampMillis(telemetryTimestamp);
+  const diagnosis = timestampMillis(diagnosisTimestamp);
+  return reading !== null && (diagnosis === null || reading > diagnosis);
+}
+
 /** Match setup actions narrowly; sensor maintenance and calibration remain care tasks. */
 export function isSensorSetupAction(text: string): boolean {
   return /\b(?:install|connect|pair|set\s*up)\b.{0,45}\b(?:environmental\s+)?sensors?\b/i.test(text);
