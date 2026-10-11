@@ -10,21 +10,23 @@ const zero = { deviceId: device.id, timestamp: testPlant.createdAt, environment:
 test("profile sibling identity remains unique while editing and changes with the plant", async (t) => {
   const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
   t.after(flow.dispose);
-  const identities = () => elements(flow.render()).filter((child) => ["PlantTelemetry", "EditPlantForm", "DeletePlantAction"].includes(String(child.type)));
+  const identities = () => elements(flow.render()).filter((child) => ["PlantTelemetry", "PlantProfileHeader", "PlantDiagnosisCard", "PlantCareTasksCard", "EditPlantForm", "DeletePlantAction"].includes(String(child.type)));
   const normal = identities();
-  assert.equal(normal.length, 2);
-  assert.equal(new Set(normal.map((child) => child.key)).size, 2);
+  assert.equal(normal.length, 4);
+  assert.equal(new Set(normal.map((child) => child.key)).size, 4);
+  const header = elements(flow.render()).find(child => child.props.accessibilityLabel === "Plant options");
+  header?.props.onPress?.();
   press(flow.render(), "Edit plant details");
   const editing = identities();
-  assert.equal(editing.length, 2);
-  assert.equal(new Set(editing.map((child) => child.key)).size, 2);
+  assert.equal(editing.length, 5);
+  assert.equal(new Set(editing.map((child) => child.key)).size, 5);
   assert.equal(editing.find((child) => child.type === "PlantTelemetry")?.key, normal.find((child) => child.type === "PlantTelemetry")?.key);
   const otherId = "44444444-4444-4444-8444-444444444444";
   flow.target(otherId);
   flow.metadata({ plants: [{ ...testPlant, id: otherId }] });
   const switched = identities();
-  assert.equal(switched.length, 2);
-  assert.equal(new Set(switched.map((child) => child.key)).size, 2);
+  assert.equal(switched.length, 4);
+  assert.equal(new Set(switched.map((child) => child.key)).size, 4);
   for (const child of switched) assert.ok(!normal.some((previous) => previous.key === child.key));
 });
 for (const payload of [{ paired: false, device: null, telemetry: null }, { paired: true, device, telemetry: null }, { paired: true, device, telemetry: zero }] as PlantTelemetry[]) {
@@ -38,12 +40,12 @@ for (const payload of [{ paired: false, device: null, telemetry: null }, { paire
     const output = JSON.stringify(node);
     assert.equal(reads, 1); assert.equal(flow.collectionReads(), 0);
     assert.doesNotMatch(output, /TelemetryHistory|local-demo/);
-    if (!payload.paired) { assert.match(output, /No sensor paired/); press(node, "Pair a Sensor"); assert.match(JSON.stringify(flow.navigations), new RegExp(plantId)); }
+    if (!payload.paired) { assert.match(output, /Connect a sensor to monitor growing conditions/); press(node, "Pair a Sensor"); assert.match(JSON.stringify(flow.navigations), new RegExp(plantId)); }
     else {
       assert.match(output, /Bedroom sensor/);
       if (!payload.telemetry) assert.match(output, /Waiting for first sensor reading/);
       else assert.deepEqual(elements(node).filter((child) => child.type === "MetricCard").map((child) => child.props.value), [0, 0, 0, 0]);
-      press(node, "Show reading history");
+      press(node, "Reading history");
       const history = elements(flow.renderTelemetry(flow.render())).find((child) => child.type === "TelemetryHistory");
       assert.equal(history?.props.deviceId, device.id);
     }
@@ -59,7 +61,7 @@ test("production profile reports malformed BFF distinctly and retry recovers", a
   let node = flow.renderTelemetry(flow.render());
   assert.doesNotMatch(JSON.stringify(node), /No sensor paired|Waiting for first/);
   press(node, "Retry sensor readings"); malformed = false; flow.render(); await nextTurn();
-  node = flow.renderTelemetry(flow.render()); assert.match(JSON.stringify(node), /No sensor paired/); flow.dispose();
+  node = flow.renderTelemetry(flow.render()); assert.match(JSON.stringify(node), /Connect a sensor to monitor growing conditions/); flow.dispose();
 });
 
 test("production profile aborts obsolete plant/session responses and refocus observes reassignment", async () => {
@@ -72,7 +74,7 @@ test("production profile aborts obsolete plant/session responses and refocus obs
   pending[1].resolve({ paired: true, device, telemetry: zero }); await nextTurn();
   assert.match(JSON.stringify(flow.renderTelemetry(flow.render())), /Bedroom sensor/);
   flow.refocus(); await nextTurn(); pending[2].resolve({ paired: false, device: null, telemetry: null }); await nextTurn();
-  assert.match(JSON.stringify(flow.renderTelemetry(flow.render())), /No sensor paired/);
+  assert.match(JSON.stringify(flow.renderTelemetry(flow.render())), /Connect a sensor to monitor growing conditions/);
   flow.session(2); flow.render(); await nextTurn(); assert.equal(pending[2].signal.aborted, true); flow.dispose(); assert.equal(pending[3].signal.aborted, true);
 });
 
@@ -83,7 +85,7 @@ test("collection hydration, retry, missing metadata and controls use AppData", a
   flow.metadata({ loaded: true, error: null }); assert.match(JSON.stringify(flow.render()), /Plant not found/);
   flow.metadata({ plants: [testPlant], error: "Refresh failed" }); await nextTurn();
   const node = flow.render(); assert.match(JSON.stringify(node), /Fern species|DeletePlantAction/);
-  press(node, "Scan this plant"); press(node, "Edit plant details"); assert.match(JSON.stringify(flow.render()), /EditPlantForm/);
+  press(node, "Scan Plant"); elements(node).find(child => child.props.accessibilityLabel === "Plant options")?.props.onPress?.(); press(flow.render(), "Edit plant details"); assert.match(JSON.stringify(flow.render()), /EditPlantForm/);
   assert.match(JSON.stringify(flow.navigations), new RegExp(plantId)); flow.dispose();
 });
 
@@ -102,17 +104,17 @@ test("guest metadata retains scanning and care without BFF reads", async () => {
   flow.target(guestId); flow.metadata({ plants: [{ ...testPlant, id: guestId }] });
   flow.session(2, "guest"); const node = flow.render(); await nextTurn();
   assert.doesNotMatch(JSON.stringify(node), /Missing or invalid plant ID/);
-  assert.match(JSON.stringify(node), /Sign in to connect a sensor|PlantCareSummary/);
-  press(node, "Scan this plant"); assert.equal(reads, 0); flow.dispose();
+  assert.match(JSON.stringify(flow.renderTelemetry(node)), /Sign in to connect a sensor/);
+  press(node, "Scan Plant"); assert.equal(reads, 0); flow.dispose();
 });
 
-test("paired profile keeps scanning secondary and preserves metrics during refresh", async (t) => {
+test("paired profile keeps scanning primary and preserves metrics during refresh", async (t) => {
   const flow = profileHarness(async () => ({paired: true, device, telemetry: zero}));
   t.after(flow.dispose);
   flow.render(); await nextTurn();
-  assert.match(JSON.stringify(flow.render()), /AI Disease Diagnosis/);
-  assert.equal(elements(flow.render()).filter(child => child.props.label === "Scan this plant").length, 1);
-  press(flow.renderTelemetry(flow.render()), "Refresh latest reading");
+  assert.match(JSON.stringify(flow.render()), /AI Diagnosis/);
+  assert.equal(elements(flow.render()).filter(child => child.props.label === "Scan Plant").length, 1);
+  press(flow.renderTelemetry(flow.render()), "Refresh readings");
   flow.render();
   const refreshing = flow.renderTelemetry(flow.render());
   assert.match(JSON.stringify(refreshing), /Updating sensor readings/);
@@ -153,7 +155,24 @@ test("raw hardware soil and lux render without presenting ADC as a percentage", 
   await nextTurn();
   const cards = elements(flow.renderTelemetry(flow.render())).filter(child => child.type === "MetricCard");
   assert.deepEqual(cards.map(child => [child.props.title, child.props.value, child.props.unit]), [
-    ["Temperature", 0, "°C"], ["Humidity", 0, "%"], ["Soil Moisture (Raw)", 2652, "ADC"], ["Light", 10.83, "lux"],
+    ["Temperature", 0, "°C"], ["Humidity", 0, "%"], ["Soil moisture · Raw ADC", 2652, "ADC"], ["Light", 10.83, "lux"],
   ]);
   assert.throws(() => parsePlantTelemetry({ ...payload, telemetry: { ...payload.telemetry, soilMoisture: { percentage: null, rawAnalogValue: 4096, status: "unavailable" } } }));
+});
+
+test("profile has four ordered sections and only Scan Plant is primary", (t) => {
+  const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
+  t.after(flow.dispose);
+  const node = flow.render();
+  const sections = elements(node).filter(child => ["PlantProfileHeader", "PlantTelemetry", "PlantDiagnosisCard", "PlantCareTasksCard"].includes(String(child.type)));
+  assert.deepEqual(sections.map(child => child.type), ["PlantProfileHeader", "PlantTelemetry", "PlantDiagnosisCard", "PlantCareTasksCard"]);
+  const actions = [...elements(node), ...elements(flow.renderTelemetry(node))].filter(child => child.type === "Action");
+  assert.deepEqual(actions.filter(child => !child.props.variant || child.props.variant === "primary").map(child => child.props.label), ["Scan Plant"]);
+  assert.doesNotMatch(JSON.stringify(node), /No verified sensor link|Moisture thresholds/);
+  assert.equal(elements(node).some(child => child.props.label === "Delete plant"), false);
+  elements(node).find(child => child.props.accessibilityLabel === "Plant options")?.props.onPress?.();
+  const menu = flow.render();
+  assert.equal(elements(menu).find(child => child.props.label === "Delete plant")?.props.variant, "destructive");
+  press(menu, "Delete plant");
+  assert.equal(elements(flow.render()).find(child => child.type === "DeletePlantAction")?.props.initiallyConfirming, true);
 });

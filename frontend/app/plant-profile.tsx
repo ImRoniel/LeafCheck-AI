@@ -1,16 +1,17 @@
 import { DeletePlantAction } from "@/components/delete-plant-action";
 import { EditPlantForm } from "@/components/edit-plant-form";
 import { PlantTelemetry } from "@/components/plant-telemetry";
-import { PlantCareSummary } from "@/components/plant-care-summary";
-import { Action, Notice, Screen, ui } from "@/components/screen";
+import { PlantProfileHeader } from "@/components/PlantProfileHeader";
+import { PlantDiagnosisCard } from "@/components/PlantDiagnosisCard";
+import { PlantCareTasksCard } from "@/components/PlantCareTasksCard";
+import { usePlantProfileGuidance } from "@/hooks/use-plant-profile-guidance";
+import { Action, Notice, Screen } from "@/components/screen";
 import { useAppData } from "@/context/app-data";
 import { fetchPlantTelemetry } from "@/services/api";
 import { useAuth } from "@/context/auth";
 import type { PlantTelemetry as SensorState } from "@/types";
-import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { Image, Text, View } from "react-native";
 
 export default function PlantProfile() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
@@ -24,11 +25,13 @@ export default function PlantProfile() {
   const [failure, setFailure] = useState<{ id: string; generation: number; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const guidance = usePlantProfileGuidance(typeof id === "string" ? id : "", validId && Boolean(plant) && auth.status === "authenticated");
+  const [editing, setEditing] = useState<string | null>(null);
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
-    setEditing(false);
+    setEditing(null);
+    setDeleting(null);
     setFailure(null);
     setLoading(false);
     if (!validId || typeof id !== "string" || auth.status !== "authenticated") return () => controller.abort();
@@ -45,82 +48,28 @@ export default function PlantProfile() {
   }, [id, auth.generation, auth.status, attempt]));
   const payload = sensor !== null && sensor.id === id && sensor.generation === auth.generation ? sensor.payload : null;
   const error = failure !== null && failure.id === id && failure.generation === auth.generation ? failure.message : null;
-  const retrySensor = () => setAttempt((value) => value + 1);
-  const isPaired = payload?.paired ?? Boolean(plant?.deviceId);
+  const retrySensor = () => setAttempt(value => value + 1);
   const pairSensor = () => router.push({ pathname: "/device-connection/scanner", params: { targetType: "plant", targetId: typeof id === "string" ? id : "" } });
+  const retryGuidance = () => { void guidance.refresh().catch(() => undefined); };
   return (
-    <Screen
-      title={plant?.name ?? "Plant profile"}
-      back
-      refresh={retrySensor}
-      loading={loading || collectionLoading}
-    >
+    <Screen refresh={() => { retrySensor(); retryGuidance(); }} loading={loading || collectionLoading}>
       {(!validRoute || (auth.status === "authenticated" && !validId)) && <Notice>Missing or invalid plant ID</Notice>}
       {!loaded && !collectionError && <Notice>Loading plant collection...</Notice>}
-      {collectionError && <><Notice>{collectionError}</Notice><Action label="Retry plant collection" onPress={() => { void refresh(); }} /></>}
+      {collectionError && <><Notice>{collectionError}</Notice><Action label="Retry plant collection" variant="secondary" onPress={() => { void refresh(); }} /></>}
       {validRoute && loaded && !collectionLoading && !collectionError && !plant && <Notice>Plant not found in your collection.</Notice>}
-      {plant && plant.id === id && (
-        <>
-          <View style={[ui.card, { alignItems: "center" }]}>
-            {plant.imageUrl && plant.imageUrl !== failedImageUrl ? (
-              <Image
-                source={{ uri: plant.imageUrl }}
-                onError={() => setFailedImageUrl(plant.imageUrl ?? null)}
-                style={{ width: "100%", height: 230, borderRadius: 20 }}
-              />
-            ) : (
-              <Ionicons name="leaf-outline" size={120} color="#278448" />
-            )}
-            <Text style={ui.heading}>{plant.species}</Text>
-            <Text style={ui.text}>
-              {plant.location || "Unassigned"} · {plant.healthStatus}
-            </Text>
-            <Text style={ui.text}>
-              Last scanned:{" "}
-              {plant.lastScannedAt
-                ? new Date(plant.lastScannedAt).toLocaleString()
-                : "Not recorded"}
-            </Text>
-          </View>
-          {editing ? (
-            <EditPlantForm
-              key={`edit:${plant.id}`}
-              plant={plant}
-              onCancel={() => setEditing(false)}
-              onSaved={() => {
-                setEditing(false);
-              }}
-            />
-          ) : (
-            <Action
-              label="Edit plant details"
-              onPress={() => setEditing(true)}
-            />
-          )}
-          <Text style={ui.text}>
-            Moisture thresholds: {plant.minMoisture ?? 30}% –{" "}
-            {plant.maxMoisture ?? 80}%
-          </Text>
-          {!isPaired && <Action
-            label="Scan this plant"
-            onPress={() =>
-              router.push({
-                pathname: "/(tabs)/scanner",
-                params: { plantId: plant.id },
-              })
-            }
-          />}
-          {auth.status === "authenticated" ? <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} /> : <><PlantCareSummary key={plant.id} plant={plant} telemetry={null} linked={false} /><Notice>Sign in to connect a sensor.</Notice></>}
-          {isPaired && <View style={ui.card}>
-            <Text accessibilityRole="header" style={ui.heading}>AI Disease Diagnosis</Text>
-            <Text style={ui.text}>Take a photo to check for visible disease symptoms.</Text>
-            <Action label="Scan this plant" onPress={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id } })} />
-          </View>}
-          {!editing && (
-            <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} />
-          )}
-        </>
-      )}
+      {plant && plant.id === id && <>
+        <PlantProfileHeader key={`header:${plant.id}`} plant={plant}
+          onBack={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/spaces")}
+          onEdit={() => { setDeleting(null); setEditing(plant.id); }}
+          onDelete={() => { setEditing(null); setDeleting(plant.id); }} />
+        {editing === plant.id && <EditPlantForm key={`edit:${plant.id}`} plant={plant} onCancel={() => setEditing(null)} onSaved={() => setEditing(null)} />}
+        {deleting === plant.id && <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} initiallyConfirming onCancel={() => setDeleting(null)} />}
+        <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} authenticated={auth.status === "authenticated"} />
+        <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={guidance.data?.latest ?? null} loading={guidance.loading} error={Boolean(guidance.error)} onRetry={retryGuidance}
+          onScan={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id } })}
+          onHistory={() => router.push("/archives")} />
+        <PlantCareTasksCard key={`tasks:${plant.id}`} tasks={guidance.data?.pending ?? []} loading={guidance.loading} error={Boolean(guidance.error)} onViewAll={() => router.push("/(tabs)/tasks")} />
+      </>}
     </Screen>
   );
 }

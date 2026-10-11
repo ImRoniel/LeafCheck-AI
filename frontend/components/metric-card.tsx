@@ -6,12 +6,14 @@ export function MetricCard({
   unit,
   status,
   onPress,
+  compact = false,
 }: {
   title: string;
   value: string | number;
   unit?: string;
   status?: "healthy" | "warning" | "critical";
   onPress?: () => void;
+  compact?: boolean;
 }) {
   const statusColors = {
     healthy: "#4CAF50",
@@ -25,11 +27,13 @@ export function MetricCard({
     <Pressable
       onPress={onPress}
       disabled={!onPress}
-      style={styles.container}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={onPress ? `${title}: ${value}${unit ? ` ${unit}` : ""}. About soil calibration` : undefined}
+      style={[styles.container, compact && styles.compact]}
     >
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, compact && { color: "#506557" }]}>{title}</Text>
       <View style={styles.valueContainer}>
-        <Text style={[styles.value, { color: statusColor }]}>{value}</Text>
+        <Text style={[styles.value, { color: compact ? "#193E27" : statusColor }, compact && { fontSize: 22, flexShrink: 1 }]}>{value}</Text>
         {unit && <Text style={styles.unit}>{unit}</Text>}
       </View>
     </Pressable>
@@ -37,6 +41,7 @@ export function MetricCard({
 }
 
 const styles = StyleSheet.create({
+  compact: { flex: 1, width: "auto", height: "auto", minHeight: 100, padding: 10, borderRadius: 14, elevation: 0, shadowOpacity: 0 },
   container: {
     backgroundColor: "#FFFFFF",
     width: "48%",

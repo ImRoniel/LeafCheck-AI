@@ -4,10 +4,10 @@ import { useRef, useState } from "react";
 import { View } from "react-native";
 import { Action, Notice, ui } from "./screen";
 
-export function DeletePlantAction({ id, name }: { id: string; name: string }) {
+export function DeletePlantAction({ id, name, initiallyConfirming = false, onCancel }: { id: string; name: string; initiallyConfirming?: boolean; onCancel?: () => void }) {
   const { deletePlant } = useAppData();
   const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState(initiallyConfirming);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef(false);
@@ -27,7 +27,7 @@ export function DeletePlantAction({ id, name }: { id: string; name: string }) {
     }
   };
   if (!confirming)
-    return <Action label="Delete plant" onPress={() => setConfirming(true)} />;
+    return <Action label="Delete plant" variant="destructive" onPress={() => setConfirming(true)} />;
   return (
     <View style={ui.card}>
       <Notice>
@@ -36,16 +36,19 @@ export function DeletePlantAction({ id, name }: { id: string; name: string }) {
       </Notice>
       {error && <Notice>{error}</Notice>}
       <Action
+        variant="destructive"
         label={deleting ? "Deleting plant..." : "Confirm permanent deletion"}
         disabled={deleting}
         onPress={() => void remove()}
       />
       <Action
         label="Cancel"
+        variant="secondary"
         disabled={deleting}
         onPress={() => {
           setConfirming(false);
           setError(null);
+          onCancel?.();
         }}
       />
     </View>

@@ -67,12 +67,12 @@ test("production Scanner -> provider -> Assignment -> Success -> Profile uses UU
   let metrics = profile.renderTelemetry(profile.render()); assert.match(JSON.stringify(metrics), /Waiting for first sensor reading/);
   assert.deepEqual(backend.calls.slice(before).map((call) => call.path), [`/api/plants/${plantId}/telemetry`]);
   backend.readings({ deviceId: claimedDevice.id, timestamp: claimedDevice.updatedAt, environment: { temperatureCelsius: 0, humidityPercentage: 0 }, soilMoisture: { percentage: 0, rawAnalogValue: 0, status: "dry" }, lightLevel: { lux: 0, status: "insufficient" } });
-  press(metrics, "Refresh latest reading"); profile.render(); await nextTurn(); metrics = profile.renderTelemetry(profile.render());
+  press(metrics, "Refresh readings"); profile.render(); await nextTurn(); metrics = profile.renderTelemetry(profile.render());
   assert.deepEqual(elements(metrics).filter((node) => node.type === "MetricCard").map((node) => node.props.value), [0, 0, 0, 0]);
   assert.doesNotMatch(JSON.stringify(metrics), /TelemetryHistory/);
-  press(metrics, "Show reading history"); assert.equal(elements(profile.renderTelemetry(profile.render())).find((node) => node.type === "TelemetryHistory")?.props.deviceId, claimedDevice.id);
+  press(metrics, "Reading history"); assert.equal(elements(profile.renderTelemetry(profile.render())).find((node) => node.type === "TelemetryHistory")?.props.deviceId, claimedDevice.id);
   profile.target(oldPlant.id); profile.render(); await nextTurn(); metrics = profile.renderTelemetry(profile.render());
-  assert.match(JSON.stringify(metrics), /No sensor paired/);
+  assert.match(JSON.stringify(metrics), /Connect a sensor to monitor growing conditions/);
   press(metrics, "Pair a Sensor"); assert.deepEqual(JSON.parse(JSON.stringify(profile.navigations.at(-1))), { pathname: "/device-connection/scanner", params: { targetType: "plant", targetId: oldPlant.id } });
 });
 

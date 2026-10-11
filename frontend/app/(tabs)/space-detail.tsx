@@ -1,3 +1,4 @@
+import { PlantSensorBadge, sensorPairingLabel } from "@/components/plant-sensor-badge";
 import { SpaceManagement } from "@/components/space-management";
 import { PlantActionMenu } from "@/components/plant-action-menu";
 import { SpaceMenuButton, type SpaceMenuAnchor } from "@/components/space-menu-button";
@@ -83,12 +84,13 @@ export default function SpaceDetailScreen() {
       <View style={styles.plantGrid}>
         {plants.map(plant => (
           <View key={plant.id} style={styles.plantCard}>
-            <Pressable style={styles.cardOpen} onLongPress={() => { removeMode.current = true; setRemoving(true); }} onPress={() => { if (!appData.guest && !removeMode.current) router.push({ pathname: "/plant-profile", params: { id: plant.id } }); }} accessibilityRole="button" accessibilityLabel={`Open ${plant.name}`} accessibilityHint="Long press to manage plants" />
+            <Pressable style={styles.cardOpen} onLongPress={() => { removeMode.current = true; setRemoving(true); }} onPress={() => { if (!appData.guest && !removeMode.current) router.push({ pathname: "/plant-profile", params: { id: plant.id } }); }} accessibilityRole="button" accessibilityLabel={`Open ${plant.name}${sensorPairingLabel(plant) ? `, ${sensorPairingLabel(plant)}` : ""}`} accessibilityHint="Long press to manage plants" />
             {removing && <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${plant.name}`} accessibilityState={{ disabled: appData.guest || deleting }} disabled={appData.guest || deleting} onPress={event => { event.stopPropagation(); setDeleteError(""); setDeleteId(plant.id); }} style={styles.removePlant}><View style={styles.minus}><Ionicons name="remove" size={12} color="#D93636" /></View></Pressable>}
             <View pointerEvents="none">
             {plant.imageUrl && !failedImages[plant.imageUrl]
               ? <Image source={{ uri: plant.imageUrl }} resizeMode="cover" accessibilityLabel={`${plant.name} photo`} style={styles.plantImage} onError={() => { const uri = plant.imageUrl!; setFailedImages(current => ({ ...current, [uri]: true })); }} />
               : <View style={[styles.plantImage, styles.plantImagePlaceholder]}><Ionicons name="leaf-outline" size={64} color="#2E8A3F" /></View>}
+            <PlantSensorBadge plant={plant} />
             </View>
             <View pointerEvents="box-none" style={styles.plantFooter}>
               <View pointerEvents="none" style={styles.plantNameContainer}><Text style={styles.plantName}>{plant.name}</Text></View>

@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import * as React from "react";
 import ts from "typescript";
+import { diagnosisPresentation } from "../../services/plant-profile-guidance";
 import type { Plant, PlantTelemetry } from "../../types";
 
 const requireModule = createRequire(import.meta.url);
@@ -53,10 +54,16 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
         if (name in overrides) return overrides[name];
         if (name === "react") return hooks;
         if (name === "react/jsx-runtime") return requireModule(name);
-        if (name === "react-native") return { Text: "Text", View: "View", Image: "Image", ActivityIndicator: "ActivityIndicator" };
+        if (name === "react-native") return { Text: "Text", View: "View", Image: "Image", ActivityIndicator: "ActivityIndicator", Pressable: "Pressable", StyleSheet: { create: (value: unknown) => value } };
         if (name === "@/components/screen" || name === "./screen") return { Screen: "Screen", Action: "Action", Notice: "Notice", ui: {} };
         if (name === "@/context/app-data") return { useAppData: () => appDataSource?.() ?? ({ ...appData, refresh: async () => { collectionReads++; } }) };
         if (name === "@/context/auth") return { useAuth: () => auth };
+        if (name === "@/hooks/use-plant-profile-guidance") return { usePlantProfileGuidance: () => ({ data: null, loading: false, error: null, refresh: async () => undefined }) };
+        if (name === "@/services/plant-profile-guidance") return { diagnosisPresentation };
+        if (name === "./DiagnosticReport") return { DiagnosticReport: "DiagnosticReport" };
+        for (const component of ["PlantProfileHeader", "PlantDiagnosisCard", "PlantCareTasksCard"]) {
+          if (name.endsWith(component)) return { [component]: component };
+        }
         if (name === "@/services/api") return { fetchPlantTelemetry };
         if (name === "@expo/vector-icons") return { Ionicons: "Icon" };
         if (name === "expo-router") return { useLocalSearchParams: () => ({ id }), useRouter: () => ({ push: (route: unknown) => navigations.push(route) }), useFocusEffect: (callback: () => void | (() => void)) => { if (callback !== focus) { cleanup?.(); focus = callback; cleanup = callback() || undefined; } } };
@@ -73,6 +80,23 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
   const telemetry = load("components/plant-telemetry.tsx").PlantTelemetry;
   const profile = load("app/plant-profile.tsx", { "@/components/plant-telemetry": { PlantTelemetry: "PlantTelemetry" } }).default;
   const telemetrySlots: unknown[] = [];
+  const childSlots = new Map<string, unknown[]>();
+  const children = Object.fromEntries(["PlantProfileHeader", "PlantDiagnosisCard", "PlantCareTasksCard"].map(name => [name, load(`components/${name}.tsx`)[name]]));
+  function expand(node: React.ReactNode): React.ReactNode {
+    return React.Children.map(node, child => {
+      if (!React.isValidElement<ElementProps>(child)) return child;
+      const name = String(child.type);
+      if (name in children) {
+        const key = `${name}:${child.key}`;
+        if (!childSlots.has(key)) childSlots.set(key, []);
+        slots = childSlots.get(key)!; cursor = 0;
+        const rendered = children[name](child.props as never);
+        slots = profileSlots;
+        return React.cloneElement(child, {}, rendered);
+      }
+      return React.cloneElement(child, {}, expand(child.props.children));
+    });
+  }
   return {
     navigations, collectionReads: () => collectionReads,
     metadata: (value: Partial<typeof appData>) => { appData = { ...appData, ...value }; },
@@ -82,7 +106,7 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
     dispose: () => cleanup?.(),
     render() {
       slots = profileSlots; cursor = 0;
-      return profile({} as never);
+      return expand(profile({} as never));
     },
     renderTelemetry(node: React.ReactNode) {
       const component = elements(node).find((child) => child.type === "PlantTelemetry");

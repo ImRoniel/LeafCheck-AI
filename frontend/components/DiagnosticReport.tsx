@@ -3,21 +3,23 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 /** Mount with the diagnosis ID as its key so each report starts collapsed. */
-export function DiagnosticReport({ text }: { text: string }) {
+export function DiagnosticReport({ text, readMoreLabel = "Read More" }: { text: string; readMoreLabel?: string }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <View style={styles.container}>
-      <Text selectable style={styles.body} numberOfLines={expanded ? undefined : 3} ellipsizeMode="tail">
-        {text}
-      </Text>
+      {expanded ? text.split(/\n/).map((line, index) => {
+        const heading = /^\s*#{1,6}\s/.test(line) || /^\s*\*\*[^*]+\*\*\s*:?\s*$/.test(line);
+        const content = line.replace(/^\s*#{1,6}\s*/, "").replace(/\*\*/g, "").replace(/^\s*[-*]\s+/, "• ");
+        return content.trim() ? <Text key={index} selectable accessibilityRole={heading ? "header" : undefined} style={[styles.body, heading && { fontWeight: "700", marginTop: 8 }]}>{content}</Text> : null;
+      }) : <Text selectable style={styles.body} numberOfLines={3} ellipsizeMode="tail">{text.replace(/^\s*#{1,6}\s*/gm, "").replace(/\*\*/g, "")}</Text>}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={expanded ? "Read Less" : "Read More"}
+        accessibilityLabel={expanded ? "Read Less" : readMoreLabel}
         accessibilityState={{ expanded }}
         onPress={() => setExpanded((value) => !value)}
         style={styles.toggle}
       >
-        <Text style={styles.toggleText}>{expanded ? "Read Less" : "Read More"}</Text>
+        <Text style={styles.toggleText}>{expanded ? "Read Less" : readMoreLabel}</Text>
         <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color="#278448" />
       </Pressable>
     </View>

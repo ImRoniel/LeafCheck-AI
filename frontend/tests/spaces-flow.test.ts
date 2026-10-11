@@ -76,6 +76,7 @@ function load(path: string, overrides: Record<string, unknown>) {
       if (name in overrides) return overrides[name];
       if (name === "@react-native-async-storage/async-storage") return { __esModule: true, default: { getItem: async () => "true" } };
       if (name === "expo-secure-store") return { getItemAsync: async () => "access-fixture" };
+      if ((name === "@/components/plant-sensor-badge" || name === "./plant-sensor-badge")) return load("components/plant-sensor-badge.tsx", { "@expo/vector-icons": { Ionicons: "Icon" } });
       if (name === "@/services/validators") return validators;
       if (name === "react/jsx-runtime") return requireModule(name);
       if (name === "expo-font") return { useFonts: () => [true] };
@@ -1086,4 +1087,42 @@ test("long press plant removal can be cancelled and only commits confirmed succe
   assert.equal(render().filter(node => node.type === "Modal")[0].props.visible, false);
   press("Cancel plant removal");
   assert.ok(!render().some(node => node.props.accessibilityLabel === "Cancel plant removal"));
+});
+
+test("sensor badges ignore pointer events and distinguish physical, demo and absent links", () => {
+  const module = load("components/plant-sensor-badge.tsx", { "@expo/vector-icons": { Ionicons: "Icon" } });
+  for (const plant of [{}, { deviceId: "" }, { deviceId: "  " }]) {
+    assert.equal(module.sensorPairingLabel(plant), null);
+    assert.equal(module.PlantSensorBadge({ plant }), null);
+  }
+  for (const simulated of [false, true]) {
+    const plant = { deviceId: "device-uuid", simulated };
+    assert.equal(module.sensorPairingLabel(plant), simulated ? "Demo sensor" : "Sensor paired");
+    const badge = module.PlantSensorBadge({ plant }) as React.ReactElement<Record<string, unknown>>;
+    assert.equal(badge.props.pointerEvents, "none");
+    assert.equal(badge.props.accessible, false);
+    assert.equal(badge.props.importantForAccessibility, "no-hide-descendants");
+    assert.deepEqual(elements(badge).filter(node => node.type === "Icon").map(node => node.props.name), ["wifi"]);
+  }
+});
+
+test("list cards announce sensor links and preserve navigation", () => {
+  const routes: unknown[] = [];
+  const module = load("components/plant-list.tsx", {
+    "@/context/app-data": { useAppData: () => ({ guest: false }) },
+    "@expo/vector-icons": { Ionicons: "Icon" },
+    "expo-router": { useRouter: () => ({ push: (route: unknown) => routes.push(route) }) },
+    "./screen": { Action: "Action", Notice: "Notice", ui: {} },
+  });
+  const cards = elements(module.PlantList({ plants: [
+    { id: "paired", name: "Fern", species: "Fern", healthStatus: "healthy", deviceId: "uuid" },
+    { id: "unpaired", name: "Basil", species: "Basil", healthStatus: "healthy" },
+    { id: "demo", name: "Demo", species: "Fern", healthStatus: "healthy", deviceId: "demo-uuid", simulated: true },
+  ] }));
+  const paired = cards.find(child => child.props.accessibilityLabel === "View Fern, Sensor paired");
+  assert.ok(paired);
+  assert.ok(cards.some(child => child.props.accessibilityLabel === "View Basil"));
+  assert.ok(cards.some(child => child.props.accessibilityLabel === "View Demo, Demo sensor"));
+  paired.props.onPress?.();
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/plant-profile", params: { id: "paired" } }]);
 });

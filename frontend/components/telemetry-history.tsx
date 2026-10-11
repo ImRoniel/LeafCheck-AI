@@ -33,6 +33,7 @@ export function TelemetryHistory({ deviceId }: { deviceId: string }) {
         <Notice>{error.message} Existing readings may be stale.</Notice>
       )}
       <Action
+        variant="secondary"
         label="Refresh history"
         onPress={() => {
           void refreshData().catch(() => {});
@@ -115,11 +116,13 @@ export function TelemetryHistory({ deviceId }: { deviceId: string }) {
       )}
       <View style={ui.row}>
         <Action
+          variant="secondary"
           label="Newer readings"
           disabled={!offset || loading}
           onPress={() => setOffset((n) => Math.max(0, n - limit))}
         />
         <Action
+          variant="secondary"
           label="Older readings"
           disabled={!pagination?.hasMore || loading}
           onPress={() => setOffset((n) => n + limit)}

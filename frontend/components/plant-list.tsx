@@ -1,3 +1,4 @@
+import { PlantSensorBadge, sensorPairingLabel } from "./plant-sensor-badge";
 import { useAppData } from "@/context/app-data";
 import type { Plant } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
@@ -56,9 +57,7 @@ export function PlantList({ plants }: { plants: Plant[] }) {
           key={plant.id}
           accessibilityRole={guest ? "text" : "button"}
           accessibilityLabel={
-            guest
-              ? `${plant.name}, ${plant.species}, local guest plant`
-              : `View ${plant.name}`
+            `${guest ? `${plant.name}, ${plant.species}, local guest plant` : `View ${plant.name}`}${sensorPairingLabel(plant) ? `, ${sensorPairingLabel(plant)}` : ""}`
           }
           disabled={guest}
           style={[ui.card, { flexDirection: "row", alignItems: "center" }]}
@@ -69,6 +68,7 @@ export function PlantList({ plants }: { plants: Plant[] }) {
             })
           }
         >
+          <View pointerEvents="none" style={{ width: 76, height: 90, justifyContent: "center", alignItems: "center" }}>
           {plant.imageUrl ? (
             <Image
               source={{ uri: plant.imageUrl }}
@@ -77,6 +77,8 @@ export function PlantList({ plants }: { plants: Plant[] }) {
           ) : (
             <Ionicons name="leaf-outline" size={64} color="#278448" />
           )}
+          <PlantSensorBadge plant={plant} />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={ui.heading}>{plant.name}</Text>
             <Text style={ui.text}>{plant.species}</Text>

@@ -66,10 +66,12 @@ export function Action({
   label,
   onPress,
   disabled = false,
+  variant = "primary",
 }: {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  variant?: "primary" | "secondary" | "destructive";
 }) {
   return (
     <Pressable
@@ -77,9 +79,9 @@ export function Action({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={[ui.button, disabled && { opacity: 0.45 }]}
+      style={[ui.button, variant === "secondary" && ui.secondaryButton, variant === "destructive" && ui.destructiveButton, disabled && { opacity: 0.45 }]}
     >
-      <Text style={ui.buttonText}>{label}</Text>
+      <Text style={[ui.buttonText, variant === "secondary" && ui.secondaryButtonText, variant === "destructive" && ui.destructiveButtonText]}>{label}</Text>
     </Pressable>
   );
 }
@@ -128,6 +130,10 @@ export const ui = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  secondaryButton: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#DBE7DA", alignSelf: "flex-start", paddingHorizontal: 14, minHeight: 44 },
+  secondaryButtonText: { color: "#278448" },
+  destructiveButton: { backgroundColor: "#FCE8E6", alignSelf: "flex-start", minHeight: 44 },
+  destructiveButtonText: { color: "#A12A24" },
   buttonText: { color: "#FFFFFF", fontWeight: "700" },
   input: {
     borderWidth: 1,

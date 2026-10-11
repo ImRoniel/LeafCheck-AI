@@ -77,11 +77,12 @@ export function EditPlantForm({
       ))}
       {error && <Notice>{error}</Notice>}
       <Action
+        variant="secondary"
         label={saving ? "Saving plant..." : "Save changes"}
         disabled={saving}
         onPress={() => void save()}
       />
-      <Action label="Cancel editing" disabled={saving} onPress={onCancel} />
+      <Action label="Cancel editing" variant="secondary" disabled={saving} onPress={onCancel} />
     </View>
   );
 }
