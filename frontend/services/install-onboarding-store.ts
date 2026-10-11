@@ -5,15 +5,13 @@ export interface IntroStorage {
 }
 export type IntroPhase = 'loading' | 'splash' | 'intro' | 'completed' | 'error';
 export interface IntroSnapshot { phase: IntroPhase; saving: boolean; error: string | null }
-const completionRecord = JSON.stringify({ version: 1, completed: true });
+const completionRecord = JSON.stringify(true);
 export function parseIntroRecord(raw: string | null): boolean {
   if (raw === null) return false;
   if (raw.length > 128) throw new Error('Invalid intro record');
   const value: unknown = JSON.parse(raw);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid intro record');
-  const record = value as Record<string, unknown>;
-  if (record.version !== 1 || record.completed !== true || Object.keys(record).length !== 2) throw new Error('Unsupported intro record');
-  return true;
+  if (typeof value !== 'boolean') throw new Error('Invalid intro record');
+  return value;
 }
 export function createIntroStore(storage: IntroStorage) {
   let state: IntroSnapshot = { phase: 'loading', saving: false, error: null };

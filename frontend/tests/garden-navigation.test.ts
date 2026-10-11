@@ -250,6 +250,7 @@ test("root stack preserves guards while native pushes reverse on Back and reduce
   for (const reducedMotion of [false, true]) {
     const Stack = Object.assign(() => null, { Screen: "Screen", Protected: "Protected" });
     const { default: Layout } = load("app/_layout.tsx", {
+      react: { ...React, useState: () => [true, () => {}], useRef: (current: unknown) => ({ current }), useEffect: () => {} },
       "@/context/install-onboarding": { InstallOnboardingProvider: "InstallOnboardingProvider", useInstallOnboarding: () => ({ phase: "completed" }) },
       "./splash": { __esModule: true, default: "Splash" },
       "@/hooks/use-reduced-motion": { useReducedMotion: () => reducedMotion },
@@ -272,7 +273,7 @@ test("root stack preserves guards while native pushes reverse on Back and reduce
     }
     assert.equal(routes.props.screenOptions.animation, reducedMotion ? "none" : "slide_from_right");
     const groups = React.Children.toArray(routes.props.children).filter(React.isValidElement) as React.ReactElement<RootProps>[];
-    assert.equal(groups[1].props.guard, false); // Signed-in setup is already complete.
+    assert.equal(groups[1].props.guard, true); // Setup remains available explicitly.
     assert.equal(groups[2].props.guard, true);
     assert.equal(groups[3].props.guard, false); // Authentication routes remain protected.
     const modal = elements(routes).find(node => node.props.name === "modal")!;

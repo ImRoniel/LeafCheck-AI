@@ -6,7 +6,7 @@ import { InstallOnboardingProvider, useInstallOnboarding } from "@/context/insta
 import Splash from "./splash";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { Stack, useRootNavigationState, useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator } from "react-native";
 function Routes() {
   const auth = useAuth();
@@ -21,12 +21,7 @@ function Routes() {
       router.replace("/(tabs)");
     }
   }, [auth.isGuest, local.ready, navigation?.key, router]);
-  if (auth.isLoading)
-    return (
-      <Screen title="Restoring session">
-        <ActivityIndicator accessibilityLabel="Restoring session" />
-      </Screen>
-    );
+  if (auth.isLoading) return <Splash />;
   if (auth.status === "error")
     return (
       <Screen title="Session unavailable">
@@ -67,21 +62,19 @@ function Routes() {
         )}
       </Screen>
     );
-  const setupPending = local.data.onboarding.status === "pending";
-  const setupRequired = authenticated && setupPending;
   return (
     <Stack
-      initialRouteName={auth.isGuest ? "(tabs)" : authenticated ? setupRequired ? "setup" : "(tabs)" : "login"}
+      initialRouteName={active ? "(tabs)" : "login"}
       screenOptions={{
         headerShown: false,
         animation: reducedMotion ? "none" : "slide_from_right",
       }}
     >
       <Stack.Screen name="index" />
-      <Stack.Protected guard={setupRequired || (auth.isGuest && setupPending)}>
+      <Stack.Protected guard={active}>
         <Stack.Screen name="setup" />
       </Stack.Protected>
-      <Stack.Protected guard={active && !setupRequired}>
+      <Stack.Protected guard={active}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="device-connection" />
@@ -97,7 +90,7 @@ function Routes() {
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Screen name="terms" />
-      <Stack.Protected guard={authenticated && !setupRequired}>
+      <Stack.Protected guard={authenticated}>
         <Stack.Screen name="plant-profile" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="archives" />
@@ -130,8 +123,19 @@ function AccountTree() {
 /** The intro tree is outside account-keyed providers, so restore cannot reset slides. */
 function StartupTree() {
   const intro = useInstallOnboarding();
+  const auth = useAuth();
   const reducedMotion = useReducedMotion();
-  if (intro.phase === "loading") return <Splash />;
+  const [splashReady, setSplashReady] = useState(false);
+  // This timer belongs to the startup tree, not the flag read or an account tree.
+  // It runs once while both storage and session restoration proceed in parallel.
+  useEffect(() => {
+    const timer = setTimeout(() => setSplashReady(true), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (splashReady && intro.phase === "splash") intro.finishSplash();
+  }, [splashReady, intro.phase, intro.finishSplash]);
+  if (!splashReady || intro.phase === "loading" || (intro.phase === "completed" && auth.isLoading)) return <Splash />;
   if (intro.phase === "error") return (
     <Screen title="Introductory setup unavailable">
       <Notice>{intro.error}</Notice>

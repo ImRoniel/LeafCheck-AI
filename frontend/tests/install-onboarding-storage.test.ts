@@ -53,3 +53,10 @@ test('synchronously throwing platform methods remain retryable', async () => {
   assert.equal(await store.complete(), false); failWrite = false;
   assert.equal(await store.complete(), true);
 });
+
+ test('boolean flags accept only true and false; missing is incomplete', () => {
+  assert.equal(parseIntroRecord(null), false);
+  assert.equal(parseIntroRecord('false'), false);
+  assert.equal(parseIntroRecord('true'), true);
+  for (const raw of ['0', '1', '"true"', '{}', ' '.repeat(129)]) assert.throws(() => parseIntroRecord(raw));
+});

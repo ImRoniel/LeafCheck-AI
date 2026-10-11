@@ -1,7 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { IntroStorage } from './install-onboarding-store';
-const key = 'leafcheck.install-intro.v1';
-/** Browser-local only; native resolution uses the .native adapter. */
+
+const key = '@leafcheck_onboarding_complete';
+/** Non-secret UX state shared by Expo Go, native builds and web. */
 export const introStorage: IntroStorage = {
-  async read() { return globalThis.localStorage.getItem(key); },
-  async write(record) { globalThis.localStorage.setItem(key, record); },
+  read: () => AsyncStorage.getItem(key),
+  write: (record) => AsyncStorage.setItem(key, record),
 };

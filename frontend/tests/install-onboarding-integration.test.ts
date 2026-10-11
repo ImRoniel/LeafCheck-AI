@@ -46,7 +46,7 @@ test('fresh anonymous and restored sessions traverse every slide and skip only t
     assert.equal(entry(store, status), status === 'anonymous' ? '/login' : status === 'authenticated' || status === 'guest' ? '/(tabs)' : null);
     const reload = createIntroStore(disk); await reload.load();
     assert.equal(reload.snapshot().phase, 'completed');
-    assert.equal(entry(reload, 'authenticated', 'pending'), '/setup/experience');
+    assert.equal(entry(reload, 'authenticated', 'pending'), '/(tabs)');
     assert.equal(entry(reload, 'authenticated', 'skipped'), '/(tabs)');
   }
 });
@@ -83,4 +83,42 @@ test('corrupt/browser-denied storage cannot admit restored sessions and does not
   denied = false; await store.load(); assert.equal(store.snapshot().phase, 'error'); assert.equal(raw, corrupt); assert.equal(writes, 0);
   // Simulate operator repair of the corrupt marker, not an application reset.
   raw = null; await store.load(); assert.equal(entry(store, 'authenticated'), '/splash');
+});
+
+test('completed intro routes by verified native restoration, not credential presence', async () => {
+  const { createSessionCoordinator } = await import('../services/session');
+  const { ApiError } = await import('../services/errors');
+  for (const credential of [null, 'rejected-fixture', 'valid-fixture']) {
+    let refreshed = 0;
+    let stored = credential;
+    const session = createSessionCoordinator({
+      async get() { return stored; },
+      async set(value) { stored = value; },
+      async remove() { stored = null; },
+    }, true, { run: work => work(), broadcastLogout() {}, listenLogout: () => () => {} });
+    session.bind({
+      async refresh() {
+        refreshed++;
+        if (credential !== 'valid-fixture') throw new ApiError('http', 'Rejected', 401);
+        return { accessToken: 'memory-access-fixture', refreshToken: 'rotated-fixture' };
+      },
+      async me() { return { id: 'user-fixture', email: 'fixture@example.test', name: null }; },
+      async login() { throw new Error('Unexpected login'); },
+      async register() { throw new Error('Unexpected register'); },
+      async logout() {},
+    });
+    let flag: string | null = 'true';
+    const intro = createIntroStore({ async read() { return flag; }, async write(value) { flag = value; } });
+    await intro.load();
+    assert.equal(entry(intro, session.snapshot().status), null);
+    await session.restore();
+    assert.equal(entry(intro, session.snapshot().status, 'pending'), credential === 'valid-fixture' ? '/(tabs)' : '/login');
+    assert.equal(refreshed, credential === null ? 0 : 1);
+    if (credential === 'valid-fixture') {
+      await session.logout(); assert.equal(entry(intro, session.snapshot().status), '/login');
+      session.enterGuest(); assert.equal(entry(intro, session.snapshot().status), '/(tabs)');
+      session.leaveGuest(); assert.equal(entry(intro, session.snapshot().status), '/login');
+    }
+    assert.equal(flag, 'true');
+  }
 });

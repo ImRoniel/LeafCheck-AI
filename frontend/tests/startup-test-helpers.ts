@@ -15,7 +15,7 @@ export function loadComponent(path: string, overrides: Record<string, unknown>, 
   runInNewContext(ts.transpileModule(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     exports, setTimeout, clearTimeout, ...globals, require: (name: string): unknown => {
       if (name in overrides) return overrides[name];
-      if (name === 'react') return { ...React, useRef: (current: unknown) => ({ current }), useEffect: (effect: () => void) => effects.push(effect) };
+      if (name === 'react') return { ...React, useState: () => [true, () => {}], useRef: (current: unknown) => ({ current }), useEffect: (effect: () => void) => effects.push(effect) };
       if (name === 'react/jsx-runtime') return requireModule(name);
       if (name === 'react-native') return { ActivityIndicator: 'ActivityIndicator' };
       throw new Error(`Unexpected import: ${name}`);
@@ -38,7 +38,7 @@ export function rootRoute(auth: { status: string; isGuest?: boolean; isLoading?:
     'expo-router': { Stack: Object.assign(() => null, { Protected: 'Protected', Screen: 'Screen' }), useRouter: () => ({ replace: (path: string) => replacements.push(path) }), useRootNavigationState: () => ({ key: 'ready' }) },
   }, effects);
   let route = Layout();
-  for (let depth = 0; depth < 12 && !route.props.screenOptions && !route.props.title; depth++) {
+  for (let depth = 0; depth < 12 && !route.props.screenOptions && !route.props.title && route.type !== 'Splash'; depth++) {
     if (typeof route.type === 'function') {
       route = (route.type as (props: NodeProps) => Element)(route.props);
     } else {

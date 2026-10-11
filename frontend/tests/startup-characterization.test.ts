@@ -2,18 +2,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { rootRoute, loadComponent, available } from './startup-test-helpers';
 test('completed installations exclude introductory routes for authenticated sessions', () => {
-  assert.deepEqual(available(rootRoute({ status: 'authenticated' }).route), ['(tabs)', 'profile', 'device-connection', 'plant-profile', 'settings', 'archives', 'modal']);
+  assert.deepEqual(available(rootRoute({ status: 'authenticated' }).route), ['setup', '(tabs)', 'profile', 'device-connection', 'plant-profile', 'settings', 'archives', 'modal']);
 });
 test('anonymous, pending setup, completed and skipped setup retain route guards', () => {
   assert.ok(available(rootRoute({ status: 'anonymous' }).route).includes('login'));
   for (const status of ['pending', 'completed', 'skipped']) {
     const routes = available(rootRoute({ status: 'authenticated' }, { ready: true, error: null, data: { onboarding: { status } } }).route);
-    assert.equal(routes.includes('setup'), status === 'pending');
-    assert.equal(routes.includes('(tabs)'), status !== 'pending');
+    assert.equal(routes.includes('setup'), true);
+    assert.equal(routes.includes('(tabs)'), true);
   }
 });
 test('restore and local failures expose recovery before account routes', () => {
-  assert.equal(rootRoute({ status: 'restoring', isLoading: true }).route.props.title, 'Restoring session');
+  assert.equal(rootRoute({ status: 'restoring', isLoading: true }).route.type, 'Splash');
   assert.equal(rootRoute({ status: 'error' }).route.props.title, 'Session unavailable');
   assert.equal(rootRoute({ status: 'authenticated' }, { ready: false, error: null, data: { onboarding: { status: 'pending' } } }).route.props.title, 'Restoring your garden');
   assert.equal(rootRoute({ status: 'authenticated' }, { ready: false, error: 'unavailable', data: { onboarding: { status: 'pending' } } }).route.props.title, 'Local setup unavailable');

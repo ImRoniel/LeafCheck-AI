@@ -1,7 +1,0 @@
-{
-  "name": "leafcheck-install-onboarding",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Backup-excluded, non-secret installation onboarding state",
-  "license": "MIT"
-}

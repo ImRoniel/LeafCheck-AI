@@ -119,25 +119,30 @@ Device mappings are local, unverified associations, not device authentication.
 Diagnosis is advisory and scans can leave server-side intermediate records after
 timeouts. Backend and hardware implementation/deployment remain outside this work.
 
-### Installation onboarding storage
+### MVP onboarding storage
 
-The introductory slides use the local `modules/install-onboarding` Expo module,
-not account garden-setup state or SecureStore. Android writes to `noBackupFilesDir`;
-iOS writes under Application Support with explicit backup exclusion. New installs,
-reinstalls and new-device restores must repeat intro without deleting refresh
-credentials. Existing installations see intro once when adopting this binary.
+The introductory slides use standard AsyncStorage on Expo Go, native builds and
+web. The only completion key is `@leafcheck_onboarding_complete`, containing the
+JSON boolean string `true` or `false`. A missing key or `false` shows the slides;
+the final action saves `true` before continuing. Failed reads/writes expose retry
+feedback without erasing credentials or garden data.
 
-Production and development builds need a rebuilt native app (Expo prebuild/EAS
-or local Xcode/Gradle build). An OTA-only update cannot provide the module;
-a missing module in these builds remains an error.
+Every cold launch shows the existing branded Splash for at least two seconds
+while storage and session restoration run. Incomplete intro takes precedence over
+a restored session. After completion, a signed-out user sees Login and a verified
+authenticated user sees Dashboard, including users with pending garden setup.
+Garden setup remains available through explicit setup routes. Refresh credentials
+stay in SecureStore on native and HttpOnly cookies on web; access JWTs stay in
+memory. The onboarding flag never uses SecureStore or Keychain.
 
-Expo Go previews use AsyncStorage under the separate
-`leafcheck.expo-go.install-intro.v1` key. This path is selected only when
-`Constants.executionEnvironment` is `ExecutionEnvironment.StoreClient`, never
-just because the native module is missing. Preview completion persists across
-reloads but does not provide production backup/transfer guarantees and is never
-migrated into the native completion marker. Reload Expo Go after applying the
-JavaScript update; no custom native build is needed for this preview path. Browser
-completion uses browser-local storage; browser-profile synchronization is outside
-the native backup guarantee. Real-device backup/transfer acceptance is separate
-from Node tests.
+No custom native onboarding module or build is required. Reload Expo Go to use the
+JavaScript update. Old native/browser/preview intro records are ignored, so an old
+installation sees the slides once when it first adopts the new key. Sign-out,
+account changes and guest entry do not reset completion.
+
+This plain local flag avoids Keychain synchronization but does not guarantee
+exclusion from ordinary app backup/restore. Clearing Expo Go project storage is
+different from reinstalling a standalone app; record the reset method when testing.
+See `tests/INSTALL_ONBOARDING_MANUAL_CHECKS.md` for the real Expo Go matrix and
+`.prd/frontend-mvp-verification-v6.md` for results. Node tests do not certify
+physical-device behavior.

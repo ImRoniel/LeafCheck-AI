@@ -268,7 +268,7 @@ test("fresh local entry opens Dashboard once, keeps setup optional, and permits 
   const local = { ready: true, data: { onboarding: { status: "pending" } } };
   const Stack = Object.assign(() => null, { Protected: "Protected", Screen: "Screen" });
   const module = load("app/_layout.tsx", {
-    react: state.react,
+    react: { ...state.react, useState: () => [true, () => {}] },
     "@/components/screen": { Action: "Action", Notice: "Notice", Screen: "Screen" },
     "@/context/install-onboarding": { InstallOnboardingProvider: "IntroProvider", useInstallOnboarding: () => ({ phase: "completed" }) },
     "./splash": { __esModule: true, default: "Splash" },

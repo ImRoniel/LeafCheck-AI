@@ -31,15 +31,6 @@ test('restore completion cannot change intro guards before a durable final actio
   await Promise.resolve(); assert.ok(release); release(); assert.equal(await saving, true);
   assert.equal(store.snapshot().phase, 'completed');
 });
-test('splash timer advances install state rather than navigating around auth guards', () => {
-  const effects: (() => void)[] = []; let finished = 0;
-  const Splash = loadComponent('app/splash.tsx', {
-    '@/components/leaf-check-logo': { LeafCheckLogo: 'Logo' },
-    '@/context/install-onboarding': { useInstallOnboarding: () => ({ phase: 'loading', finishSplash: () => finished++ }) },
-    'react-native': { View: 'View', StyleSheet: { create: (value: unknown) => value } },
-  }, effects);
-  Splash(); effects.forEach(effect => effect()); assert.equal(finished, 0);
-});
 test('onboarding final action saves without navigating to login or marking garden setup', async () => {
   const effects: (() => void)[] = []; let saves = 0;
   const Onboarding = loadComponent('app/onboarding.tsx', {
@@ -65,15 +56,90 @@ test('all root routes are explicitly guarded, including forbidden deep-link dest
     for (const route of routeNames) assert.ok(declared.includes(route), `${route} missing from intro guards`);
   }
 });
-test('splash waits two seconds after marker bootstrap and clears its timer', () => {
-  let callback: (() => void) | undefined; let cleared = false; let finished = 0;
-  const effects: (() => void)[] = [];
-  const Splash = loadComponent('app/splash.tsx', {
-    '@/components/leaf-check-logo': { LeafCheckLogo: 'Logo' },
-    '@/context/install-onboarding': { useInstallOnboarding: () => ({ phase: 'splash', finishSplash: () => finished++ }) },
-    'react-native': { View: 'View', StyleSheet: { create: (value: unknown) => value } },
-  }, effects, { setTimeout: (work: () => void, delay: number) => { assert.equal(delay, 2000); callback = work; return 1; }, clearTimeout: (id: number) => { assert.equal(id, 1); cleared = true; } });
-  Splash(); const cleanup: unknown = effects[0](); assert.equal(finished, 0);
-  assert.ok(callback); callback(); assert.equal(finished, 1);
-  assert.equal(typeof cleanup, 'function'); (cleanup as () => void)(); assert.equal(cleared, true);
+// Exercise the actual StartupTree hooks across renders without real-time sleeps.
+function startupHarness(intro: ReturnType<typeof createIntroStore>) {
+  let ready = false;
+  let status = 'restoring';
+  let callback: (() => void) | undefined;
+  let schedules = 0, clears = 0;
+  let hook = 0;
+  const dependencies: (readonly unknown[])[] = [];
+  const cleanups: (() => void)[] = [];
+  const pending: (() => void)[] = [];
+  const setReady = (value: boolean) => { ready = value; };
+  const react = {
+    ...React,
+    useState: () => [ready, setReady],
+    useEffect(effect: () => void | (() => void), deps: readonly unknown[]) {
+      const index = hook++;
+      const previous = dependencies[index];
+      if (!previous || deps.some((value, i) => !Object.is(value, previous[i]))) {
+        dependencies[index] = deps;
+        pending.push(() => { cleanups[index]?.(); const cleanup = effect(); cleanups[index] = cleanup || (() => {}); });
+      }
+    },
+  };
+  return {
+    setStatus(value: string) { status = value; },
+    render() {
+      hook = 0;
+      const root = introRoot(intro.snapshot(), status, {
+        react,
+        '@/context/install-onboarding': { InstallOnboardingProvider: 'IntroProvider', useInstallOnboarding: () => ({ ...intro.snapshot(), finishSplash: intro.finishSplash }) },
+      }, [], {
+        setTimeout(work: () => void, delay: number) { assert.equal(delay, 2000); schedules++; callback = work; return 1; },
+        clearTimeout(id: number) { assert.equal(id, 1); clears++; },
+      });
+      pending.splice(0).forEach(effect => effect());
+      return root;
+    },
+    elapse() { assert.ok(callback); callback(); },
+    unmount() { cleanups.forEach(cleanup => cleanup()); },
+    schedules: () => schedules,
+    clears: () => clears,
+  };
+}
+test('every startup keeps branded splash for the minimum and waits for relevant checks', async () => {
+  for (const raw of [null, 'false', 'true']) {
+    let release: ((value: string | null) => void) | undefined;
+    const store = createIntroStore({ read: () => new Promise(resolve => { release = resolve; }), async write() {} });
+    const loading = store.load(); await Promise.resolve();
+    const app = startupHarness(store);
+    assert.equal(app.render().type, 'Splash');
+    app.setStatus('authenticated'); assert.equal(app.render().type, 'Splash');
+    assert.equal(app.schedules(), 1);
+    app.elapse(); assert.equal(app.render().type, 'Splash'); // Slow flag read.
+    assert.ok(release); release(raw); await loading;
+    app.setStatus('restoring'); app.render();
+    if (raw === 'true') {
+      assert.equal(app.render().type, 'Splash'); // Completed flag still waits for auth.
+      app.setStatus('authenticated'); assert.notEqual(app.render().type, 'Splash');
+    } else {
+      assert.equal(store.snapshot().phase, 'intro');
+      assert.deepEqual(guardedScreens(app.render()), ['onboarding']); // Auth need not block slides.
+      await store.complete(); assert.equal(app.render().type, 'Splash');
+      app.setStatus('signedOut'); assert.notEqual(app.render().type, 'Splash');
+    }
+    assert.equal(app.schedules(), 1);
+    app.unmount(); assert.equal(app.clears(), 1);
+  }
+});
+test('fast returning-session checks cannot skip splash; errors recover after minimum', async () => {
+  for (const raw of ['true', 'false', 'null', '{']) {
+    const store = createIntroStore({ async read() { return raw; }, async write() {} });
+    await store.load();
+    const app = startupHarness(store); app.setStatus('signedOut');
+    assert.equal(app.render().type, 'Splash');
+    app.elapse(); const root = app.render();
+    if (raw === 'true') assert.notEqual(root.type, 'Splash');
+    else if (raw === 'false') { assert.equal(store.snapshot().phase, 'intro'); assert.deepEqual(guardedScreens(app.render()), ['onboarding']); }
+    else assert.equal(root.props.title, 'Introductory setup unavailable');
+    app.unmount(); assert.equal(app.clears(), 1);
+  }
+});
+test('unmount clears the startup timer before it has fired', async () => {
+  const store = createIntroStore({ async read() { return null; }, async write() {} });
+  const app = startupHarness(store); assert.equal(app.render().type, 'Splash');
+  app.unmount(); assert.equal(app.clears(), 1);
+  assert.equal(store.snapshot().phase, 'loading');
 });

@@ -1,0 +1,167 @@
+{
+  "schema": 3,
+  "runtime": 3,
+  "change": "prd-v6",
+  "prd": ".prd/prd-v6.md",
+  "base": "55c2dc313e69f3eb02eeed93016c8d2d97d0c846",
+  "registered": "2026-10-11T02:48:36Z",
+  "sequence": 6,
+  "lifecycle": {
+    "state": "completed",
+    "since": "2026-10-11T03:00:52Z",
+    "reason": null,
+    "note": null,
+    "superseded_by": null
+  },
+  "agreements": [
+    {
+      "id": "G-01",
+      "digest": "de63b7d557ccb19a17db0f2ae665a574d8d87874eaf59999b0d7054888d23ad4",
+      "prd_revision": "59e97397f8683e8d6d087fc17fb1ab3864c474c5442fb9356bb6f217fb4e39f7",
+      "breakdown": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "inventory": null,
+      "coverage": null,
+      "tickets": [],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v6/agreements/G-01.json",
+      "recorded": "2026-10-11T02:48:50Z"
+    },
+    {
+      "id": "G-02",
+      "digest": "c2bdf9ae53bf7a55b369f08473c98ed195b256fff116b64025aea7a5515d85e4",
+      "prd_revision": "59e97397f8683e8d6d087fc17fb1ab3864c474c5442fb9356bb6f217fb4e39f7",
+      "breakdown": "8faa8b1f5f3b2ff866034cdf5c6bc67936d963035dea07305d7083bccf179d33",
+      "inventory": "d41481783c034b56d153f3d57fa9ef7db38b26b2b626459629d4b361a4991ebd",
+      "coverage": "e8278258375a2264cb7a1209edb6674cb14dc525c8c1ff3c3096d3c6e5940fd4",
+      "tickets": [
+        "T-20",
+        "T-21",
+        "T-22"
+      ],
+      "decisions": [],
+      "snapshot": ".prd/changes/prd-v6/agreements/G-02.json",
+      "recorded": "2026-10-11T02:53:29Z"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "A-01",
+      "agreement": "G-01",
+      "digest": "de63b7d557ccb19a17db0f2ae665a574d8d87874eaf59999b0d7054888d23ad4",
+      "disposition": "user",
+      "reference": "User pincer-plan brief, 2026-10-11",
+      "excerpt": "Revert custom native module. Implement simple AsyncStorage MVP solution.",
+      "constraints": null,
+      "basis": null,
+      "explanation": null,
+      "decisions": [],
+      "recorded": "2026-10-11T02:48:50Z"
+    },
+    {
+      "id": "A-02",
+      "agreement": "G-02",
+      "digest": "c2bdf9ae53bf7a55b369f08473c98ed195b256fff116b64025aea7a5515d85e4",
+      "disposition": "delegated",
+      "reference": null,
+      "excerpt": null,
+      "constraints": null,
+      "basis": "A-01",
+      "explanation": "The user invoked pincer-narrow after PRD v6 planning, delegating decomposition of the same explicitly authorized AsyncStorage MVP scope; these three ordered tickets and complete map implement that scope without deferrals or new architecture.",
+      "decisions": [],
+      "recorded": "2026-10-11T02:53:30Z"
+    }
+  ],
+  "decisions": [],
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "register",
+      "from": null,
+      "to": "planned",
+      "at": "2026-10-11T02:48:36Z",
+      "reason": null,
+      "agreement": null,
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 2,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-11T02:48:50Z",
+      "reason": null,
+      "agreement": "G-01",
+      "authorization": "A-01",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 3,
+      "kind": "adopt",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-11T02:53:29Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": null,
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 4,
+      "kind": "authorize",
+      "from": "planned",
+      "to": "planned",
+      "at": "2026-10-11T02:53:30Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 5,
+      "kind": "activate",
+      "from": "planned",
+      "to": "active",
+      "at": "2026-10-11T02:55:04Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    },
+    {
+      "sequence": 6,
+      "kind": "complete",
+      "from": "active",
+      "to": "completed",
+      "at": "2026-10-11T03:00:52Z",
+      "reason": null,
+      "agreement": "G-02",
+      "authorization": "A-02",
+      "decision": null,
+      "replacement": null,
+      "note": null
+    }
+  ],
+  "evaluations": [],
+  "legacy": {
+    "receipts": {},
+    "authorization_text": null,
+    "migrated_from": null,
+    "migrated": null
+  },
+  "coverage": {
+    "map": ".prd/coverage/prd-v6.json",
+    "adopted": "2026-10-11T02:53:29Z",
+    "agreement": "G-02"
+  }
+}

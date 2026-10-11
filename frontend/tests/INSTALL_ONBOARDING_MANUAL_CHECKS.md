@@ -1,35 +1,39 @@
-# Installation intro: native acceptance
+# AsyncStorage MVP: Expo Go acceptance
 
-Use rebuilt iOS/Android binaries containing `InstallOnboarding`; Expo Go and an
-OTA-only update are insufficient. Record version/build, OS/device, installation
-method, backup/transfer mechanism, date, observed outcomes and artifact references
-in `.prd/frontend-install-verification-v4.md`. Use test accounts; never record tokens.
+Use the current JavaScript bundle in Expo Go; no custom onboarding module or native
+build is needed. Use test accounts and record platform, OS, Expo Go/runtime version,
+date, reset method and observations in `.prd/frontend-mvp-verification-v6.md`.
+Never record credential values. Preserve account garden data when preparing states.
 
-1. Fresh install, no credentials: branded splash → all three slides → login.
-2. Fresh install/new device with a valid test session: same splash/slides; final
-   action skips login and resumes saved garden setup or reaches Home as appropriate.
-3. Complete intro and relaunch. Intro stays complete through sign-out, login to a
-   second account and guest access; garden data stays account-scoped.
-4. Remove/reinstall the app and clear Android app data. Intro repeats. On iOS test
-   with a retained Keychain credential: intro still precedes authenticated routes;
-   the app must not proactively delete that credential.
-5. Complete intro on source device, back up and restore to a second device. Also
-   perform device-to-device transfer. Verify garden data can be restored while the
-   intro marker is absent. Exercise both cloud restore and direct transfer on each
-   platform; record the actual mechanism rather than assuming backup flags prove it.
-6. Inspect built native integration: Android marker under `noBackupFilesDir`; iOS
-   Application Support directory/file explicitly excluded from backup. SecureStore
-   key/service and device-only accessibility stay unchanged; Android SecureStore
-   entries stay excluded; no synchronizable attributes/shared access group added.
-7. Open Home/setup/login/terms deep links before intro completion; try hardware Back.
-   Neither deep links nor guest effects can bypass splash/slides.
-8. Slow/offline/expired-session restoration while traversing slides. A late successful
-   restore leaves the current slide intact; after completion existing recovery applies.
-9. Inject marker read/write denial and malformed/unsupported content on a test build.
-   Observe generic retry, no overwritten garden data, no navigation before save,
-   double-tap coalescing, and successful retry after restoring storage access.
-10. Review large text, screen-reader page controls and saving/retry feedback, reduced
-    motion, safe areas, existing artwork/layout and Android Back.
+1. Remove only `@leafcheck_onboarding_complete` in an isolated test project, then
+   cold launch. Splash lasts at least two seconds, followed by all three slides.
+   Repeat with the flag set to the JSON boolean string `false`.
+2. Repeat missing/false with an existing valid session: slides still precede
+   authenticated routes. Late restore does not reset the current slide.
+3. Finish the final slide. Verify the persisted value is `true`; reload the project.
+   Every cold launch still briefly shows Splash, but slides do not repeat.
+4. With `true` and no refresh credential/test session, observe Splash → Login.
+   With an expired/rejected test credential, observe Login after verified rejection.
+   Do not print or copy credentials to prepare this test.
+5. With `true` and a valid restored session, observe Splash → Dashboard, including
+   a test account whose garden setup is pending. Explicit setup routes still work.
+6. Sign out, sign in as a second test account, and enter/leave guest mode. Intro
+   stays complete, protected routes remain protected and garden data stays scoped.
+7. Open Dashboard/setup/login/terms deep links before completing intro; try Back.
+   Neither direct links nor guest navigation may bypass slides.
+8. Delay flag reads or session restoration. Splash stays until relevant checks
+   resolve; missing/false may reveal slides before auth finishes. Completed intro
+   waits for auth. Existing recovery appears after actual errors.
+9. Inject malformed/nonboolean flag data and read/write failures using an isolated
+   test fixture. Observe sanitized retry feedback, no unrelated data deletion,
+   no completion before successful save, and coalesced repeated final taps.
+10. Confirm unchanged artwork/layout, large text, screen-reader controls and
+    saving/retry feedback, reduced motion and Android Back behavior.
 
-Mark unavailable prerequisites/results **unverified**. Automated tests, module
-autolinking and static source inspection are supporting evidence, not native lifecycle proof.
+The key is a nonsecret AsyncStorage boolean, never a SecureStore flag. Legacy
+markers are ignored and may cause a one-time replay of intro. There is no ordinary
+backup-exclusion/device-transfer guarantee in this MVP. State exactly how Expo Go
+storage was reset; a project reload does not clear persisted storage.
+
+Unavailable prerequisites/results remain **unverified**. Required real-device
+review C-04 is not waived by Node tests or this checklist.
