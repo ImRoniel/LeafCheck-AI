@@ -3,11 +3,11 @@ import test from "node:test";
 import { filterCareTaskPeriod } from "../services/care-task-filter";
 import type { GardenCareTask } from "../types/care-task";
 
-test("Monday calendar filters retain overdue/manual checks and distinguish exact week boundaries", () => {
+test("Monday calendar filters retain overdue checks and exclude undated checks and distinguish exact week boundaries", () => {
   const now = new Date(2026, 9, 4, 12); // Sunday, local calendar time.
   const task = (id: string, date: Date | null): GardenCareTask => ({ id, key: id, plantId: "p", title: id, details: "", dueAt: date?.toISOString() ?? null, priority: "routine" });
   const tasks = [task("overdue", new Date(2026, 8, 1)), task("manual", null), task("sunday", new Date(2026, 9, 4, 23, 59)), task("next", new Date(2026, 9, 5)), task("last", new Date(2026, 9, 11, 23, 59)), task("later", new Date(2026, 9, 12))];
-  assert.deepEqual(filterCareTaskPeriod(tasks, "This Week", now).map(t => t.id), ["overdue", "manual", "sunday"]);
+  assert.deepEqual(filterCareTaskPeriod(tasks, "This Week", now).map(t => t.id), ["overdue", "sunday"]);
   assert.deepEqual(filterCareTaskPeriod(tasks, "Next Week", now).map(t => t.id), ["next", "last"]);
   assert.deepEqual(filterCareTaskPeriod(tasks, "Later", now).map(t => t.id), ["later"]);
   assert.equal(tasks[1].dueAt, null);
@@ -21,4 +21,16 @@ test("completed views use completion timestamps rather than inventing manual due
   assert.equal(filterCareTaskPeriod([task], "This Week", new Date(2026, 9, 4)).length, 0);
   assert.equal(filterCareTaskPeriod([task], "Next Week", new Date(2026, 9, 4)).length, 1);
   assert.equal(task.dueAt, null);
+});
+
+
+test("All dates includes undated checks; Today filters by local due or completion date", () => {
+  const now = new Date(2026, 9, 4, 12);
+  const manual = { id: "manual", key: "manual", plantId: "p", title: "Check", details: "", dueAt: null, priority: "routine" as const };
+  const today = { ...manual, id: "today", dueAt: new Date(2026, 9, 4, 8).toISOString() };
+  const tomorrow = { ...manual, id: "tomorrow", dueAt: new Date(2026, 9, 5).toISOString() };
+  assert.deepEqual(filterCareTaskPeriod([manual, today, tomorrow], "All dates", now), [manual, today, tomorrow]);
+  assert.deepEqual(filterCareTaskPeriod([manual, today, tomorrow], "Today", now), [today]);
+  const completed = { ...manual, completedAt: today.dueAt };
+  assert.deepEqual(filterCareTaskPeriod([completed], "Today", now), [completed]);
 });
