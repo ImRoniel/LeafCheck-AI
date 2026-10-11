@@ -19,5 +19,6 @@
     "expo": "~57.0.25",
     "react": "19.2.3",
     "react-native": "0.86.3"
-  }
+  },
+  "main": "expo-router/entry"
 }

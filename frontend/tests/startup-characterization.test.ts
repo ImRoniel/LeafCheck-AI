@@ -5,7 +5,7 @@ test('completed installations exclude introductory routes for authenticated sess
   assert.deepEqual(available(rootRoute({ status: 'authenticated' }).route), ['setup', '(tabs)', 'profile', 'device-connection', 'plant-profile', 'settings', 'archives', 'modal']);
 });
 test('anonymous, pending setup, completed and skipped setup retain route guards', () => {
-  assert.ok(available(rootRoute({ status: 'anonymous' }).route).includes('login'));
+  assert.ok(available(rootRoute({ status: 'anonymous' }).route).includes('(auth)'));
   for (const status of ['pending', 'completed', 'skipped']) {
     const routes = available(rootRoute({ status: 'authenticated' }, { ready: true, error: null, data: { onboarding: { status } } }).route);
     assert.equal(routes.includes('setup'), true);
@@ -22,7 +22,7 @@ test('guests without tokens stay on login and reduced motion disables transition
   const guest = rootRoute({ status: 'guest', isGuest: true });
   guest.effects.forEach(effect => effect());
   assert.deepEqual(guest.replacements, []);
-  assert.ok(available(guest.route).includes('login'));
+  assert.ok(available(guest.route).includes('(auth)'));
   assert.ok(!available(guest.route).includes('(tabs)'));
   const loading = rootRoute({ status: 'guest', isGuest: true }, { ready: false, error: null, data: { onboarding: { status: 'pending' } } });
   loading.effects.forEach(effect => effect());

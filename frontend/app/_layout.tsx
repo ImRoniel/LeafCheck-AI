@@ -57,7 +57,7 @@ function Routes({ hasToken }: { hasToken: boolean }) {
     );
   return (
     <Stack
-      initialRouteName={active ? "(tabs)" : "login"}
+      initialRouteName={active ? "(tabs)" : "(auth)"}
       screenOptions={{
         headerShown: false,
         animation: reducedMotion ? "none" : "slide_from_right",
@@ -73,7 +73,7 @@ function Routes({ hasToken }: { hasToken: boolean }) {
         <Stack.Screen name="device-connection" />
       </Stack.Protected>
       <Stack.Protected guard={!authenticated}>
-        <Stack.Screen name="login" />
+        <Stack.Screen name="(auth)" />
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
         <Stack.Screen name="otp-verification" />
@@ -184,7 +184,7 @@ function StartupTree() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="device-connection" />
-        <Stack.Screen name="login" />
+        <Stack.Screen name="(auth)" />
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
         <Stack.Screen name="otp-verification" />

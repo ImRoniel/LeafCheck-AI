@@ -1,23 +1,15 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "./frontend/tsconfig.json",
   "compilerOptions": {
-    "strict": true,
     "paths": {
       "@/*": [
-        "./*"
+        "./frontend/*"
       ]
-    },
-    "module": "preserve",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "types": [
-      "node"
-    ]
+    }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "frontend/**/*.ts",
+    "frontend/**/*.tsx",
+    ".expo/types/**/*.ts"
   ]
 }

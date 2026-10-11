@@ -11,7 +11,7 @@ test('fresh install only admits splash then intro for every authentication outco
     for (const phase of ['splash', 'intro'] as const) {
       const root = introRoot({ phase, saving: false, error: null }, status);
       assert.deepEqual(guardedScreens(root), [phase === 'intro' ? 'onboarding' : 'splash']);
-      for (const forbidden of ['login', '(tabs)', 'setup', 'terms', 'plant-profile']) assert.ok(!guardedScreens(root).includes(forbidden));
+      for (const forbidden of ['(auth)', '(tabs)', 'setup', 'terms', 'plant-profile']) assert.ok(!guardedScreens(root).includes(forbidden));
     }
   }
 });

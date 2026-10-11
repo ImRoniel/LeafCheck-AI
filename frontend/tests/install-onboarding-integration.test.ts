@@ -43,7 +43,7 @@ test('fresh anonymous and restored sessions traverse every slide and skip only t
     assert.equal(render().props.currentSlide, 1); render().props.onNext?.();
     assert.equal(render().props.currentSlide, 2); render().props.onLetsGo?.();
     await store.complete(); assert.equal(store.snapshot().phase, 'completed');
-    assert.equal(entry(store, status), status === 'authenticated' ? '/(tabs)' : status === 'error' || status === 'restoring' ? null : '/login');
+    assert.equal(entry(store, status), status === 'authenticated' ? '/(tabs)' : status === 'error' || status === 'restoring' ? null : '/(auth)/login');
     const reload = createIntroStore(disk); await reload.load();
     assert.equal(reload.snapshot().phase, 'completed');
     assert.equal(entry(reload, 'authenticated', 'pending'), '/(tabs)');
@@ -112,12 +112,12 @@ test('completed intro routes by verified native restoration, not credential pres
     await intro.load();
     assert.equal(entry(intro, session.snapshot().status), null);
     await session.restore();
-    assert.equal(entry(intro, session.snapshot().status, 'pending'), credential === 'valid-fixture' ? '/(tabs)' : '/login');
+    assert.equal(entry(intro, session.snapshot().status, 'pending'), credential === 'valid-fixture' ? '/(tabs)' : '/(auth)/login');
     assert.equal(refreshed, credential === null ? 0 : 1);
     if (credential === 'valid-fixture') {
-      await session.logout(); assert.equal(entry(intro, session.snapshot().status), '/login');
-      session.enterGuest(); assert.equal(entry(intro, session.snapshot().status), '/login');
-      session.leaveGuest(); assert.equal(entry(intro, session.snapshot().status), '/login');
+      await session.logout(); assert.equal(entry(intro, session.snapshot().status), '/(auth)/login');
+      session.enterGuest(); assert.equal(entry(intro, session.snapshot().status), '/(auth)/login');
+      session.leaveGuest(); assert.equal(entry(intro, session.snapshot().status), '/(auth)/login');
     }
     assert.equal(flag, 'true');
   }
