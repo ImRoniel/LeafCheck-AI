@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { createApiClient } from "../services/api";
+import { ApiError } from "../services/errors";
 import type { ArchiveEntry, ScanResponse } from "../types";
 import { elements, press, profileHarness, plantId, accountId, testPlant } from "./helpers/plant-telemetry-harness";
 
@@ -54,7 +55,7 @@ test("failed re-evaluation retains the old report and allows retry", async () =>
   const flow = setup(); flow.scan(async () => { throw new Error("AI unavailable"); });
   flow.render(); await nextTurn(); press(flow.render(), "Re-evaluate with Sensor Data"); await nextTurn();
   const node = flow.render();
-  assert.match(JSON.stringify(node), /Re-evaluation failed/);
+  assert.match(JSON.stringify(node), /AI diagnosis could not be generated/);
   assert.match(JSON.stringify(node), /No device associated/);
   assert.match(JSON.stringify(node), /Re-evaluate with Sensor Data/);
   flow.dispose();
@@ -90,4 +91,75 @@ test("API accepts saved-photo scans without an upload and rejects missing plant 
   assert.equal((await client.scanPlant({ plantId, reusePreviousImage: true })).diagnostic.id, "new");
   assert.throws(() => client.scanPlant({ reusePreviousImage: true }));
   assert.throws(() => client.scanPlant({ plantId }));
+});
+
+for (const paired of [false, true]) {
+  test(`missing diagnosis retries the saved photo with ${paired ? "sensor enhancement" : "image-only context"}, without needing newer telemetry`, async () => {
+    const flow = paired ? setup() : profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
+    flow.metadata({ plants: [{ ...testPlant, ...(paired ? { deviceId } : {}), imageUrl: "data:image/jpeg;base64,/9j/2Q==" }] });
+    flow.guidance({ ...latest, rawAnalysisText: null, diagnosisError: true, createdAt: readingAt });
+    let resolve!: (report: ScanResponse) => void;
+    let scans = 0;
+    flow.scan(async request => {
+      scans++;
+      assert.deepEqual(JSON.parse(JSON.stringify(request)), { plantId, reusePreviousImage: true });
+      return new Promise(done => { resolve = done; });
+    });
+    flow.render(); await nextTurn();
+    const before = flow.render();
+    assert.match(JSON.stringify(before), /Scan saved\. AI diagnosis failed\. Retry to generate the diagnosis\./);
+    assert.doesNotMatch(JSON.stringify(before), /Retry saved guidance|Re-evaluate with Sensor Data/);
+    const retryRow = elements(before).find(node => elements(node.props.children).some(child => child.props.label === "Retry AI Diagnosis") && node.type === "View");
+    assert.match(JSON.stringify(retryRow), new RegExp(paired ? "Sensor-Enhanced AI" : "Image-Only AI"));
+    press(before, "Retry AI Diagnosis");
+    assert.match(JSON.stringify(flow.render()), /Retrying\.\.\./);
+    assert.equal(elements(flow.render()).find(node => node.props.label === "Retrying...")?.props.disabled, true);
+    const card = elements(flow.render()).find(node => node.type === "PlantDiagnosisCard");
+    (card?.props.onRetry as () => void)(); assert.equal(scans, 1);
+    resolve({ ...report, diagnosisError: false, telemetry: paired ? report.telemetry : null }); await nextTurn();
+    const updated = elements(flow.render()).find(node => node.type === "PlantDiagnosisCard");
+    assert.equal((updated?.props.latest as ArchiveEntry).diagnosisError, false);
+    assert.match(JSON.stringify(updated), /Light is low/);
+    assert.doesNotMatch(JSON.stringify(updated), /AI diagnosis failed|Retrying/);
+    assert.equal(flow.collectionReads(), 1); assert.equal(flow.guidanceRefreshes(), 1);
+    assert.deepEqual(flow.navigations, []);
+    flow.dispose();
+  });
+}
+
+test("a photo with no archive can generate diagnosis, and repeated quota failures leave a usable retry button", async () => {
+  const flow = setup(); flow.guidance(null);
+  flow.scan(async () => ({ ...report, diagnosisError: true, diagnosisCode: "SCAN_AI_BUSY", diagnosisMessage: "The AI service is busy. Please try again in a few minutes.", diagnostic: { ...report.diagnostic, rawAnalysisText: null }, careTasks: [], notification: null }));
+  flow.render(); await nextTurn();
+  press(flow.render(), "Retry AI Diagnosis"); await nextTurn();
+  assert.match(JSON.stringify(flow.render()), /AI service is busy\. Please try again in a few minutes/);
+  assert.match(JSON.stringify(flow.render()), /Retry AI Diagnosis/);
+  flow.scan(async () => { throw new ApiError("http", "raw private provider response", 503, { code: "SCAN_AI_BUSY" }); });
+  press(flow.render(), "Retry AI Diagnosis"); await nextTurn();
+  assert.match(JSON.stringify(flow.render()), /AI service is busy/);
+  assert.doesNotMatch(JSON.stringify(flow.render()), /raw private/);
+  flow.dispose();
+});
+
+test("retry diagnosis is available without sensors or a previous successful report, and stops on route exit", async () => {
+  const flow = profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
+  flow.metadata({ plants: [{ ...testPlant, imageUrl: "saved" }] });
+  let signal: AbortSignal | undefined, resolve!: (report: ScanResponse) => void;
+  flow.scan(async (_request, options) => { signal = options?.signal; return new Promise(done => { resolve = done; }); });
+  flow.render(); await nextTurn(); press(flow.render(), "Retry AI Diagnosis");
+  flow.dispose(); assert.equal(signal?.aborted, true);
+  resolve(report); await nextTurn();
+  assert.equal(flow.guidanceRefreshes(), 0); assert.equal(flow.collectionReads(), 0);
+});
+
+test("scan API accepts saved incomplete diagnoses and rejects inconsistent failure payloads", async () => {
+  const incomplete = { ...report, diagnosisError: true, diagnosisMessage: "Scan saved. AI diagnosis failed. Retry to generate the diagnosis.", diagnosisCode: "SCAN_AI_BUSY", diagnostic: { ...report.diagnostic, rawAnalysisText: null, healthStatus: "unknown" }, careTasks: [], notification: null };
+  const api = createApiClient({ fetch: async () => Response.json(incomplete) });
+  assert.equal((await api.scanPlant({ plantId, reusePreviousImage: true })).diagnosisError, true);
+  for (const invalid of [{ ...incomplete, diagnosisError: false }, { ...incomplete, diagnosisMessage: undefined },
+    { ...incomplete, notification: { notifyAt: readingAt, reason: "invented reminder" } },
+    { ...incomplete, diagnostic: { ...incomplete.diagnostic, rawAnalysisText: "pretend diagnosis" } }]) {
+    const bad = createApiClient({ fetch: async () => Response.json(invalid) });
+    await assert.rejects(bad.scanPlant({ plantId, reusePreviousImage: true }), (error: unknown) => error instanceof ApiError && error.kind === "validation");
+  }
 });

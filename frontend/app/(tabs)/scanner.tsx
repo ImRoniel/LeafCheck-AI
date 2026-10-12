@@ -372,7 +372,7 @@ export default function Camera() {
               size={24}
               color={report.diagnostic.healthStatus === "healthy" ? "#278448" : report.diagnostic.healthStatus === "critical" ? "#C62828" : report.diagnostic.healthStatus === "warning" ? "#8B6914" : "#5A6B5E"}
             />
-            <Text style={s.reportBadge}>{(report.subjectKind === "artificial_plant" || report.subjectKind === "non_plant" ? "INFORMATION" : report.diagnostic.healthStatus.toUpperCase())}</Text>
+            <Text style={s.reportBadge}>{(report.diagnosisError ? "DIAGNOSIS PENDING" : report.subjectKind === "artificial_plant" || report.subjectKind === "non_plant" ? "INFORMATION" : report.diagnostic.healthStatus.toUpperCase())}</Text>
           </View>
 
           {report.identification ? <>
@@ -392,7 +392,13 @@ export default function Camera() {
 
           <Text style={s.reportSectionTitle}>Diagnostic Report</Text>
           {report.plant && <Text style={s.reportMeta}>{report.telemetry ? "Sensor-Enhanced AI" : "Image-Only AI"}</Text>}
-          <DiagnosticReport key={report.diagnostic.id} text={report.diagnostic.rawAnalysisText || "No analysis text was returned."} />
+          {report.diagnosisError ? <>
+            <Notice>Scan saved. AI diagnosis failed. Retry to generate the diagnosis.</Notice>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open plant to retry AI diagnosis" style={s.secondaryButton}
+              onPress={() => router.push({ pathname: "/plant-profile", params: { id: report.plant!.id } })}>
+              <Text style={s.secondaryButtonText}>Open plant to retry AI diagnosis</Text>
+            </Pressable>
+          </> : <DiagnosticReport key={report.diagnostic.id} text={report.diagnostic.rawAnalysisText || "No analysis text was returned."} />}
 
           {report.plant && <>
           <View style={s.divider} />
@@ -505,17 +511,17 @@ export default function Camera() {
             <>
               <View style={s.successBanner}>
                 <Text style={s.successText}>
-                  {`Plant saved. ${report.careTasks.length} care ${report.careTasks.length === 1 ? "task" : "tasks"} added.`}
+                  {report.diagnosisError ? "Plant saved. Retry AI diagnosis from its profile." : `Plant saved. ${report.careTasks.length} care ${report.careTasks.length === 1 ? "task" : "tasks"} added.`}
                 </Text>
               </View>
-              <Pressable
+              {!report.diagnosisError && <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Open Care Tasks"
                 style={s.secondaryButton}
                 onPress={() => router.push("/(tabs)/tasks")}
               >
                 <Text style={s.secondaryButtonText}>Open Care Tasks</Text>
-              </Pressable>
+              </Pressable>}
             </>
           )}
           <Pressable

@@ -26,6 +26,9 @@ export interface ScanResponse {
   success: true;
   subjectKind?: "living_plant" | "artificial_plant" | "non_plant";
   photoSaveFailed?: boolean;
+  diagnosisError?: boolean;
+  diagnosisMessage?: string;
+  diagnosisCode?: string;
   plant: { id: string; name: string; species: string; deviceId?: string | null } | null;
   identification: {
     speciesName: string;
@@ -35,7 +38,7 @@ export interface ScanResponse {
   diagnostic: {
     id: string;
     healthStatus: HealthStatus;
-    rawAnalysisText: string;
+    rawAnalysisText: string | null;
     telemetryFreshness: string;
     createdAt?: string;
   };
@@ -63,6 +66,7 @@ export interface ArchiveEntry {
   userId: string | null;
   healthStatus: string;
   rawAnalysisText: string | null;
+  diagnosisError?: boolean;
   speciesName: string | null;
   notificationTime: string | null;
   notificationReason: string | null;

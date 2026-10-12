@@ -46,6 +46,9 @@ export interface ScanResponse {
   success: boolean;
   subjectKind: SubjectKind;
   photoSaveFailed?: boolean;
+  diagnosisError?: boolean;
+  diagnosisMessage?: string;
+  diagnosisCode?: string;
   plant: {
     id: string;
     name: string;
@@ -60,7 +63,7 @@ export interface ScanResponse {
   diagnostic: {
     id: string;
     healthStatus: string;
-    rawAnalysisText: string;
+    rawAnalysisText: string | null;
     telemetryFreshness: string;
     createdAt?: string;
   };

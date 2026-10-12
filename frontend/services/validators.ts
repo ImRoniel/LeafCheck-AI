@@ -251,9 +251,10 @@ const scanCheck = object({
   success: enumeration(true),
   subjectKind: optional(enumeration("living_plant", "artificial_plant", "non_plant")),
   photoSaveFailed: optional(boolean),
+  diagnosisError: optional(boolean), diagnosisMessage: optional(text), diagnosisCode: optional(text),
   plant: nullable(object({ id: nonempty, name: text, species: text, deviceId: optional(nullable(uuid)) })),
   identification: nullable(object({ speciesName: nonempty, commonName: nullable(text), confidence: range(0, 1) })),
-  diagnostic: object({ id: nonempty, healthStatus: health, rawAnalysisText: text, telemetryFreshness: text, createdAt: optional(date) }),
+  diagnostic: object({ id: nonempty, healthStatus: health, rawAnalysisText: nullable(text), telemetryFreshness: text, createdAt: optional(date) }),
   telemetry: nullable(object({ ...snapshot, soilMoistureRaw: optional(nullable(integer(0, 4095))) })),
   careTasks: array(object({ title: text, taskType: text, description: text, urgency: enumeration("routine", "immediate", "urgent"), dueDate: text })),
   notification: nullable(object({ notifyAt: text, reason: text })),
@@ -262,8 +263,10 @@ export function parseScan(value: unknown): ScanResponse {
   const result = parse<ScanResponse>(scanCheck)(value);
   if (result.subjectKind === "artificial_plant" || result.subjectKind === "non_plant") {
     if (result.plant !== null || result.identification !== null || result.telemetry !== null ||
-      result.careTasks.length !== 0 || result.notification !== null || result.diagnostic.healthStatus !== "unknown") fail("response.nonliving");
-  } else if (!result.plant || !result.identification || result.diagnostic.healthStatus === "unknown") {
+      result.careTasks.length !== 0 || result.notification !== null || result.diagnostic.healthStatus !== "unknown" || result.diagnosisError) fail("response.nonliving");
+  } else if (result.diagnosisError) {
+    if (!result.plant || !result.identification || result.diagnostic.rawAnalysisText !== null || result.careTasks.length || result.notification !== null || !result.diagnosisMessage) fail("response.incomplete_diagnosis");
+  } else if (!result.plant || !result.identification || result.diagnostic.healthStatus === "unknown" || result.diagnostic.rawAnalysisText === null) {
     fail("response.living_plant");
   }
   return result;
@@ -283,6 +286,7 @@ export const parseArchives = parse<ArchiveEntry[]>(
       userId: nullable(text),
       healthStatus: text,
       rawAnalysisText: nullable(text),
+      diagnosisError: optional(boolean),
       speciesName: nullable(text),
       notificationTime: nullable(text),
       notificationReason: nullable(text),

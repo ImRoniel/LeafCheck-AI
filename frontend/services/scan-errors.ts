@@ -1,5 +1,15 @@
 import { ApiError } from "./errors";
 
+export function diagnosisRetryErrorMessage(error: unknown): string {
+  const details = error instanceof ApiError ? error.details : error;
+  const code = details && typeof details === "object" && "code" in details ? details.code : undefined;
+  if (code === "SCAN_AI_BUSY" || (error instanceof ApiError && error.status === 429)) return "The AI service is busy. Please try again in a few minutes.";
+  if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return "Sign in again to retry the AI diagnosis.";
+  if (error instanceof ApiError && (error.kind === "network" || error.kind === "timeout")) return "Couldn’t generate the diagnosis. Check your connection and retry.";
+  if (code === "NO_SAVED_IMAGE" || code === "PREVIOUS_IMAGE_UNAVAILABLE") return "The saved photo could not be loaded. Please retry or save a new plant photo.";
+  return "The AI diagnosis could not be generated. Please try again in a few minutes.";
+}
+
 export function scanNeedsServiceRecovery(error: unknown): boolean {
   if (!(error instanceof ApiError)) return false;
   const details = error.details;

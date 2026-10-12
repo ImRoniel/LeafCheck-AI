@@ -17,7 +17,8 @@
 import { randomUUID } from "node:crypto";
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
-import { geminiError, geminiModel } from "../lib/gemini.js";
+import { geminiModel } from "../lib/gemini.js";
+import { diagnosisFailure, logDiagnosisError } from "../lib/diagnosis-error.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { ownedDevice, ownedPlant } from "../lib/ownership.js";
 import { fetchPlantSpecs } from "../lib/perenual.js";
@@ -32,7 +33,7 @@ import { reportCareTasks } from "../lib/report-care-tasks.js";
 import { storeScanImage, discardScanImage, type StoredScanImage } from "../lib/scan-image-storage.js";
 import { persistScan } from "../lib/scan-persistence.js";
 import type { Prisma } from "../generated/postgres-client/index.js";
-import type { PlantIdentificationResult, ScanRequest, SubjectKind } from "../types/scan.js";
+import type { GeminiStructuredOutput, PlantIdentificationResult, ScanRequest, SubjectKind } from "../types/scan.js";
 
 export const scanRouter = Router();
 scanRouter.use(requireAuth);
@@ -115,26 +116,39 @@ scanRouter.post("/", async (req: Request, res: Response) => {
   try {
     // Fail locally before spending identification quota or touching scan caches.
     const model = geminiModel();
+    const existing = plantId ? await prismaPg.plant.findFirst({
+      where: { id: plantId, userId },
+      select: { id: true, name: true, species: true, deviceId: true },
+    }) : null;
+    if (plantId && !existing) throw new HttpError(404, "NOT_FOUND", "Plant not found.");
+    if (existing && deviceId !== undefined && deviceId !== existing.deviceId) {
+      throw new HttpError(404, "NOT_FOUND", "Device not associated with this plant.");
+    }
     // ── Step 1: Optional Pl@ntNet attempt ────────────────────────────────
-    console.log("[Scan] Step 1: Trying Pl@ntNet (8-second deadline)...");
     let identification: PlantIdentificationResult;
-    try {
-      identification = await identifyPlant(imageBase64);
-    } catch (error: unknown) {
-      // Never expose provider URLs, API keys, image data or raw error messages.
-      console.error("[Scan] Pl@ntNet unavailable; continuing with Gemini:",
-        error instanceof HttpError ? error.code : "PLANT_IDENTIFICATION_FAILED");
-      identification = { speciesName: "Unknown", commonName: null, confidence: 0, rawResponse: null };
+    if (reusePreviousImage && existing) {
+      console.log("[Scan] Reusing saved plant identity and photo for diagnosis.");
+      // A diagnosis retry reuses owned identity/photo, without identification quota.
+      identification = { speciesName: existing.species, commonName: existing.name, confidence: 0,
+        rawResponse: { source: "saved-plant", plantId: existing.id } };
+    } else {
+      console.log("[Scan] Step 1: Trying Pl@ntNet (8-second deadline)...");
+      try {
+        identification = await identifyPlant(imageBase64);
+      } catch (error: unknown) {
+        console.error("[Scan] Pl@ntNet unavailable; continuing with Gemini:",
+          error instanceof HttpError ? error.code : "PLANT_IDENTIFICATION_FAILED");
+        identification = { speciesName: "Unknown", commonName: null, confidence: 0, rawResponse: null };
+      }
+      // Gemini confirms new images before Perenual or saving.
+      console.log("[Scan] Step 2: Confirming the plant and species with Gemini...");
+      const subject = await detectScanSubject(model, imageBase64, identification);
+      if (subject.subjectKind !== "living_plant") {
+        sendNonlivingScan(res, subject.subjectKind);
+        return;
+      }
+      identification = subject.identification;
     }
-
-    // ── Step 2: Gemini confirms the subject before Perenual or saving ────
-    console.log("[Scan] Step 2: Confirming the plant and species with Gemini...");
-    const subject = await detectScanSubject(model, imageBase64, identification);
-    if (subject.subjectKind !== "living_plant") {
-      sendNonlivingScan(res, subject.subjectKind);
-      return;
-    }
-    identification = subject.identification;
     console.log(
       "[Scan] Identified: %s (%s) — confidence: %s%%",
       identification.speciesName,
@@ -149,18 +163,10 @@ scanRouter.post("/", async (req: Request, res: Response) => {
       species: string;
       deviceId: string | null;
     };
-    if (plantId) {
-      const existing = await prismaPg.plant.findFirst({
-        where: { id: plantId, userId },
-        select: { id: true, name: true, species: true, deviceId: true },
-      });
-      if (!existing) throw new HttpError(404, "NOT_FOUND", "Plant not found.");
-      if (deviceId !== undefined && deviceId !== existing.deviceId) {
-        throw new HttpError(404, "NOT_FOUND", "Device not associated with this plant.");
-      }
+    if (existing) {
       plant = existing;
     } else {
-      // Defer persistence until providers have produced a diagnosis.
+      // Save the confirmed identity/photo even if diagnosis subsequently fails.
       plant = {
         id: "",
         name: identification.commonName ?? identification.speciesName,
@@ -349,33 +355,27 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
       },
     ];
 
-    const result = await model
-      .generateContent(contents)
-      .catch((error: unknown) => {
-        throw geminiError(error);
-      });
-    const rawText = result.response.text();
-
-    const geminiOutput = parseGeminiJson(rawText);
-
-    if (geminiOutput !== null && typeof geminiOutput === "object" && "subjectKind" in geminiOutput &&
-      (geminiOutput.subjectKind === "artificial_plant" || geminiOutput.subjectKind === "non_plant")) {
-      // Normalize nonliving outcomes; never persist or generate tasks from them.
-      sendNonlivingScan(res, geminiOutput.subjectKind);
-      return;
+    let output: GeminiStructuredOutput | null = null;
+    let failedDiagnosis: ReturnType<typeof diagnosisFailure> | undefined;
+    let diagnosisStage = "generate-content";
+    try {
+      const result = await model.generateContent(contents);
+      diagnosisStage = "parse-report";
+      const geminiOutput = parseGeminiJson(result.response.text());
+      if (geminiOutput !== null && typeof geminiOutput === "object" && "subjectKind" in geminiOutput &&
+        (geminiOutput.subjectKind === "artificial_plant" || geminiOutput.subjectKind === "non_plant")) {
+        sendNonlivingScan(res, geminiOutput.subjectKind);
+        return;
+      }
+      validateScanEnvelope(geminiOutput);
+      diagnosisStage = "derive-care-actions";
+      const candidate = { ...geminiOutput, careTasks: reportCareTasks(geminiOutput.diagnosticReport, scanTime) };
+      validateScanOutput(candidate);
+      output = candidate;
+    } catch (error: unknown) {
+      logDiagnosisError(error, diagnosisStage);
+      failedDiagnosis = diagnosisFailure(error);
     }
-
-    validateScanEnvelope(geminiOutput);
-    // Ignore any provider careTasks field: the report is the sole task source.
-    const output = {
-      subjectKind: geminiOutput.subjectKind,
-      healthStatus: geminiOutput.healthStatus,
-      diagnosticReport: geminiOutput.diagnosticReport,
-      notification: geminiOutput.notification,
-      careTasks: reportCareTasks(geminiOutput.diagnosticReport, scanTime),
-    };
-    validateScanOutput(output);
-    const healthStatus = output.healthStatus;
     let storedImage: StoredScanImage | undefined;
     let photoSaveFailed = false;
     try {
@@ -386,14 +386,15 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
     } catch {
       // Storage errors can expose token-bearing URLs; log only a safe message.
       photoSaveFailed = true;
+      storedImage = { imageUrl: `data:image/jpeg;base64,${imageBase64}`, uploadFailed: true };
       console.error("[Scan] Profile photo could not be saved.");
     }
     const saved = await persistScan(prismaPg, {
-      userId, plantId,
+      userId, plantId, deviceId,
       name: identification.commonName ?? identification.speciesName.split(" ")[0],
       species: identification.speciesName,
       location: location?.trim() || undefined,
-      scanTime, output, imageUrl: storedImage?.imageUrl,
+      scanTime, output, diagnosisFailure: failedDiagnosis, imageUrl: storedImage?.imageUrl,
       identification: {
         speciesName: identification.speciesName,
         commonName: identification.commonName,
@@ -417,6 +418,8 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
       success: true,
       subjectKind: "living_plant",
       photoSaveFailed,
+      diagnosisError: Boolean(failedDiagnosis),
+      ...(failedDiagnosis ? { diagnosisMessage: failedDiagnosis.message, diagnosisCode: failedDiagnosis.code } : {}),
       plant: {
         id: plant.id,
         name: plant.name,
@@ -430,17 +433,17 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
       },
       diagnostic: {
         id: analysis.id,
-        healthStatus,
-        rawAnalysisText: output.diagnosticReport,
+        healthStatus: saved.healthStatus,
+        rawAnalysisText: output?.diagnosticReport ?? null,
         telemetryFreshness: freshnessContext,
         createdAt: analysis.createdAt.toISOString(),
       },
       telemetry,
       careTasks: validTasks,
-      notification: {
+      notification: output ? {
         notifyAt: output.notification!.notifyAt,
         reason: output.notification!.reason,
-      },
+      } : null,
     });
   } catch (error: unknown) {
     // Provider errors can contain credential-bearing URLs. Log codes only.
@@ -493,7 +496,8 @@ scanRouter.get("/archives", async (req: Request, res: Response) => {
         plant: { select: { id: true, name: true, species: true } },
       },
     });
-    res.json(archives);
+    // Null report text is the durable incomplete-diagnosis marker; no migration required.
+    res.json(archives.map(entry => ({ ...entry, diagnosisError: !entry.rawAnalysisText?.trim() })));
   } catch (error) {
     console.error("[Scan] Archives error:", error);
     res.status(500).json({ error: "Failed to fetch archives." });

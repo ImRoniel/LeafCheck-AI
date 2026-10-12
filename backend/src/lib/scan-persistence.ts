@@ -10,8 +10,10 @@ export interface ScanPersistenceInput {
   species: string;
   location?: string;
   imageUrl?: string;
+  deviceId?: string;
   scanTime: Date;
-  output: GeminiStructuredOutput;
+  output: GeminiStructuredOutput | null;
+  diagnosisFailure?: { code: string; message: string };
   identification: Omit<Prisma.PlantIdentificationUncheckedCreateInput, "plantId">;
   telemetrySnapshot?: Prisma.InputJsonValue;
   idealSpecs?: Prisma.InputJsonValue;
@@ -19,32 +21,36 @@ export interface ScanPersistenceInput {
 
 /** All scan-owned relational writes commit together; providers run before this. */
 export async function persistScan(client: Pick<PrismaClient, "$transaction">, input: ScanPersistenceInput) {
-  validateScanOutput(input.output);
-  if (input.output.subjectKind !== "living_plant") {
+  if (input.output === null) {
+    if (!input.diagnosisFailure) throw new HttpError(400, "INVALID_INPUT", "A diagnosis failure must be explicit.");
+  } else validateScanOutput(input.output);
+  if (input.output && input.output.subjectKind !== "living_plant") {
     throw new HttpError(400, "INVALID_INPUT", "Only living plant scans can be saved.");
   }
   return client.$transaction(async (tx) => {
-    const select = { id: true, name: true, species: true, deviceId: true } as const;
+    const select = { id: true, name: true, species: true, deviceId: true, healthStatus: true } as const;
     const plant = input.plantId
       ? await tx.plant.findFirst({ where: { id: input.plantId, userId: input.userId }, select })
       : await tx.plant.create({ data: {
         name: input.name, species: input.species, location: input.location, imageUrl: input.imageUrl,
-        userId: input.userId, healthStatus: "unknown", lastScannedAt: input.scanTime,
+        userId: input.userId, healthStatus: "unknown", lastScannedAt: input.scanTime, deviceId: input.deviceId,
       }, select });
     if (!plant) throw new HttpError(404, "NOT_FOUND", "Plant not found.");
+    // An unsuccessful diagnosis cannot downgrade an existing health assessment.
+    const healthStatus = input.output?.healthStatus ?? plant.healthStatus ?? "unknown";
 
     await tx.plantIdentification.create({ data: { ...input.identification, plantId: plant.id } });
     const analysis = await tx.aIAnalysis.create({ data: {
-      plantId: plant.id, userId: input.userId, healthStatus: input.output.healthStatus,
-      diagnoses: [], recommendations: [], rawAnalysisText: input.output.diagnosticReport,
+      plantId: plant.id, userId: input.userId, healthStatus,
+      diagnoses: [], recommendations: [], rawAnalysisText: input.output?.diagnosticReport ?? null,
       speciesName: input.species, telemetrySnapshot: input.telemetrySnapshot, idealSpecs: input.idealSpecs,
-      notificationTime: new Date(input.output.notification!.notifyAt),
-      notificationReason: input.output.notification!.reason, isArchived: true, archivedAt: input.scanTime,
+      notificationTime: input.output ? new Date(input.output.notification!.notifyAt) : null,
+      notificationReason: input.output?.notification?.reason ?? null, isArchived: true, archivedAt: input.scanTime,
     } });
     const careTasks: CareTaskOutput[] = [];
     // At most five tasks; individual inserts keep report order and return the
     // actual saved fields, without relying on bulk-insert return ordering.
-    for (const task of input.output.careTasks) {
+    for (const task of input.output?.careTasks ?? []) {
       const saved = await tx.careTask.create({ data: {
         plantId: plant.id, userId: input.userId, analysisId: analysis.id,
         title: task.title, taskType: task.taskType, description: task.description,
@@ -59,9 +65,9 @@ export async function persistScan(client: Pick<PrismaClient, "$transaction">, in
         dueDate: saved.dueDate.toISOString() });
     }
     await tx.plant.update({ where: { id: plant.id, userId: input.userId }, data: {
-      healthStatus: input.output.healthStatus, lastScannedAt: input.scanTime, species: input.species,
+      ...(input.output ? { healthStatus } : {}), lastScannedAt: input.scanTime, species: input.species,
       ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
     } });
-    return { plant, analysis, careTasks };
+    return { plant, analysis, careTasks, healthStatus };
   });
 }

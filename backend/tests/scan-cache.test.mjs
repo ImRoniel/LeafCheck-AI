@@ -41,6 +41,7 @@ let writeOrder;
 let writeFailure;
 let imageFailure, imageWrites, discardedImages, noPlantIdentification;
 let identificationError, detectionText, subjectPrompts, subjectImages, stageCalls, speciesRequests, diagnosisError;
+let existingHealthStatus;
 const captureWrite = (stage, data) => {
   writeOrder.push(stage);
   if (writeFailure === stage) throw new Error("private persistence detail");
@@ -75,9 +76,10 @@ before(async () => {
             plantCreates++;
             return {
               id: "new-plant",
-              name: "Basil",
-              species: speciesName,
-              deviceId: null,
+              name: data.name,
+              species: data.species,
+              deviceId: data.deviceId ?? null,
+              healthStatus: data.healthStatus,
             };
           },
           findFirst: async () => plantOwned ? ({
@@ -87,6 +89,7 @@ before(async () => {
             species: speciesName,
             deviceId: linkedDevice,
             imageUrl: savedImageUrl,
+            healthStatus: existingHealthStatus,
           }) : null,
           update: async ({ data }) => {
             healthWrites.push(captureWrite("health", data));
@@ -219,6 +222,7 @@ beforeEach(() => {
   responseText = JSON.stringify({subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "healthy", notification: {notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up"}});
   imageFailure = false; imageWrites = 0; discardedImages = 0; noPlantIdentification = false;
   identificationError = null; detectionText = undefined; subjectPrompts = []; subjectImages = []; stageCalls = []; speciesRequests = []; diagnosisError = null;
+  existingHealthStatus = "healthy";
   guidanceQueries = [];
   taskWrites = [];
   identificationWrites = [];
@@ -241,6 +245,7 @@ test("re-evaluation reuses the owned saved photo, fresh MAC telemetry and normal
     soilMoistureRaw: 2625, lightLux: 0.83 };
   const result = await scan(false, { imageBase64: undefined, reusePreviousImage: true });
   assert.equal(result.status, 201);
+  assert.equal(identifications, 0); assert.equal(subjectImages.length, 0);
   assert.deepEqual(sentImages, ["/9j/2Q=="]);
   assert.match(prompts[0], /Raw ADC: 2625/);
   assert.deepEqual(telemetryQueries[0].where, { deviceId: sensorMac });
@@ -490,7 +495,8 @@ test("unpaired scans stay image-only and paired sensors without readings disclos
   assert.doesNotMatch(prompts[1], /Actual Sensor Readings/);
 });
 
-test("malformed AI structures fail safely before creating plants or analyses", async () => {
+test("malformed diagnosis reports save confirmed plants without inventing advice", async () => {
+  detectionText = JSON.stringify({ subjectKind: "living_plant", speciesName, commonName: "Basil", confidence: 0.9 });
   const valid = {
     subjectKind: "living_plant", healthStatus: "warning", diagnosticReport: "Inspect the leaves.", careTasks: [],
     notification: { notifyAt: new Date().toISOString(), reason: "Follow up" },
@@ -501,10 +507,12 @@ test("malformed AI structures fail safely before creating plants or analyses", a
   ]) {
     responseText = JSON.stringify(output);
     const result = await scan(true);
-    assert.equal(result.status, 502);
-    assert.equal(result.body.code, "SCAN_AI_UNAVAILABLE");
-    assert.equal(plantCreates, 0);
-    assert.equal(analyses.length, 0);
+    assert.equal(result.status, 201);
+    assert.equal(result.body.diagnosisError, true);
+    assert.equal(result.body.diagnosisCode, "SCAN_AI_UNAVAILABLE");
+    assert.equal(result.body.diagnostic.rawAnalysisText, null);
+    assert.equal(result.body.diagnostic.healthStatus, "unknown");
+    assert.equal(taskWrites.length, 0);
   }
   responseText = JSON.stringify({
     ...valid,
@@ -770,12 +778,15 @@ test("failed Pl@ntNet plus failed Gemini returns only a sanitized Gemini error a
   assert.equal(plantCreates, 0); assert.equal(analyses.length, 0); assert.equal(fetches, 0);
 });
 
-test("fallback Gemini diagnosis failures after identification cannot save a partial scan", async () => {
+test("fallback Gemini diagnosis failure preserves the confirmed plant and photo", async () => {
   identificationError = new Error("offline");
   diagnosisError = new Error("private generation detail");
   const result = await scan(true);
-  assert.equal(result.status, 502); assert.equal(result.body.code, "SCAN_AI_UNAVAILABLE");
-  assert.equal(plantCreates, 0); assert.equal(identificationWrites.length, 0); assert.equal(imageWrites, 0);
+  assert.equal(result.status, 201); assert.equal(result.body.diagnosisError, true);
+  assert.equal(result.body.diagnosisCode, "SCAN_AI_UNAVAILABLE");
+  assert.equal(plantCreates, 1); assert.equal(identificationWrites.length, 1); assert.equal(imageWrites, 1);
+  assert.equal(result.body.diagnostic.rawAnalysisText, null); assert.equal(taskWrites.length, 0);
+  assert.equal(healthWrites[0].imageUrl, "https://example.com/plant.jpg");
 });
 
 test("invalid Gemini subject identities stop before enrichment or persistence", async () => {
@@ -806,10 +817,71 @@ test("failed scan persistence cleans up its newly uploaded photo", async () => {
   const result = await scan(true);
   assert.equal(result.status, 500); assert.equal(discardedImages, 1);
 });
-test("unclassified and malformed AI reports cannot create plants", async () => {
+test("unclassified diagnosis text preserves identity after a valid living-plant check", async () => {
+  detectionText = JSON.stringify({ subjectKind: "living_plant", speciesName, commonName: "Basil", confidence: 0.9 });
   for (const response of ["healthy", JSON.stringify({subjectKind: "invalid"}), JSON.stringify({healthStatus: "healthy"})]) {
     responseText = response;
     const result = await scan(true);
-    assert.equal(result.status, 502); assert.equal(plantCreates, 0);
+    assert.equal(result.status, 201); assert.equal(result.body.diagnosisError, true);
+    assert.equal(result.body.diagnostic.rawAnalysisText, null); assert.equal(taskWrites.length, 0);
   }
+});
+
+for (const [name, error] of [["quota", Object.assign(new Error("Too many requests"), { status: 429 })],
+  ["timeout", Object.assign(new Error("Request timed out"), { name: "TimeoutError" })]]) {
+  test(`diagnosis ${name} returns a successful save with a durable failure flag and no invented health/tasks`, async t => {
+    const logs = [];
+    t.mock.method(console, "error", (...args) => logs.push(args));
+    diagnosisError = error;
+    const result = await scan(true);
+    assert.equal(result.status, 201); assert.equal(result.body.success, true);
+    assert.equal(result.body.diagnosisError, true);
+    assert.equal(result.body.diagnosisCode, name === "quota" ? "SCAN_AI_BUSY" : "SCAN_AI_UNAVAILABLE");
+    assert.match(result.body.diagnosisMessage, name === "quota" ? /AI service is busy/ : /Scan saved/);
+    assert.equal(result.body.diagnostic.healthStatus, "unknown"); assert.equal(result.body.diagnostic.rawAnalysisText, null);
+    assert.equal(result.body.notification, null); assert.deepEqual(result.body.careTasks, []);
+    assert.equal(plantCreates, 1); assert.equal(analyses.length, 1); assert.equal(imageWrites, 1);
+    assert.equal(healthWrites[0].imageUrl, "https://example.com/plant.jpg");
+    assert.equal(healthWrites[0].healthStatus, undefined);
+    const [, logged, stack] = logs.find(([label]) => label === "[Scan] Gemini diagnosis failed");
+    assert.equal(logged.stage, "generate-content"); assert.equal(logged.status, error.status);
+    assert.match(stack, /at /); assert.match(stack, new RegExp(error.message));
+    const archives = await (await fetch(`${baseUrl}/api/scan/archives`)).json();
+    assert.equal(archives[0].diagnosisError, true); assert.equal(archives[0].rawAnalysisText, null);
+  });
+}
+
+test("diagnosis retry reuses the saved image and current MAC readings, preserving prior health on failure", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  existingHealthStatus = "warning";
+  latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 29, humidity: 60, soilMoistureRaw: 2500, lightLux: 100 };
+  diagnosisError = Object.assign(new Error("busy"), { status: 429 });
+  const failed = await scan();
+  assert.equal(failed.status, 201); assert.equal(failed.body.diagnostic.healthStatus, "warning");
+  assert.equal(healthWrites[0].healthStatus, undefined); assert.equal(taskWrites.length, 0);
+  latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 31, humidity: 72, soilMoistureRaw: 2625, lightLux: 0.83 };
+  diagnosisError = null;
+  const retried = await scan(false, { imageBase64: undefined, reusePreviousImage: true });
+  assert.equal(retried.status, 201); assert.equal(retried.body.diagnosisError, false);
+  assert.equal(plantCreates, 0); assert.equal(identifications, 1); assert.equal(subjectImages.length, 1);
+  assert.equal(imageWrites, 1); assert.deepEqual(sentImages, ["/9j/2Q=="]);
+  for (const value of [/Actual Sensor Readings/, /Temperature: 31/, /Humidity: 72/, /Raw ADC: 2625/, /Ambient Light: 0.83 lux/, /FRESH/]) assert.match(prompts[0], value);
+  assert.equal(retried.body.telemetry.soilMoistureRaw, 2625);
+  assert.ok(telemetryQueries.every(query => query.where.deviceId === "LC-A50528"));
+  assert.equal(analyses.length, 2); assert.equal(taskWrites.length, 1);
+});
+
+test("an owned device on a new incomplete scan stays paired for later sensor-enhanced retries", async () => {
+  const deviceId = "00000000-0000-4000-8000-000000000002";
+  diagnosisError = new Error("offline");
+  const result = await scan(true, { deviceId });
+  assert.equal(result.status, 201); assert.equal(result.body.plant.deviceId, deviceId);
+  assert.equal(result.body.diagnosisError, true);
+});
+
+test("failed diagnosis does not turn a failed database transaction into a successful plant-save response", async () => {
+  diagnosisError = new Error("offline"); writeFailure = "analysis";
+  const result = await scan(true);
+  assert.equal(result.status, 500); assert.equal(result.body.success, false);
+  assert.equal(plantCreates, 0); assert.equal(analyses.length, 0); assert.equal(discardedImages, 1);
 });

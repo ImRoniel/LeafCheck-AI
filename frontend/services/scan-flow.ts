@@ -49,7 +49,7 @@ export function createScanFlow(
     const target = plantId!;
     publish({ phase: "synchronizing", synchronizationError: null });
     try {
-      if (!patched) {
+      if (!patched && !report.diagnosisError) {
         await client.updatePlantHealth(
           target,
           report.diagnostic.healthStatus,

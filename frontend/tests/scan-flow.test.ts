@@ -131,3 +131,17 @@ for (const subjectKind of ["artificial_plant", "non_plant"] as const) {
     assert.equal(flow.getState().report, response);
   });
 }
+
+test("a saved scan with failed diagnosis synchronizes the plant without overwriting health or rescanning", async () => {
+  const partial: ScanResponse = { ...report, diagnosisError: true, diagnosisMessage: "Scan saved. AI diagnosis failed. Retry to generate the diagnosis.",
+    diagnostic: { ...report.diagnostic, healthStatus: "unknown", rawAnalysisText: null } };
+  let scans = 0, fetches = 0;
+  const flow = createScanFlow({ scanPlant: async () => { scans++; return partial; },
+    updatePlantHealth: async () => assert.fail("failed diagnosis cannot overwrite health"),
+    fetchPlant: async () => { if (++fetches === 1) throw new Error("offline"); return plant; } });
+  await assert.rejects(flow.scan({ imageBase64: "abc" }));
+  assert.equal(flow.getState().report?.diagnosisError, true);
+  await flow.retrySynchronization();
+  assert.equal(scans, 1); assert.equal(flow.getState().phase, "complete");
+  assert.equal(flow.getState().plant?.healthStatus, "healthy");
+});
