@@ -81,17 +81,37 @@ test("new routes refresh once and respect cancellation and timeout", async () =>
 test("account sensor overview validates inventory, accepts explicit demos and preserves identity on reading errors", async () => {
   const entry = { device, plants: [{ id: plantId, name: "Fern" }], demo: false, readingError: false, telemetry };
   const requests: { url: string; init?: RequestInit }[] = [];
-  const response = [entry, { ...entry, device: { ...device, macAddress: `DEMO:${plantId}` }, demo: true, readingError: true, telemetry: null }];
+  const response = [entry, { ...entry, device: { ...device, macAddress: `DEMO:${plantId}`, status: "SIMULATED" }, demo: true, readingError: true, telemetry: null }];
   const api = createApiClient({ baseUrl: "http://test", fetch: async (url, init) => { requests.push({ url: String(url), init }); return Response.json(response); } });
   const signal = new AbortController().signal;
   assert.deepEqual(await api.fetchSensorOverview({ accessToken: "access", signal }), response);
   assert.equal(requests[0].url, "http://test/api/devices/overview");
   assert.equal(new Headers(requests[0].init?.headers).get("Authorization"), "Bearer access");
-  const invalid = [{ ...entry, telemetry: { ...telemetry, deviceId: plantId } }, { ...entry, demo: true }, { ...entry, plants: [{ id: "not-a-uuid", name: "Fern" }] }];
+  const invalid = [{ ...entry, device: { ...device, status: "SIMULATED" } }, { ...entry, telemetry: { ...telemetry, deviceId: plantId } }, { ...entry, demo: true }, { ...entry, plants: [{ id: "not-a-uuid", name: "Fern" }] }];
   for (const bad of invalid) {
     const api = createApiClient({ fetch: async () => Response.json([bad]) });
     await assert.rejects(api.fetchSensorOverview(), validation);
   }
   const empty = createApiClient({ fetch: async () => Response.json([]) });
   assert.deepEqual(await empty.fetchSensorOverview(), []);
+});
+
+test("simulated device responses work for plant telemetry while demo claims stay blocked", async () => {
+  const demo = { ...device, macAddress: `DEMO:${plantId}`, status: "SIMULATED" };
+  const response = { paired: true, device: demo, telemetry: null };
+  const api = createApiClient({ fetch: async () => Response.json(response) });
+  assert.deepEqual(await api.fetchPlantTelemetry(plantId), response);
+  assert.throws(() => api.claimDevice(demo.macAddress), validation);
+});
+
+test("temporary sensor diagnostics report the actual URL and HTTP status without tokens or error payloads", async t => {
+  const logs: unknown[][] = [], errors: unknown[][] = [];
+  t.mock.method(console, "log", (...args: unknown[]) => { logs.push(args); });
+  t.mock.method(console, "error", (...args: unknown[]) => { errors.push(args); });
+  const api = createApiClient({ baseUrl: "https://example.test/backend/", fetch: async () => Response.json({ error: "Internal server error.", privateDetails: "private database password" }, { status: 500 }) });
+  await assert.rejects(api.fetchSensorOverview({ accessToken: "private-access-token" }), (error: unknown) => error instanceof ApiError && error.status === 500);
+  assert.deepEqual(logs[0], ["[Sensor Overview] GET", "https://example.test/backend/api/devices/overview"]);
+  assert.deepEqual(logs[1], ["[Sensor Overview] Response", { url: "https://example.test/backend/api/devices/overview", status: 500 }]);
+  assert.deepEqual(errors[0], ["[Sensor Overview] Request failed", { url: "https://example.test/backend/api/devices/overview", kind: "http", status: 500 }]);
+  assert.doesNotMatch(JSON.stringify([...logs, ...errors]), /private-access-token|private database password/);
 });

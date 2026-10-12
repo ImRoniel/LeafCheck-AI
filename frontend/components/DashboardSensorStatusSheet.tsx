@@ -10,7 +10,7 @@ export function DashboardSensorStatusSheet({ onClose, onOpenPlant }: { onClose: 
   const refresh = () => { void overview.refresh().catch(() => undefined); };
   return <TaskSheet title="Sensor Overview" onClose={onClose}>
     {!overview.ready && !overview.error && <Text accessibilityLiveRegion="polite" style={s.meta}>Loading account sensors…</Text>}
-    {overview.error && <Text accessibilityLiveRegion="polite" style={s.error}>Couldn’t refresh the sensor overview.{overview.ready ? " Showing saved readings." : ""}</Text>}
+    {overview.error && <Text accessibilityLiveRegion="polite" style={s.error}>{overview.errorMessage ?? "Couldn’t refresh the sensor overview."}{overview.ready ? " Showing saved readings." : ""}</Text>}
     {overview.entries.map(entry => {
       const status = overviewReadingStatus(entry, now, Boolean(overview.error));
       const reading = entry.telemetry;

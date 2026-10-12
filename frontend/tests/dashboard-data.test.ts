@@ -6,6 +6,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { loadDashboardTelemetry } from "../services/dashboard-telemetry";
 import * as summaryService from "../services/dashboard-summary";
+import { sensorOverviewErrorMessage } from "../services/sensor-overview";
 import * as careTasks from "../services/care-tasks";
 import type { Plant } from "../types/plant";
 import type { PlantTelemetry } from "../types/device";
@@ -110,6 +111,7 @@ test("sensor overview polling passes cancellation signals and fences stale accou
     exports, require(name: string) {
       if (name === "@/context/auth") return { useAuth: () => auth };
       if (name === "./use-device-activity") return { useDeviceActivity: () => active };
+      if (name === "@/services/sensor-overview") return { sensorOverviewErrorMessage };
       if (name === "@/services/api") return { api: { fetchSensorOverview: async ({ signal }: { signal: AbortSignal }) => { passedSignal = signal; return [{ deviceId: "owned" }]; } } };
       if (name === "@/services/use-polling-resource") return { usePollingResource: (key: string, loader: typeof load, options: { enabled: boolean }) => {
         requestedKey = key; load = loader; enabled = options.enabled;

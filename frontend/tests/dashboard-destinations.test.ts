@@ -112,3 +112,16 @@ test("sensor link opens the overview for zero, one or many sensors, including fa
     assert.equal(pushed.length, 0);
   }
 });
+
+test("overview errors distinguish session, missing endpoint, connection and validation failures", async () => {
+  const { sensorOverviewErrorMessage } = await import("../services/sensor-overview");
+  assert.equal(sensorOverviewErrorMessage(null), null);
+  assert.match(sensorOverviewErrorMessage({ kind: "http", status: 401 })!, /Sign in again/);
+  assert.match(sensorOverviewErrorMessage({ kind: "http", status: 404 })!, /unavailable on the server/);
+  assert.match(sensorOverviewErrorMessage({ kind: "network" })!, /Check your connection/);
+  assert.match(sensorOverviewErrorMessage({ kind: "validation" })!, /details could not be read/);
+  const { DashboardSensorStatusSheet } = load("components/DashboardSensorStatusSheet.tsx", { "@/hooks/use-sensor-overview": { useSensorOverview: () => ({ ready: false, loading: false, entries: [], error: { kind: "http", status: 404 }, errorMessage: sensorOverviewErrorMessage({ kind: "http", status: 404 }), refresh: async () => {} }) } });
+  const markup = renderToStaticMarkup(DashboardSensorStatusSheet({ onClose: () => {}, onOpenPlant: () => {} } as never));
+  assert.match(markup, /unavailable on the server/);
+  assert.doesNotMatch(markup, /Loading account sensors|No sensors claimed/);
+});

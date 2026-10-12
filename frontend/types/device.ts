@@ -5,7 +5,7 @@ export interface Device {
   name: string;
   macAddress: string;
   userId: string;
-  status: "ONLINE" | "OFFLINE";
+  status: "ONLINE" | "OFFLINE" | "SIMULATED";
   createdAt: string;
   updatedAt: string;
 }

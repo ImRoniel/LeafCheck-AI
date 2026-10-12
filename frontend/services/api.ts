@@ -196,6 +196,7 @@ export function createApiClient(
             response = await send();
             if (response.status === 401) session.reject();
           }
+          if (path === "/api/devices/overview") console.log("[Sensor Overview] Response", { url: `${base}${path}`, status: response.status });
           if (controller.signal.aborted) throw abortError;
           if (response.ok && response.status === 204) return parser(undefined);
           if (allow404 && response.status === 404) return null as T;
@@ -280,7 +281,21 @@ export function createApiClient(
       ),
     fetchUserPlants: (options?: RequestOptions) =>
       request("/api/plants", v.parsePlants, options),
-    fetchSensorOverview: (options?: RequestOptions) => request("/api/devices/overview", v.parseSensorOverview, options),
+    fetchSensorOverview: async (options?: RequestOptions) => {
+      // Temporary diagnostics: URL and error category only, never headers or response data.
+      const url = `${base}/api/devices/overview`;
+      console.log("[Sensor Overview] GET", url);
+      try {
+        return await request("/api/devices/overview", v.parseSensorOverview, options);
+      } catch (cause: unknown) {
+        const error = asApiError(cause);
+        if (error.kind !== "cancelled") console.error("[Sensor Overview] Request failed", {
+          url, kind: error.kind, status: error.status,
+          ...(error.kind === "validation" ? { validation: error.message } : {}),
+        });
+        throw error;
+      }
+    },
     claimDevice: (macAddress: string, name?: string, options?: RequestOptions) => {
       const mac = v.normalizeMac(macAddress);
       if (name !== undefined) {

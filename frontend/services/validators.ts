@@ -174,21 +174,28 @@ const plantWithMoisture: Check = (value, path) => {
 export const parsePlant = parse<Plant>(plantWithMoisture);
 export const parsePlants = parse<Plant[]>(array(plantWithMoisture));
 export const parseTelemetry = parse<TelemetryPayload>(telemetryCheck);
-export const parseDevice = parse<Device>(object({
+const deviceCheck = object({
   id: uuid, name: nonempty, macAddress: (value, path) => {
     text(value, path);
-    normalizeMac(value as string);
-  }, userId: uuid, status: enumeration("ONLINE", "OFFLINE"), createdAt: date, updatedAt: date,
-}));
+    const address = value as string;
+    if (address.startsWith("DEMO:")) uuid(address.slice(5), path);
+    else normalizeMac(address);
+  }, userId: uuid, status: enumeration("ONLINE", "OFFLINE", "SIMULATED"), createdAt: date, updatedAt: date,
+});
+export function parseDevice(value: unknown): Device {
+  const device = parse<Device>(deviceCheck)(value);
+  if (device.status === "SIMULATED" && !device.macAddress.startsWith("DEMO:")) fail("response.device.status");
+  return device;
+}
 export const parseSensorOverview = (value: unknown): SensorOverviewEntry[] => {
-  array(object({ device: object({ id: uuid, name: nonempty, macAddress: nonempty, userId: uuid,
-    status: enumeration("ONLINE", "OFFLINE"), createdAt: date, updatedAt: date }),
+  array(object({ device: (device, _path) => { parseDevice(device); },
     plants: array(object({ id: uuid, name: nonempty })), demo: boolean, readingError: boolean,
     telemetry: nullable(telemetryCheck),
   }))(value, "response");
   const entries = value as SensorOverviewEntry[];
   for (const entry of entries) {
     const address = entry.device.macAddress;
+    if (entry.demo !== address.startsWith("DEMO:")) fail("response.demo");
     if (entry.demo) {
       if (!address.startsWith("DEMO:")) fail("response.device.macAddress");
       uuid(address.slice(5), "response.device.macAddress");

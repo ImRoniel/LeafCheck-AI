@@ -4,21 +4,23 @@ import { before, beforeEach, after, mock, test } from "node:test";
 import { randomUUID } from "node:crypto";
 let server, base;
 let devices, readings, calls, failInventory, failedAddresses;
+let loggedErrors = [];
 const owner = randomUUID(), other = randomUUID(), plantId = randomUUID();
 const now = new Date("2026-10-12T08:00:00Z");
-const device = (macAddress, userId = owner, plants = []) => ({ id: randomUUID(), macAddress, name: macAddress, userId, plants, status: "OFFLINE", createdAt: now, updatedAt: now, privateField: "omit" });
+const device = (macAddress, userId = owner, plants = []) => ({ id: randomUUID(), macAddress, name: macAddress, userId, plants, status: macAddress.startsWith("DEMO:") ? "SIMULATED" : "OFFLINE", createdAt: now, updatedAt: now, privateField: "omit" });
 const reading = (deviceId, extra = {}) => ({ deviceId, timestamp: now, temperature: 0, humidity: 0, soilMoisture: 2652, soilMoistureRaw: null, lightLux: 500, lightLevel: null, ...extra });
 before(async () => {
+  mock.method(console, "error", (...args) => loggedErrors.push(args));
   mock.module(new URL("../src/lib/auth.js", import.meta.url).href, { namedExports: { requireAuth: (req, res, next) => {
     const id = req.get("authorization"); if (!id) return res.status(401).json({ code: "UNAUTHORIZED" });
     res.locals.auth = { user: { id } }; next();
   } } });
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, { namedExports: { prismaPg: { device: { findMany: async query => {
-    calls.push(["inventory", query]); if (failInventory) throw new Error("private PG password");
+    calls.push(["inventory", query]); if (failInventory) throw Object.assign(new Error("private PG password"), { name: "PrismaClientKnownRequestError", code: "P2022", meta: { modelName: "Device", column: "Device.missing", databaseUrl: "postgresql://secret" } });
     return devices.filter(device => device.userId === query.where.userId).map(device => ({ ...device, plants: device.plants.filter(plant => plant.userId === query.include.plants.where.userId) }));
   } } } } });
   mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: { sensorReading: { findFirst: async query => {
-    calls.push(["reading", query]); if (failedAddresses.has(query.where.deviceId)) throw new Error("private Mongo credentials");
+    calls.push(["reading", query]); if (failedAddresses.has(query.where.deviceId)) throw Object.assign(new Error("private Mongo credentials"), { code: "P1001" });
     return readings.filter(reading => reading.deviceId === query.where.deviceId).sort((a, b) => b.timestamp - a.timestamp)[0] ?? null;
   } } } } });
   const { devicesRouter } = await import("../src/routes/devices.ts");
@@ -27,7 +29,7 @@ before(async () => {
   server = app.listen(0, "127.0.0.1"); await new Promise(resolve => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}/api/devices/overview`;
 });
-beforeEach(() => { devices = []; readings = []; calls = []; failInventory = false; failedAddresses = new Set(); });
+beforeEach(() => { devices = []; readings = []; calls = []; failInventory = false; failedAddresses = new Set(); loggedErrors = []; });
 after(async () => { await new Promise(resolve => server.close(resolve)); mock.restoreAll(); });
 const get = (user = owner, query = "") => fetch(base + query, { headers: user ? { Authorization: user } : {} });
 test("overview requires authentication before querying either database", async () => {
@@ -56,7 +58,7 @@ test("latest physical samples use MACs; demo samples use UUIDs and stay explicit
   const entries = await (await get()).json();
   assert.equal(entries[0].telemetry.environment.temperatureCelsius, 26);
   assert.equal(entries[0].telemetry.timestamp, now.toISOString());
-  assert.equal(entries[1].demo, true); assert.equal(entries[1].telemetry.soilMoisture.percentage, 50);
+  assert.equal(entries[1].device.status, "SIMULATED"); assert.equal(entries[1].demo, true); assert.equal(entries[1].telemetry.soilMoisture.percentage, 50);
 });
 test("one failed telemetry store read preserves device identity and healthy neighbours", async () => {
   devices = [device("LC-A50528"), device("LC-000001")]; readings = [reading("LC-000001")]; failedAddresses.add("LC-A50528");
@@ -64,10 +66,19 @@ test("one failed telemetry store read preserves device identity and healthy neig
   assert.equal(entries[0].device.macAddress, "LC-A50528"); assert.equal(entries[0].readingError, true); assert.equal(entries[0].telemetry, null);
   assert.equal(entries[1].readingError, false); assert.ok(entries[1].telemetry);
   assert.ok(!JSON.stringify(entries).includes("credentials"));
+  assert.equal(loggedErrors[0][0], "[Sensor Overview] Reading failed");
+  assert.equal(loggedErrors[0][1].stage, "mongodb-lookup");
+  assert.equal(loggedErrors[0][1].code, "P1001");
+  assert.ok(!JSON.stringify(loggedErrors).includes("credentials"));
 });
 test("empty account is explicit, while inventory failures are sanitized errors", async () => {
   assert.deepEqual(await (await get()).json(), []);
   failInventory = true; const response = await get(); assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), { error: "Internal server error.", code: "INTERNAL_ERROR" });
   assert.equal(calls.filter(([type]) => type === "reading").length, 0);
+  assert.equal(loggedErrors[0][0], "[Sensor Overview] PostgreSQL inventory failed");
+  assert.equal(loggedErrors[0][1].code, "P2022");
+  assert.equal(loggedErrors[0][1].column, "Device.missing");
+  assert.ok(!JSON.stringify(loggedErrors).includes("password"));
+  assert.ok(!JSON.stringify(loggedErrors).includes("postgresql://"));
 });
