@@ -21,23 +21,23 @@ export default function Home() {
       : { pathname: "/plant-profile", params: { id } });
   };
   return <View style={s.page}>
-    <Screen refresh={refresh} loading={dashboard.refreshing} backgroundColor="#FAFCF9">
+    <Screen refresh={refresh} loading={dashboard.refreshing} backgroundColor="#F4F9F4">
       <GreetingHeader plantCount={data.plants.length} ready={data.loaded} now={now} />
       {dashboard.error && <View style={s.error}><Text accessibilityLiveRegion="polite" style={s.note}>{dashboard.error}{data.loaded ? " Showing saved plants." : ""}</Text><Action label="Retry dashboard" variant="secondary" onPress={refresh} /></View>}
       <DashboardDailyDigest summary={summary} sensors={sensors} now={now} ready={dashboard.ready} careReady={dashboard.careReady}
         scansReady={dashboard.scansReady} guest={data.guest} careError={dashboard.careError} scansError={dashboard.scansError}
-        onAttention={() => router.push({ pathname: "/(tabs)/garden", params: { view: "all", plantIds: summary.attention.map(item => item.plant.id).join(",") } })}
+        onAttention={() => router.navigate("/(tabs)/spaces")}
         onTasks={() => router.push({ pathname: "/(tabs)/tasks", params: { period: summary.dueToday ? "Today" : "All dates" } })}
         onScans={() => router.push("/archives")}
         onSensors={() => sensors.length === 1 ? openPlant(sensors[0].plant.id) : setSensorSheet(true)} onRetry={refresh} />
       {data.loaded && (data.plants.length > 0 ? <DashboardPlantHighlights items={summary.highlights} onOpenPlant={openPlant}
-        onViewAll={() => router.push({ pathname: "/(tabs)/garden", params: { view: "all", plantIds: "" } })} />
-        : !data.error && <View style={s.empty}><Text accessibilityRole="header" style={s.emptyTitle}>Your garden starts here</Text><Text style={s.note}>Add a plant and make room for a little green.</Text><Action label="Add your first plant" onPress={() => router.push("/(tabs)/garden")} /></View>)}
+        onViewAll={() => router.navigate("/(tabs)/spaces")} />
+        : !data.error && <View style={s.empty}><Text accessibilityRole="header" style={s.emptyTitle}>Your garden starts here</Text><Text style={s.note}>Add a plant and make room for a little green.</Text><Action label="Add your first plant" onPress={() => router.navigate("/(tabs)/spaces")} /></View>)}
     </Screen>
     {sensorSheet && <DashboardSensorStatusSheet sensors={sensors} onClose={() => setSensorSheet(false)} onOpenPlant={openPlant} onRetry={refresh} />}
   </View>;
 }
 const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#FAFCF9" }, error: { gap: 8 }, note: { fontSize: 14, lineHeight: 21, color: "#506557" },
+  page: { flex: 1, backgroundColor: "#F4F9F4" }, error: { gap: 8 }, note: { fontSize: 14, lineHeight: 21, color: "#506557" },
   empty: { padding: 22, gap: 14, backgroundColor: "#FFFFFF", borderRadius: 22 }, emptyTitle: { color: "#193E27", fontSize: 20, fontWeight: "700" },
 });

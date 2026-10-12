@@ -180,3 +180,38 @@ test("device management presents physical hardware separately from local demo as
   assert.match(markup, /Local demo assignments/);
   assert.doesNotMatch(markup, /No physical hardware is connected|Demo assignments for this account only/);
 });
+
+test("dashboard attention, View all and empty-garden actions activate the canonical My Spaces tab", () => {
+  type CollectionProps = ElementProps & { onAttention?: () => void; onViewAll?: () => void; label?: string };
+  const nodes = (tree: React.ReactNode): React.ReactElement<CollectionProps>[] => React.Children.toArray(tree).flatMap(child =>
+    React.isValidElement<CollectionProps>(child) ? [child, ...nodes(child.props.children)] : []);
+  const digest = load("components/DashboardDailyDigest.tsx");
+  const highlights = load("components/DashboardPlantHighlights.tsx");
+  for (const guest of [false, true]) {
+    const navigated: string[] = [];
+    const pushed: unknown[] = [];
+    const plants = Array.from({ length: 5 }, (_, index) => ({ ...plant, id: `p${index}`, healthStatus: "warning" as const }));
+    const collection = { plants, guest, loaded: true };
+    const attentionSummary = summaryService.summarizeDashboard(plants, [], [], now);
+    const { default: Home } = load("app/(tabs)/index.tsx", {
+      "@/components/DashboardDailyDigest": digest,
+      "@/components/DashboardPlantHighlights": highlights,
+      "@/components/DashboardSensorStatusSheet": { DashboardSensorStatusSheet: () => null },
+      "@/components/greeting-header": { GreetingHeader: () => null },
+      "@/components/screen": { Screen: "Screen", Action: "Action" },
+      "@/hooks/use-dashboard-data": { useDashboardData: () => ({ data: collection, summary: attentionSummary, sensors: [], now, ready: true, careReady: true, scansReady: !guest, refreshing: false, refresh: async () => {} }) },
+      "expo-router": { useRouter: () => ({ navigate: (route: string) => navigated.push(route), push: (route: unknown) => pushed.push(route) }) },
+      react: { ...React, useState: (initial: unknown) => [initial, () => {}] },
+    });
+    const home = Home({} as never);
+    const digestNode = nodes(home).find(node => node.props.onAttention)!;
+    assert.ok(press(digest.DashboardDailyDigest(digestNode.props as never), "5 plants need attention"));
+    const highlightNode = nodes(home).find(node => node.props.onViewAll)!;
+    assert.ok(press(highlights.DashboardPlantHighlights(highlightNode.props as never), "View all plants"));
+    collection.plants = [];
+    const add = nodes(Home({} as never)).find(node => node.props.label === "Add your first plant")!;
+    assert.ok(add); add.props.onPress!();
+    assert.deepEqual(navigated, ["/(tabs)/spaces", "/(tabs)/spaces", "/(tabs)/spaces"]);
+    assert.equal(pushed.length, 0, "collection actions must activate the existing tab without pushing the legacy route");
+  }
+});

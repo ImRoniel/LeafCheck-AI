@@ -13,6 +13,6 @@ export function GreetingHeader({ plantCount, ready, now }: { plantCount: number;
   </View>;
 }
 const s = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 }, text: { flex: 1, minWidth: 0, gap: 6 },
-  greeting: { fontSize: 26, lineHeight: 33, fontWeight: "700", color: "#193E27" }, subtitle: { fontSize: 13, lineHeight: 20, color: "#506557" },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 20, paddingHorizontal: 18, backgroundColor: "#1A4D2E", borderRadius: 24, boxShadow: "0px 5px 16px rgba(26,77,46,0.16)" }, text: { flex: 1, minWidth: 0, gap: 6 },
+  greeting: { fontSize: 26, lineHeight: 33, fontWeight: "800", color: "#FFFFFF" }, subtitle: { fontSize: 13, lineHeight: 20, color: "rgba(230,246,230,0.88)" },
 });

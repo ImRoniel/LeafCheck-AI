@@ -320,3 +320,16 @@ test("dashboard puts the daily digest before photo highlights and removes legacy
   assert.match(source, /<DashboardDailyDigest[\s\S]*<DashboardPlantHighlights/);
   assert.doesNotMatch(source, /DashboardAlerts|DashboardAiSummary|PlantOverviewCard|connectedDevices/);
 });
+
+test("saved Garden links redirect to the actual My Spaces route, including links carrying legacy filters", () => {
+  const Redirect = () => null;
+  const { default: GardenRedirect } = load("app/(tabs)/garden.tsx", {
+    "expo-router": {
+      Redirect,
+      useLocalSearchParams: () => ({ view: "all", plantIds: "plant-1,plant-2" }),
+    },
+  });
+  const node = GardenRedirect({} as never) as React.ReactElement<{ href: string }>;
+  assert.equal(node.type, Redirect);
+  assert.equal(node.props.href, "/(tabs)/spaces");
+});

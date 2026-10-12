@@ -13,6 +13,6 @@ export function DashboardPlantHighlights({ items, onOpenPlant, onViewAll }: { it
   </View>;
 }
 const s = StyleSheet.create({
-  section: { gap: 6 }, header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }, title: { color: "#193E27", fontSize: 19, fontWeight: "700" },
-  link: { minHeight: 44, justifyContent: "center", paddingHorizontal: 4 }, linkText: { fontSize: 14, color: "#17633A", fontWeight: "600" }, plants: { gap: 12, paddingBottom: 4 },
+  section: { gap: 6 }, header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }, title: { color: "#1A4D2E", fontSize: 19, fontWeight: "800" },
+  link: { minHeight: 44, justifyContent: "center", paddingHorizontal: 4 }, linkText: { fontSize: 14, color: "#278448", fontWeight: "700" }, plants: { gap: 12, paddingBottom: 12 },
 });
