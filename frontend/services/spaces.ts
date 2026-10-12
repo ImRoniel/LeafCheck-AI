@@ -1,6 +1,17 @@
 import type { LocalState, LocalSpace } from "../types/local-state";
 import type { Plant } from "../types/plant";
 export const spaceBackgrounds = ["#E8F2E8", "#E3EFEF", "#F3EBD8", "#EDE6F1", "#F5E5DE"] as const;
+export function isUnassignedPlant(plant: Plant) {
+  return !plant.location?.trim() || plant.location.trim().toLowerCase() === "unassigned";
+}
+export function assignLocalPlant(state: LocalState, plantId: string, space: string): LocalState {
+  const destination = groupSpaces(state.spaces, state.guestPlants).spaces;
+  if (!destination.includes(space) || space.trim().toLowerCase() === "unassigned") throw new Error("This space is unavailable.");
+  const plant = state.guestPlants.find(item => item.id === plantId);
+  if (!plant || !isUnassignedPlant(plant)) throw new Error("This plant is no longer unassigned. Refresh your plants and try again.");
+  return { ...state, guestPlants: state.guestPlants.map(item => item.id === plantId
+    ? { ...item, location: space, updatedAt: new Date().toISOString() } : item) };
+}
 export function groupSpaces(metadata: LocalSpace[], plants: Plant[]) {
   const groups = new Map<string, Plant[]>();
   metadata.forEach(s => { if (!s.status) groups.set(s.name, []); });

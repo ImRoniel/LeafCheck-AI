@@ -11,10 +11,13 @@ import * as spaces from "../services/spaces";
 import * as profilePhoto from "../services/profile-photo";
 import * as validators from "../services/validators";
 import type { Plant } from "../types/plant";
+import { createApiClient, type CreatePlantInput, type UpdatePlantInput } from "../services/api";
+import { CONNECTION_ERROR_MESSAGE } from "../services/errors";
 
 const requireModule = createRequire(`${process.cwd()}/package.json`);
 type Props = {
   children?: React.ReactNode;
+  footer?: React.ReactNode;
   accessibilityLabel?: string;
   onPress?: () => void;
   onLongPress?: () => void;
@@ -28,12 +31,13 @@ type Props = {
   name?: string;
   initialRouteName?: string;
   value?: Record<string, unknown>;
+  title?: string;
   horizontal?: boolean;
   source?: { uri: string };
 };
 function elements(node: React.ReactNode): React.ReactElement<Props>[] {
   return React.Children.toArray(node).flatMap(child => React.isValidElement<Props>(child)
-    ? [child, ...elements(child.props.children)] : []);
+    ? [child, ...elements(child.props.children), ...elements(child.props.footer)] : []);
 }
 function cardContainer(nodes: React.ReactElement<Props>[], openLabel: string) {
   return nodes.find(node => node.type === "View" && React.Children.toArray(node.props.children).some(child => React.isValidElement<Props>(child) && child.props.accessibilityLabel === openLabel))!;
@@ -97,7 +101,8 @@ function load(path: string, overrides: Record<string, unknown>) {
         StyleSheet: { create: (styles: unknown) => styles },
       };
       if (name === "@/components/NeedsAttentionPlantList") return { NeedsAttentionPlantList: "NeedsAttentionPlantList" };
-      for (const component of ["BrandScreenHeader", "UnassignedPlantsSection", "DashboardPlantCard"]) {
+      if (name === "./task-sheet") return { TaskSheet: "TaskSheet" };
+      for (const component of ["BrandScreenHeader", "UnassignedPlantsSection", "DashboardPlantCard", "AddExistingPlantSheet", "care-task-thumbnail"]) {
         if (name === `@/components/${component}` || name === `./${component}`) return load(`components/${component}.tsx`, overrides);
       }
       throw new Error(`Unexpected import: ${name}`);
@@ -867,7 +872,7 @@ test("large-text add menus widen and wrap while retaining the gap beside the plu
     });
     const nodes = elements(module.default());
     const menu = nodes.find(node => node.type === "AnchoredActionOverlay")!;
-    const preferred = Math.ceil(112 * Math.max(1, fontScale));
+    const preferred = Math.ceil(160 * Math.max(1, fontScale));
     assert.equal((menu.props as any).menuWidth, preferred);
     const anchor = { x: width - 86, y: 630, width: 55, height: 55 };
     const placed = position(anchor, width, 844, fontScale > 1 ? 140 : 67, "left", preferred);
@@ -882,7 +887,7 @@ test("large-text add menus widen and wrap while retaining the gap beside the plu
   }
 });
 
-test("plus opens only Scan Plant and Add a Plant beside it, dismisses outside, and preserves flows in both sessions", () => {
+test("without unassigned plants, plus offers Scan Plant and Add Plant Manually, dismisses outside, and preserves flows in both sessions", () => {
   for (const guest of [true, false]) {
     const state = hooks();
     const routes: unknown[] = [];
@@ -908,9 +913,9 @@ test("plus opens only Scan Plant and Add a Plant beside it, dismisses outside, a
     open();
     assert.equal(menu().props.visible, true);
     assert.equal((menu().props as any).placement, "left");
-    assert.equal((menu().props as any).menuWidth, 112);
+    assert.equal((menu().props as any).menuWidth, 160);
     assert.equal((menu().props as any).anchor.x, 316);
-    assert.deepEqual(elements(menu()).filter(node => node.type === "Pressable").map(node => node.props.accessibilityLabel), ["Scan Plant", "Add a Plant"]);
+    assert.deepEqual(elements(menu()).filter(node => node.type === "Pressable").map(node => node.props.accessibilityLabel), ["Scan Plant", "Add Plant Manually"]);
     for (const button of elements(menu()).filter(node => node.type === "Pressable")) {
       const label = elements(button).find(node => node.type === "Text")!;
       assert.equal((label.props as any).numberOfLines, undefined); // Enlarged text can wrap instead of being clipped.
@@ -926,9 +931,143 @@ test("plus opens only Scan Plant and Add a Plant beside it, dismisses outside, a
     assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/(tabs)/scanner", params: { space: "Bedroom" } }]);
     assert.equal(menu().props.visible, false);
     open();
-    elements(menu()).find(node => node.props.accessibilityLabel === "Add a Plant")!.props.onPress!();
+    elements(menu()).find(node => node.props.accessibilityLabel === "Add Plant Manually")!.props.onPress!();
     assert.equal(menu().props.visible, false);
     assert.equal(render().filter(node => node.type === "Modal").at(-1)!.props.visible, true);
+  }
+});
+
+async function addToSpaceHarness(guest: boolean, withUnassigned = true) {
+  let raw: string | null = null;
+  let failWrite = false;
+  const storage = { getItem: async () => raw, setItem: async (_key: string, value: string) => {
+    if (failWrite) throw new Error("Unable to save plant move."); raw = value;
+  } };
+  const key = localStateKey(guest ? null : "owner");
+  const store = createLocalStateStore(storage, key); await store.load();
+  const loose: Plant = { id: guest ? "guest-snake" : "11111111-1111-4111-8111-111111111111", name: "Snake", species: "Dracaena trifasciata",
+    healthStatus: guest ? "unknown" : "warning", imageUrl: "https://images.test/snake.jpg",
+    ...(guest ? {} : { deviceId: "22222222-2222-4222-8222-222222222222" }),
+    lastScannedAt: "2026-10-12T00:00:00Z", createdAt: "2026-10-12T00:00:00Z", updatedAt: "2026-10-12T00:00:00Z" };
+  const assigned = { ...loose, id: guest ? "guest-fern" : "33333333-3333-4333-8333-333333333333", name: "Fern", location: "Balcony" };
+  let collection = withUnassigned ? [assigned, loose] : [assigned];
+  await store.update(state => ({ ...spaces.createSpace(state, "Balcony", spaces.spaceBackgrounds[0], []), guestPlants: guest ? collection : [] }));
+  const requests: { method: string; url: string; body: unknown }[] = [];
+  let refreshes = 0;
+  const api = createApiClient({ baseUrl: "https://plants.test", fetch: async (url, init) => {
+    const body = JSON.parse(String(init?.body)) as UpdatePlantInput;
+    requests.push({ method: init?.method ?? "GET", url: String(url), body });
+    if (failWrite) throw new Error("Unable to save plant move.");
+    return new Response(JSON.stringify(init?.method === "PATCH" ? { ...loose, ...body }
+      : { ...loose, ...body, id: "44444444-4444-4444-8444-444444444444", healthStatus: "unknown", deviceId: undefined }),
+      { status: init?.method === "PATCH" ? 200 : 201 });
+  } });
+  const app = {
+    guest, loaded: true, get plants() { return guest ? store.snapshot().data.guestPlants : collection; },
+    refresh: async () => { refreshes++; },
+    updatePlant: async (id: string, input: UpdatePlantInput) => {
+      const plant = await api.updatePlant(id, input); collection = collection.map(item => item.id === id ? plant : item);
+      await app.refresh(); return plant;
+    },
+    createPlant: async (input: CreatePlantInput) => {
+      if (guest) {
+        const plant = { ...loose, ...input, id: "guest-new", deviceId: undefined };
+        await store.update(state => ({ ...state, guestPlants: [...state.guestPlants, plant] })); return plant;
+      }
+      const plant = await api.createPlant(input); collection = [...collection, plant]; await app.refresh(); return plant;
+    },
+  };
+  const context = load("context/spaces.tsx", {
+    "@/services/spaces": spaces, "./app-data": { useAppData: () => app },
+    "./local-state": { useLocalState: () => ({ ...store.snapshot(), update: store.update }) },
+  });
+  const state = hooks();
+  const module = load("app/(tabs)/space-detail.tsx", {
+    react: state.react,
+    "@/components/space-management": { SpaceManagement: "SpaceManagement" },
+    "@/components/plant-action-menu": { PlantActionMenu: "PlantActionMenu" },
+    "@/components/space-menu-button": { SpaceMenuButton: "SpaceMenuButton" },
+    "@/context/spaces": { useSpaces: context.useSpaces }, "@/context/app-data": { useAppData: () => app },
+    "@expo/vector-icons": { Ionicons: "Icon" },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+    "expo-router": { useLocalSearchParams: () => ({ space: "Balcony" }), useRouter: () => ({ setParams: () => {} }) },
+  });
+  const render = () => { state.reset(); return elements(module.default()); };
+  const picker = () => render().find(node => typeof node.type === "function" && node.type.name === "AddExistingPlantSheet");
+  const sheet = () => elements(invoke(picker()!));
+  const press = (nodes: React.ReactElement<Props>[], label: string) => {
+    const button = nodes.find(node => node.props.accessibilityLabel === label); assert.ok(button, label); button.props.onPress!();
+  };
+  const open = () => {
+    const plus = render().find(node => node.props.accessibilityLabel === "Add plant")!;
+    const { ref } = plus.props as Props & { ref: { current: { measureInWindow: (callback: (...args: number[]) => void) => void } | null } };
+    ref.current = { measureInWindow: callback => callback(300, 600, 55, 55) }; plus.props.onPress!();
+  };
+  return { app, store, storage, key, context, requests, loose, render, picker, sheet, press, open,
+    fail: (value: boolean) => { failWrite = value; }, refreshes: () => refreshes };
+}
+
+test("add-existing picker moves the same owned plant, preserves sensor/photo/diagnosis metadata, closes and updates both space groups", async () => {
+  for (const guest of [true, false]) {
+    const h = await addToSpaceHarness(guest); h.open();
+    assert.ok(h.picker());
+    assert.equal(h.render().find(node => node.type === "AnchoredActionOverlay")?.props.visible, false);
+    assert.equal(h.render().filter(node => node.type === "Modal").at(-1)?.props.visible, false);
+    assert.equal(h.sheet()[0].props.title, "Add to Balcony");
+    assert.ok(h.sheet().some(node => node.props.children === h.loose.species));
+    assert.ok(h.sheet().some(node => node.props.children === (guest ? "Not assessed" : "Needs Attention")));
+    const thumbnail = h.sheet().find(node => typeof node.type === "function" && node.type.name === "CareTaskThumbnail")!;
+    assert.equal((thumbnail.props as Props & { uri: string }).uri, h.loose.imageUrl);
+    h.press(h.sheet(), "Add Snake to Balcony");
+    h.press(h.sheet(), "Add Snake to Balcony"); // A rapid repeated tap must not submit twice.
+    await nextTurn();
+    assert.equal(h.picker(), undefined);
+    assert.equal(h.app.plants.length, 2);
+    assert.deepEqual({ ...h.app.plants.find(plant => plant.id === h.loose.id), updatedAt: h.loose.updatedAt }, { ...h.loose, location: "Balcony" });
+    assert.equal(h.context.useSpaces().plantsBySpace.Balcony.length, 2);
+    assert.equal(h.context.useSpaces().unassignedPlants.length, 0);
+    assert.ok(h.render().some(node => node.props.accessibilityLabel?.startsWith("Open Snake")));
+    if (guest) {
+      assert.equal(h.requests.length, 0);
+      const reloaded = createLocalStateStore(h.storage, h.key); await reloaded.load();
+      assert.equal(reloaded.snapshot().data.guestPlants.find(plant => plant.id === h.loose.id)?.location, "Balcony");
+    } else {
+      assert.deepEqual(h.requests, [{ method: "PATCH", url: `https://plants.test/api/plants/${h.loose.id}`, body: { location: "Balcony" } }]);
+      assert.equal(h.refreshes(), 1);
+    }
+    await assert.rejects(h.context.useSpaces().assignPlant("Balcony", h.loose.id), /no longer unassigned/);
+  }
+});
+
+test("failed existing-plant assignment stays open without creating a duplicate, and retry succeeds", async () => {
+  for (const guest of [true, false]) {
+    const h = await addToSpaceHarness(guest); h.fail(true); h.open();
+    h.press(h.sheet(), "Add Snake to Balcony"); await nextTurn();
+    assert.ok(h.picker()); assert.equal(h.app.plants.find(plant => plant.id === h.loose.id)?.location, undefined);
+    assert.equal(h.app.plants.length, 2);
+    assert.ok(h.sheet().some(node => node.type === "Text" && node.props.children === (guest ? "Unable to save plant move." : CONNECTION_ERROR_MESSAGE)));
+    h.fail(false); h.press(h.sheet(), "Add Snake to Balcony"); await nextTurn();
+    assert.equal(h.picker(), undefined); assert.equal(h.app.plants.length, 2);
+    await assert.rejects(h.context.useSpaces().assignPlant("Unassigned", h.loose.id), /space is unavailable/);
+    await assert.rejects(h.context.useSpaces().assignPlant("Balcony", "not-owned"), /no longer unassigned/);
+  }
+});
+
+test("explicit create-instead and empty fallback both create a new plant directly inside the selected space", async () => {
+  for (const guest of [true, false]) for (const withUnassigned of [true, false]) {
+    const h = await addToSpaceHarness(guest, withUnassigned); h.open();
+    if (withUnassigned) h.press(h.sheet(), "Create a new plant instead");
+    else { assert.equal(h.picker(), undefined); h.press(h.render(), "Add Plant Manually"); }
+    assert.equal(h.picker(), undefined);
+    assert.equal(h.render().filter(node => node.type === "Modal").at(-1)?.props.visible, true);
+    h.render().find(node => node.props.accessibilityLabel === "Plant name")!.props.onChangeText!("Basil");
+    h.render().find(node => node.props.accessibilityLabel === "Plant species")!.props.onChangeText!("Ocimum basilicum");
+    h.press(h.render(), "Add plant to Balcony"); await nextTurn();
+    const created = h.app.plants.find(plant => plant.name === "Basil"); assert.ok(created);
+    assert.equal(created.location, "Balcony"); assert.equal(h.context.useSpaces().plantsBySpace.Balcony.length, 2);
+    assert.equal(h.context.useSpaces().unassignedPlants.length, withUnassigned ? 1 : 0);
+    assert.equal(h.render().filter(node => node.type === "Modal").at(-1)?.props.visible, false);
+    if (!guest) assert.deepEqual(h.requests, [{ method: "POST", url: "https://plants.test/api/plants", body: { name: "Basil", species: "Ocimum basilicum", location: "Balcony" } }]);
   }
 });
 

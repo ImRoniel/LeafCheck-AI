@@ -1,6 +1,7 @@
 import { PlantSensorBadge, sensorPairingLabel } from "@/components/plant-sensor-badge";
 import { SpaceManagement } from "@/components/space-management";
 import { PlantActionMenu } from "@/components/plant-action-menu";
+import { AddExistingPlantSheet } from "@/components/AddExistingPlantSheet";
 import { SpaceMenuButton, type SpaceMenuAnchor } from "@/components/space-menu-button";
 import { AnchoredActionOverlay } from "@/components/anchored-action-overlay";
 import { actionMenuStyles, useActionMenuFont } from "@/components/action-menu-style";
@@ -19,12 +20,14 @@ export default function SpaceDetailScreen() {
   const { fontScale = 1 } = useWindowDimensions();
   const { space, add } = useLocalSearchParams<{ space?: string; add?: string }>();
   const currentSpace = typeof space === "string" ? space : "";
-  const { spaces, plantsBySpace, addPlant, ready, error: storageError, retry } = useSpaces();
+  const { spaces, plantsBySpace, unassignedPlants = [], assignPlant, addPlant, ready, error: storageError, retry } = useSpaces();
   const valid = ready && spaces.includes(currentSpace);
   const appData = useAppData();
   const plants = plantsBySpace[currentSpace] ?? [];
   const [modalVisible, setModalVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [existingVisible, setExistingVisible] = useState(false);
+  const [addingId, setAddingId] = useState<string | null>(null);
   const [optionsAnchor, setOptionsAnchor] = useState<SpaceMenuAnchor>();
   const plusButton = useRef<View>(null);
   const menuFont = useActionMenuFont();
@@ -53,6 +56,16 @@ export default function SpaceDetailScreen() {
   };
 
   const close = () => { if (!busy) { setModalVisible(false); setError(""); router.setParams({ add: "" }); } };
+  const closeExisting = () => { if (!pending.current) { setExistingVisible(false); setError(""); } };
+  const movePlant = async (plantId: string) => {
+    if (!valid || pending.current) return;
+    pending.current = true; setAddingId(plantId); setError("");
+    try {
+      await assignPlant(currentSpace, plantId);
+      setExistingVisible(false);
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to move plant. Please try again."); }
+    finally { pending.current = false; setAddingId(null); }
+  };
   const createPlant = async () => {
     if (pending.current) return;
     pending.current = true; setBusy(true); setError("");
@@ -101,8 +114,12 @@ export default function SpaceDetailScreen() {
       </View>
       </ScrollView>
       {valid && <Pressable ref={plusButton} collapsable={false} style={[styles.detailPlus, { bottom: insets.bottom + 94 }]} onPress={() => {
-        plusButton.current?.measureInWindow((x, y, width, height) => { setOptionsAnchor({ x, y, width, height }); setOptionsVisible(true); });
-      }} accessibilityRole="button" accessibilityLabel="Add plant" accessibilityState={{ expanded: optionsVisible }}>
+        if (pending.current) return;
+        setError("");
+        if (currentSpace.trim().toLowerCase() !== "unassigned" && unassignedPlants.length) {
+          setOptionsVisible(false); setExistingVisible(true);
+        } else plusButton.current?.measureInWindow((x, y, width, height) => { setOptionsAnchor({ x, y, width, height }); setOptionsVisible(true); });
+      }} accessibilityRole="button" accessibilityLabel="Add plant" accessibilityState={{ expanded: optionsVisible || existingVisible, disabled: busy || addingId !== null }} disabled={busy || addingId !== null}>
         <Ionicons name="add" size={35} color="#20B64D" />
       </Pressable>}
       <SpaceManagement variant="detail" space={managed ? currentSpace : null} anchor={managed ?? undefined} onClose={() => setManaged(null)} onManaged={() => router.replace("/(tabs)/spaces")} />
@@ -119,10 +136,15 @@ export default function SpaceDetailScreen() {
           </View>
         </View></View>
       </Modal>
-      <AnchoredActionOverlay visible={optionsVisible && valid} anchor={optionsAnchor} placement="left" menuWidth={Math.ceil(112 * Math.max(1, fontScale))} closeLabel="Close add plant menu" onClose={() => setOptionsVisible(false)}>
+      {existingVisible && valid && <AddExistingPlantSheet space={currentSpace} plants={unassignedPlants} addingId={addingId} error={error}
+        onSelect={id => void movePlant(id)} onClose={closeExisting} onCreate={() => {
+          if (pending.current) return;
+          setExistingVisible(false); setError(""); setModalVisible(true);
+        }} />}
+      <AnchoredActionOverlay visible={optionsVisible && valid} anchor={optionsAnchor} placement="left" menuWidth={Math.ceil(160 * Math.max(1, fontScale))} closeLabel="Close add plant menu" onClose={() => setOptionsVisible(false)}>
         <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 3 }}>
           <Pressable accessibilityRole="button" accessibilityLabel="Scan Plant" style={[actionMenuStyles.button, styles.addMenuButton]} onPress={() => { setOptionsVisible(false); router.push({ pathname: "/(tabs)/scanner", params: { space: currentSpace } }); }}><Text style={[actionMenuStyles.label, styles.addMenuText, { fontFamily: menuFont }]}>Scan Plant</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Add a Plant" style={[actionMenuStyles.button, styles.addMenuButton]} onPress={() => { setOptionsVisible(false); setError(""); setModalVisible(true); }}><Text style={[actionMenuStyles.label, styles.addMenuText, { fontFamily: menuFont }]}>Add a Plant</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Add Plant Manually" style={[actionMenuStyles.button, styles.addMenuButton]} onPress={() => { setOptionsVisible(false); setError(""); setModalVisible(true); }}><Text style={[actionMenuStyles.label, styles.addMenuText, { fontFamily: menuFont }]}>Add Plant Manually</Text></Pressable>
         </ScrollView>
       </AnchoredActionOverlay>
       <Modal visible={(modalVisible || add === "manual") && valid} transparent animationType="fade" onRequestClose={close}>
