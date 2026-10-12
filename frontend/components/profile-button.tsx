@@ -17,6 +17,6 @@ export function ProfileButton() {
 }
 
 const styles = StyleSheet.create({
-  button: { width: 38, height: 38, borderRadius: 20, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center", marginRight: 2 },
+  button: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center", marginRight: 2 },
   image: { width: 38, height: 38, borderRadius: 19 },
 });

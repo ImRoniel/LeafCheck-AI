@@ -1,128 +1,43 @@
-import { DashboardAiSummary } from "@/components/dashboard-ai-summary";
-import { DashboardAlerts } from "@/components/dashboard-alerts";
+import { DashboardDailyDigest } from "@/components/DashboardDailyDigest";
+import { DashboardPlantHighlights } from "@/components/DashboardPlantHighlights";
+import { DashboardSensorStatusSheet } from "@/components/DashboardSensorStatusSheet";
 import { GreetingHeader } from "@/components/greeting-header";
-import { PlantOverviewCard } from "@/components/plant-overview-card";
-import { Screen } from "@/components/screen";
-import { useAppData } from "@/context/app-data";
-import { useLocalState } from "@/context/local-state";
-import {
-  getDashboardAlert,
-  getDashboardCollectionStatus,
-} from "@/services/dashboard-summary";
-import { Ionicons } from "@expo/vector-icons";
+import { Action, Screen } from "@/components/screen";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 export default function Home() {
-  const data = useAppData();
-  const local = useLocalState();
-  const connectedCount = local.data.connectedDevices.length;
+  const dashboard = useDashboardData();
+  const { data, summary, sensors, now } = dashboard;
   const router = useRouter();
-
-  return (
-    <View style={{ flex: 1 }}>
-      <Screen refresh={() => void data.refresh()} loading={data.loading}>
-        <View style={s.topBackground} />
-        <GreetingHeader mockConnected={connectedCount > 0} />
-
-        <View style={s.quickActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Scan Plant"
-            style={s.scanBanner}
-            onPress={() => router.push("/(tabs)/scanner")}
-          >
-            <View style={s.scanBannerIcon}>
-              <Ionicons name="scan-outline" size={28} color="#FFFFFF" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={s.scanBannerTitle}>Scan Plant</Text>
-              <Text style={s.scanBannerSubtitle}>
-                Point camera at any plant for instant AI identification & care
-                specs
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Pair Sensor"
-            accessibilityHint="Open demo sensor pairing and choose any plant or space"
-            style={[s.scanBanner, s.pairAction]}
-            onPress={() => router.push("/device-connection/scanner")}
-          >
-            <View style={s.scanBannerIcon}>
-              <Ionicons name="radio-outline" size={28} color="#FFFFFF" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={s.scanBannerTitle}>Pair Sensor</Text>
-              <Text style={s.scanBannerSubtitle}>
-                Add a demo sensor to a plant or space
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
-          </Pressable>
-        </View>
-
-        <DashboardAlerts
-          message={getDashboardAlert(data)}
-          connectedCount={connectedCount}
-          onConnect={() => router.push("/device-connection/scanner")}
-          onManage={() => router.push("/device-connection/manage")}
-        />
-        {data.loaded && <PlantOverviewCard />}
-        <DashboardAiSummary
-          collectionStatus={getDashboardCollectionStatus(data)}
-          onRetry={() => void data.refresh()}
-        />
-      </Screen>
-    </View>
-  );
+  const [sensorSheet, setSensorSheet] = useState(false);
+  const refresh = () => { void dashboard.refresh(); };
+  const openPlant = (id: string) => {
+    setSensorSheet(false);
+    const plant = data.plants.find(item => item.id === id);
+    if (!plant) return;
+    router.push(data.guest ? { pathname: "/(tabs)/space-detail", params: { space: plant.location?.trim() || "Unassigned" } }
+      : { pathname: "/plant-profile", params: { id } });
+  };
+  return <View style={s.page}>
+    <Screen refresh={refresh} loading={dashboard.refreshing} backgroundColor="#FAFCF9">
+      <GreetingHeader plantCount={data.plants.length} ready={data.loaded} now={now} />
+      {dashboard.error && <View style={s.error}><Text accessibilityLiveRegion="polite" style={s.note}>{dashboard.error}{data.loaded ? " Showing saved plants." : ""}</Text><Action label="Retry dashboard" variant="secondary" onPress={refresh} /></View>}
+      <DashboardDailyDigest summary={summary} sensors={sensors} now={now} ready={dashboard.ready} careReady={dashboard.careReady}
+        scansReady={dashboard.scansReady} guest={data.guest} careError={dashboard.careError} scansError={dashboard.scansError}
+        onAttention={() => router.push({ pathname: "/(tabs)/garden", params: { view: "all", plantIds: summary.attention.map(item => item.plant.id).join(",") } })}
+        onTasks={() => router.push({ pathname: "/(tabs)/tasks", params: { period: summary.dueToday ? "Today" : "All dates" } })}
+        onScans={() => router.push("/archives")}
+        onSensors={() => sensors.length === 1 ? openPlant(sensors[0].plant.id) : setSensorSheet(true)} onRetry={refresh} />
+      {data.loaded && (data.plants.length > 0 ? <DashboardPlantHighlights items={summary.highlights} onOpenPlant={openPlant}
+        onViewAll={() => router.push({ pathname: "/(tabs)/garden", params: { view: "all", plantIds: "" } })} />
+        : !data.error && <View style={s.empty}><Text accessibilityRole="header" style={s.emptyTitle}>Your garden starts here</Text><Text style={s.note}>Add a plant and make room for a little green.</Text><Action label="Add your first plant" onPress={() => router.push("/(tabs)/garden")} /></View>)}
+    </Screen>
+    {sensorSheet && <DashboardSensorStatusSheet sensors={sensors} onClose={() => setSensorSheet(false)} onOpenPlant={openPlant} onRetry={refresh} />}
+  </View>;
 }
-
 const s = StyleSheet.create({
-  topBackground: {
-    position: "absolute",
-    top: 0,
-    width: 476,
-    height: 263,
-    left: "50%",
-    marginLeft: -238,
-    backgroundColor: "#2F8135",
-    borderBottomLeftRadius: 112,
-    borderBottomRightRadius: 112,
-  },
-  quickActions: {
-    backgroundColor: "#1B5E20",
-    borderRadius: 18,
-    marginVertical: 10,
-    overflow: "hidden",
-  },
-  pairAction: { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.3)" },
-  scanBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1B5E20",
-    minHeight: 80,
-    padding: 16,
-  },
-  scanBannerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scanBannerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  scanBannerSubtitle: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.85)",
-    marginTop: 2,
-    lineHeight: 16,
-  },
+  page: { flex: 1, backgroundColor: "#FAFCF9" }, error: { gap: 8 }, note: { fontSize: 14, lineHeight: 21, color: "#506557" },
+  empty: { padding: 22, gap: 14, backgroundColor: "#FFFFFF", borderRadius: 22 }, emptyTitle: { color: "#193E27", fontSize: 20, fontWeight: "700" },
 });

@@ -8,6 +8,7 @@ import { runInNewContext } from "node:vm";
 import * as React from "react";
 import ts from "typescript";
 import * as devices from "../services/device-connection";
+import * as dashboardSummary from "../services/dashboard-summary";
 import { createLocalStateStore } from "../services/local-state-storage";
 import { initialLocalState } from "../types/local-state";
 
@@ -168,6 +169,10 @@ async function harness(screen = "assignment") {
             };
           case "@/context/spaces":
             return { useSpaces: () => ({ spaces }) };
+          case "@/hooks/use-dashboard-data":
+            return { useDashboardTelemetry: () => ({ sensors: [] }) };
+          case "@/services/dashboard-summary":
+            return dashboardSummary;
           case "@/hooks/use-device-activity":
             return { useDeviceActivity: () => active };
           case "@/services/device-connection":

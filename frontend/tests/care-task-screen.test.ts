@@ -93,7 +93,7 @@ async function harness(guest = true, width = 390, reducedMotion = false) {
       if (name === "@/services/care-tasks") return careTasks;
       if (name === "@/services/care-task-filter") return careTaskFilter;
       if (name === "@/services/care-task-presentation") return careTaskPresentation;
-      if (name === "expo-router") return { useFocusEffect: () => {}, useRouter: () => ({ push: (route: unknown) => navigated.push(route), navigate: (route: unknown) => navigated.push(route) }) };
+      if (name === "expo-router") return { useLocalSearchParams: () => ({}), useFocusEffect: () => {}, useRouter: () => ({ push: (route: unknown) => navigated.push(route), navigate: (route: unknown) => navigated.push(route) }) };
       if (name === "react-native-safe-area-context") return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name.startsWith("@/components/")) return load(`components/${name.slice("@/components/".length)}.tsx`);
       if (name.startsWith("./")) return load(`components/${name.slice(2)}.tsx`);

@@ -13,7 +13,7 @@ import type { CareCompletion, GardenCareTask } from "@/types/care-task";
 import { filterCareTaskPeriod } from "@/services/care-task-filter";
 import { tasksDueToday } from "@/services/care-task-presentation";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from "react-native";
 
@@ -22,6 +22,7 @@ export default function CareTasks() {
   const local = useLocalState();
   const remote = useCareTasks(!data.guest);
   const router = useRouter();
+  const params = useLocalSearchParams<{ period?: string }>();
   const [now, setNow] = useState(() => new Date());
   const [saving, setSaving] = useState(false);
   const [filters, setFilters] = useState<TaskFilters>({ status: "pending", period: "All dates" });
@@ -39,6 +40,10 @@ export default function CareTasks() {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useFocusEffect(useCallback(() => {
+    if (params.period === "Today" || params.period === "All dates") {
+      setFilters({ status: "pending", period: params.period });
+      router.setParams({ period: "" });
+    }
     const tick = () => { if (AppState.currentState === "active") setNow(new Date()); };
     tick();
     const timer = setInterval(tick, 60_000);
@@ -47,7 +52,7 @@ export default function CareTasks() {
       tick();
     });
     return () => { ++screenEpoch.current; clearInterval(timer); listener.remove(); };
-  }, []));
+  }, [params.period, router]));
   const allGroups = groupCareTasks(buildCareTasks(data.plants, local.data.schedules, local.data.careCompletions, now,
     data.guest ? [] : remote.tasks), now);
   const groups = {

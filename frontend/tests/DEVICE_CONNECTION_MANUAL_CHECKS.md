@@ -35,10 +35,10 @@ Also repeat the existing [scan checks](SCAN_MANUAL_CHECKS.md) and [setup checks]
 
 ## Multi-entry and multi-sensor checks
 
-- The overlapping quick-action container has separate Scan Plant and Pair Sensor controls. Scan Plant retains camera permissions and guest sign-in guidance. Pair Sensor opens unrestricted demo assignment even after previous pairing.
+- Home uses Daily Digest and plant photos. Scan remains in navigation; physical sensor pairing remains in owned plant profiles. No permanent dashboard setup banners appear.
 - Pair two different nodes to different plants/spaces. Both remain after restart. Connected Hardware shows the demo count, Add Sensor, and Manage Devices. Never label simulated pairing as active live telemetry.
 - Selecting an already-paired node clearly offers reassignment. Confirm it changes only that node, does not duplicate its count, and preserves other assignments and manual care.
-- Manage Devices lists all demo assignments, permits reassignment/removal, and shows an explicit empty state after the last removal. Dashboard reverts to Alerts and its previous non-Auto badge. Live plant links and local device mappings are untouched.
+- Manage Devices lists server-linked sensors with source, reading status and timestamp separately from local demo assignments. Removing a local demo assignment does not affect physical links or the dashboard’s telemetry-derived status.
 - Pair from Plant Detail and Space Detail (including empty local spaces). Assignment automatically selects and disables the intended destination. Retry discovery, choose another device, and use Back: the target must stay locked. Start again from Dashboard: no previous contextual target remains.
 - Test contextual links with missing, repeated, malformed, deleted, and other-account destinations. Confirmation remains disabled with recovery guidance; it never falls back to another target. Test Unicode and punctuation in space names.
 - Upgrade a profile containing only the legacy single demo assignment. It appears once in Manage Devices. Remove it, restart, and verify it does not reappear. Corrupt collection entries must fail closed without overwriting storage.

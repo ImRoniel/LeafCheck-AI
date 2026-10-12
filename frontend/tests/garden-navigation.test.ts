@@ -286,7 +286,7 @@ test("root stack preserves guards while native pushes reverse on Back and reduce
 });
 
 test("collection entry points lead to My Spaces and Garden has no visible tab title", () => {
-  for (const file of ["components/plant-overview-card.tsx", "components/delete-plant-action.tsx", "app/(tabs)/search.tsx", "app/(tabs)/explore.tsx"]) {
+  for (const file of ["components/delete-plant-action.tsx", "app/(tabs)/search.tsx", "app/(tabs)/explore.tsx"]) {
     const source = readFileSync(file, "utf8");
     assert.match(source, /\/\(tabs\)\/spaces/);
     assert.doesNotMatch(source, /\/\(tabs\)\/garden/);
@@ -315,10 +315,8 @@ test("legacy camera redirect preserves target params; notifications lead to acti
   );
 });
 
-test("dashboard puts plant overview directly after hardware and AI summary last", () => {
+test("dashboard puts the daily digest before photo highlights and removes legacy widgets", () => {
   const source = readFileSync("app/(tabs)/index.tsx", "utf8");
-  assert.match(
-    source,
-    /<DashboardAlerts[\s\S]*?\/\>\s*\{data.loaded && <PlantOverviewCard \/>\}\s*<DashboardAiSummary/,
-  );
+  assert.match(source, /<DashboardDailyDigest[\s\S]*<DashboardPlantHighlights/);
+  assert.doesNotMatch(source, /DashboardAlerts|DashboardAiSummary|PlantOverviewCard|connectedDevices/);
 });

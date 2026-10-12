@@ -12,12 +12,13 @@ export default function Garden() {
   const data = useAppData();
   const { spaces, plantsBySpace, backgrounds } = useSpaces();
   const router = useRouter();
-  const { view } = useLocalSearchParams<{ view?: string }>();
+  const { view, plantIds } = useLocalSearchParams<{ view?: string; plantIds?: string }>();
   const bySpace = view !== "all";
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(false);
-  const matches = filterPlants(data.plants, query);
+  const selectedIds = typeof plantIds === "string" && plantIds ? new Set(plantIds.split(",")) : null;
+  const matches = filterPlants(selectedIds ? data.plants.filter(plant => selectedIds.has(plant.id)) : data.plants, query);
 
   return (
     <Screen
@@ -46,6 +47,7 @@ export default function Garden() {
           );
         })}
       </View>
+      {selectedIds && <View style={{ gap: 8 }}><Text style={ui.heading}>Plants needing attention</Text><Action label="Show all plants" variant="secondary" onPress={() => router.setParams({ plantIds: "" })} /></View>}
       <TextInput
         accessibilityLabel="Search plants by name, species or location"
         style={ui.input}
@@ -88,7 +90,7 @@ export default function Garden() {
       )}
       {bySpace ? (
         spaces.map((space) => {
-          const plants = filterPlants(plantsBySpace[space] ?? [], query);
+          const plants = filterPlants((plantsBySpace[space] ?? []).filter(plant => !selectedIds || selectedIds.has(plant.id)), query);
           if (query.trim() && !plants.length) return null;
           return (
             <View
