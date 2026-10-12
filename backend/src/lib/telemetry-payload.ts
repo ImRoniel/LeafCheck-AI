@@ -6,7 +6,7 @@ interface Reading {
 }
 /** Physical moisture is raw ADC; only virtual demo readings have calibrated percentages. */
 export function serializeTelemetry(reading: Reading, deviceId: string, isDemo: boolean, minMoisture = 30, maxMoisture = 80): TelemetryPayload {
-  const lux = isDemo ? reading.lightLevel ?? null : reading.lightLux ?? null;
+  const lux = isDemo ? reading.lightLevel ?? null : reading.lightLux ?? reading.lightLevel ?? null;
   return {
     deviceId, timestamp: reading.timestamp.toISOString(),
     soilMoisture: {

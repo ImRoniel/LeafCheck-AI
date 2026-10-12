@@ -12,7 +12,7 @@
  *   HTTP POST → Express Backend every READ_INTERVAL_MS (default 15s)
  *
  * Payload keys (must match backend schema exactly):
- *   deviceId, temperature, humidity, soilMoisture, soilMoistureRaw, lightLevel
+ *   deviceId, temperature, humidity, soilMoisture, soilMoistureRaw, lightLux
  *
  * NOTE: No timestamp is sent — the server assigns an authoritative timestamp.
  * NOTE: No pH sensor — pH is botanical reference data, not live telemetry.
@@ -143,9 +143,9 @@ void loop() {
   doc["deviceId"]        = DEVICE_ID;
   doc["temperature"]     = round(temperature * 100.0) / 100.0;  // 2 decimal places
   doc["humidity"]        = round(humidity * 100.0) / 100.0;
-  doc["soilMoisture"]    = round(soilPct * 10.0) / 10.0;        // 1 decimal place
+  doc["soilMoisture"]    = soilRaw; // Legacy raw ADC field; percentages require calibration.
   doc["soilMoistureRaw"] = soilRaw;
-  doc["lightLevel"]      = round(lux * 10.0) / 10.0;
+  doc["lightLux"]        = round(lux * 10.0) / 10.0;
 
   String payload;
   serializeJson(doc, payload);

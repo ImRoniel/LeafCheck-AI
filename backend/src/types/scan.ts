@@ -49,6 +49,7 @@ export interface ScanResponse {
   diagnosisError?: boolean;
   diagnosisMessage?: string;
   diagnosisCode?: string;
+  telemetrySnapshot?: import("../lib/diagnosis-telemetry.js").DiagnosisTelemetrySnapshot | null;
   plant: {
     id: string;
     name: string;

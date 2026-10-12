@@ -5,7 +5,8 @@ export interface HardwareTelemetryPayload {
   humidity: number;
   soilMoisture: number;
   soilMoistureRaw?: number | null;
-  lightLux: number;
+  lightLux?: number;
+  lightLevel?: number;
 }
 
 export interface SoilMoisture {

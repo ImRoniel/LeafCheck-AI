@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import * as React from "react";
 import ts from "typescript";
-import { diagnosisPresentation, hasNewerTelemetry } from "../../services/plant-profile-guidance";
+import * as profileGuidanceService from "../../services/plant-profile-guidance";
 import { diagnosisRetryErrorMessage } from "../../services/scan-errors";
 import type { Plant, PlantTelemetry, ArchiveEntry, ScanRequest, ScanResponse } from "../../types";
 
@@ -58,17 +58,17 @@ export function profileHarness(fetchPlantTelemetry: (id: string, options: { sign
   function load(path: string, overrides: Record<string, unknown> = {}) {
     const exports: Record<string, (props: never) => React.ReactElement<ElementProps>> = {};
     runInNewContext(ts.transpileModule(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-      exports, AbortController,
+      exports, AbortController, setInterval: (callback: () => void, ms: number) => { const timer = setInterval(callback, ms); timer.unref?.(); return timer; }, clearInterval,
       require(name: string) {
         if (name in overrides) return overrides[name];
         if (name === "react") return hooks;
         if (name === "react/jsx-runtime") return requireModule(name);
-        if (name === "react-native") return { Text: "Text", View: "View", Image: "Image", ActivityIndicator: "ActivityIndicator", Pressable: "Pressable", StyleSheet: { create: (value: unknown) => value } };
+        if (name === "react-native") return { AppState: { currentState: "active" }, Text: "Text", View: "View", Image: "Image", ActivityIndicator: "ActivityIndicator", Pressable: "Pressable", StyleSheet: { create: (value: unknown) => value } };
         if (name === "@/components/screen" || name === "./screen") return { Screen: "Screen", Action: "Action", Notice: "Notice", ui: {} };
         if (name === "@/context/app-data") return { useAppData: () => appDataSource?.() ?? ({ ...appData, refresh: async () => { collectionReads++; } }) };
         if (name === "@/context/auth") return { useAuth: () => auth };
         if (name === "@/hooks/use-plant-profile-guidance") return { usePlantProfileGuidance: () => ({ data: { latest: savedGuidance, pending: [] }, loading: false, error: null, refresh: async () => { guidanceRefreshes++; } }) };
-        if (name === "@/services/plant-profile-guidance") return { diagnosisPresentation, hasNewerTelemetry };
+        if (name === "@/services/plant-profile-guidance") return profileGuidanceService;
         if (name === "@/services/scan-errors") return { diagnosisRetryErrorMessage };
         if (name === "./DiagnosticReport") return { DiagnosticReport: "DiagnosticReport" };
         for (const component of ["PlantProfileHeader", "PlantDiagnosisCard", "PlantCareTasksCard"]) {

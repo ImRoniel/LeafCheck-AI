@@ -289,7 +289,7 @@ test("demo seeding cannot reuse a device belonging to another owner or plant", a
   }
 });
 
-test("hardware MAC resolves to UUID and raw ADC is never classified as a percentage", async () => {
+test("hardware readings retain the registered MAC and raw ADC is never classified as a percentage", async () => {
   const hardwareId = randomUUID();
   devices.set(hardwareId, { id: hardwareId, userId: "owner", macAddress: "LC-A50528" });
   const response = await request("/api/telemetry", null, "POST", {
@@ -298,11 +298,11 @@ test("hardware MAC resolves to UUID and raw ADC is never classified as a percent
   });
   assert.equal(response.status, 201);
   const reading = await response.json();
-  assert.equal(reading.deviceId, hardwareId);
+  assert.equal(reading.deviceId, "LC-A50528");
   assert.equal(reading.soilMoisture, null);
   assert.equal(reading.soilMoistureRaw, 2024);
-  assert.equal(reading.lightLevel, 1200);
-  assert.equal(rows.at(-1).deviceId, hardwareId);
+  assert.equal(reading.lightLux, 1200);
+  assert.equal(rows.at(-1).deviceId, "LC-A50528");
   const latest = await (await request(`/api/telemetry/${hardwareId}/latest`)).json();
   assert.deepEqual(latest.soilMoisture, { percentage: null, rawAnalogValue: 2024, status: "unavailable" });
   assert.equal(latest.lightLevel.lux, 1200);
@@ -320,10 +320,10 @@ test("hardware ingestion accepts sensor boundaries and rejects invalid input bef
     const response = await request("/api/telemetry", null, "POST", { ...valid, ...extra });
     assert.equal(response.status, 201);
     const reading = await response.json();
-    assert.equal(reading.deviceId, hardwareId);
+    assert.equal(reading.deviceId, "LC-000001");
     assert.equal(reading.soilMoisture, null);
     assert.equal(reading.soilMoistureRaw, extra.soilMoistureRaw ?? extra.soilMoisture ?? valid.soilMoisture);
-    assert.equal(reading.lightLevel, extra.lightLux ?? valid.lightLux);
+    assert.equal(reading.lightLux, extra.lightLux ?? valid.lightLux);
     assert.ok(Number.isFinite(Date.parse(reading.timestamp)));
   }
   const count = writes;

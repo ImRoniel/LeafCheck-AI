@@ -1,4 +1,19 @@
-import type { CareTask } from "../types";
+import type { CareTask, DiagnosisTelemetrySnapshot } from "../types";
+
+export function telemetryIsFresh(timestamp: unknown, now = Date.now()): boolean {
+  const reading = timestampMillis(timestamp);
+  const age = reading === null ? NaN : now - reading;
+  return Number.isFinite(age) && age >= -60_000 && age <= 30 * 60_000;
+}
+
+export function diagnosisBadgeLabel(snapshot: DiagnosisTelemetrySnapshot | null | undefined, diagnosedAt: unknown): string {
+  if (!snapshot) return "Image-Only AI";
+  if (snapshot.simulated === true) return "Demo-Assisted AI";
+  const physical = snapshot.simulated === false || /^(?:LC-[0-9a-f]{6}|[0-9a-f]{2}(?::[0-9a-f]{2}){5}|[0-9a-f]{2}(?:-[0-9a-f]{2}){5})$/i.test(snapshot.deviceId);
+  if (!physical) return "Image-Only AI"; // Legacy snapshots with unverified provenance.
+  const at = timestampMillis(snapshot.capturedAt) ?? timestampMillis(diagnosedAt);
+  return at !== null && telemetryIsFresh(snapshot.timestamp, at) ? "Sensor-Enhanced AI" : "Image + Older Sensor Readings";
+}
 
 export function timestampMillis(value: unknown): number | null {
   const millis = value instanceof Date ? value.getTime()

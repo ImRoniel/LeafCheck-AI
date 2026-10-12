@@ -19,6 +19,8 @@ import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { geminiModel } from "../lib/gemini.js";
 import { diagnosisFailure, logDiagnosisError } from "../lib/diagnosis-error.js";
+import { diagnosisTelemetrySnapshot, readingIsFresh } from "../lib/diagnosis-telemetry.js";
+import { demoDeviceId } from "../lib/demo-telemetry.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { ownedDevice, ownedPlant } from "../lib/ownership.js";
 import { fetchPlantSpecs } from "../lib/perenual.js";
@@ -262,9 +264,11 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     } else {
       const ageMs = Date.now() - latestReading.timestamp.getTime();
       const ageMinutes = Math.round(ageMs / 60_000);
-      const isStale = ageMinutes > 30;
+      const isStale = !readingIsFresh(latestReading.timestamp.toISOString());
 
-      if (ageMinutes < 1) {
+      if (isStale && ageMs < 0) {
+        freshnessContext = "Sensor timestamp is in the future and cannot be verified. Do not treat these readings as current conditions.";
+      } else if (!isStale && ageMinutes < 1) {
         freshnessContext =
           "Sensor reading is from less than 1 minute ago (FRESH — highly reliable).";
       } else if (isStale) {
@@ -293,8 +297,14 @@ Ideal Environmental Specs for ${specs.speciesName} (${specs.commonName ?? "unkno
       soilMoisture: isDemo ? latestReading.soilMoisture ?? null : null,
       soilMoistureRaw: isDemo ? latestReading.soilMoistureRaw ?? null
         : latestReading.soilMoistureRaw ?? latestReading.soilMoisture ?? null,
-      lightLevel: isDemo ? latestReading.lightLevel ?? null : latestReading.lightLux ?? null,
+      lightLevel: isDemo ? latestReading.lightLevel ?? null : latestReading.lightLux ?? latestReading.lightLevel ?? null,
       timestamp: latestReading.timestamp.toISOString(),
+    } : null;
+    const telemetrySnapshot = telemetry && queryDeviceId ? {
+      deviceId: queryDeviceId, timestamp: telemetry.timestamp, capturedAt: new Date().toISOString(), simulated: isDemo,
+      temperature: telemetry.temperature, humidity: telemetry.humidity,
+      soilMoisture: telemetry.soilMoisture, soilMoistureRaw: telemetry.soilMoistureRaw,
+      lightLux: telemetry.lightLevel,
     } : null;
     const telemetryBlock = telemetry
       ? `
@@ -320,6 +330,8 @@ Species Identified: ${identification.speciesName} (${identification.commonName ?
 Identification Confidence: ${(identification.confidence * 100).toFixed(1)}%
 ${specsBlock}
 ${telemetryBlock}
+Reference availability and measurement availability are independent. Missing ideal species specs do not mean supplied sensor measurements are missing.
+Fresh physical measurements may inform current conditions. Stale or simulated readings must be described as historical or simulated; do not present them as current measurements.
 
 First classify the image as living_plant, artificial_plant, or non_plant. Visual evidence takes precedence over the suggested species identity.
 For artificial_plant, return exactly "This appears to be an artificial plant. No biological care is needed!" as diagnosticReport, healthStatus "unknown", and notification null. Do not include Care actions or biological recommendations.
@@ -401,8 +413,7 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
         confidence: identification.confidence,
         rawResponse: identification.rawResponse as Prisma.InputJsonValue,
       },
-      telemetrySnapshot: latestReading
-        ? JSON.parse(JSON.stringify(latestReading)) as Prisma.InputJsonValue : undefined,
+      telemetrySnapshot: telemetrySnapshot ?? undefined,
       idealSpecs: specs
         ? JSON.parse(JSON.stringify(specs)) as Prisma.InputJsonValue : undefined,
     }).catch(async (error: unknown) => {
@@ -439,6 +450,7 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
         createdAt: analysis.createdAt.toISOString(),
       },
       telemetry,
+      telemetrySnapshot,
       careTasks: validTasks,
       notification: output ? {
         notifyAt: output.notification!.notifyAt,
@@ -497,7 +509,9 @@ scanRouter.get("/archives", async (req: Request, res: Response) => {
       },
     });
     // Null report text is the durable incomplete-diagnosis marker; no migration required.
-    res.json(archives.map(entry => ({ ...entry, diagnosisError: !entry.rawAnalysisText?.trim() })));
+    res.json(archives.map(entry => ({ ...entry, diagnosisError: !entry.rawAnalysisText?.trim(),
+      telemetrySnapshot: diagnosisTelemetrySnapshot(entry.telemetrySnapshot, demoDeviceId(entry.plantId)),
+    })));
   } catch (error) {
     console.error("[Scan] Archives error:", error);
     res.status(500).json({ error: "Failed to fetch archives." });

@@ -7,13 +7,14 @@ import type { ArchiveEntry, ScanResponse } from "../types";
 import { elements, press, profileHarness, plantId, accountId, testPlant } from "./helpers/plant-telemetry-harness";
 
 const deviceId = "22222222-2222-4222-8222-222222222222";
-const createdAt = "2026-10-12T00:00:00Z", readingAt = "2026-10-12T01:00:00Z";
+const createdAt = new Date(Date.now() - 2 * 60 * 60_000).toISOString(), readingAt = new Date().toISOString();
 const latest: ArchiveEntry = { id: "old", plantId, userId: accountId, healthStatus: "healthy",
   rawAnalysisText: "No device associated with this plant", speciesName: "Fern", notificationTime: null,
   notificationReason: null, createdAt, plant: { id: plantId, name: "Fern", species: "Fern" } };
 const report: ScanResponse = { success: true, plant: latest.plant,
   identification: { speciesName: "Fern", commonName: null, confidence: 1 },
-  diagnostic: { id: "new", healthStatus: "warning", rawAnalysisText: "Light is low. Move to indirect light.", telemetryFreshness: "FRESH", createdAt: "2026-10-12T02:00:00Z" },
+  diagnostic: { id: "new", healthStatus: "warning", rawAnalysisText: "Light is low. Move to indirect light.", telemetryFreshness: "FRESH", createdAt: new Date(Date.now() + 1000).toISOString() },
+  telemetrySnapshot: { deviceId: "LC-A50528", temperature: 32, humidity: 76, soilMoisture: null, soilMoistureRaw: 2625, lightLux: 0.83, timestamp: readingAt, simulated: false },
   telemetry: { temperature: 32, humidity: 76, soilMoisture: null, soilMoistureRaw: 2625, lightLevel: 0.83, timestamp: readingAt },
   careTasks: [], notification: null };
 const setup = () => {
@@ -69,7 +70,7 @@ test("button requires a paired device, saved image, previous diagnosis and newer
   assert.equal(elements(unavailable).find(node => node.props.label === "Re-evaluate with Sensor Data")?.props.disabled, true);
   assert.match(JSON.stringify(unavailable), /No saved photo is available/);
   flow.metadata({ plants: [{ ...testPlant, deviceId, imageUrl: "saved" }] });
-  flow.guidance({ ...latest, createdAt: readingAt });
+  flow.guidance({ ...latest, telemetrySnapshot: report.telemetrySnapshot });
   assert.doesNotMatch(JSON.stringify(flow.render()), /Re-evaluate with Sensor Data/);
   flow.guidance(null);
   assert.doesNotMatch(JSON.stringify(flow.render()), /Re-evaluate with Sensor Data/);
@@ -97,7 +98,7 @@ for (const paired of [false, true]) {
   test(`missing diagnosis retries the saved photo with ${paired ? "sensor enhancement" : "image-only context"}, without needing newer telemetry`, async () => {
     const flow = paired ? setup() : profileHarness(async () => ({ paired: false, device: null, telemetry: null }));
     flow.metadata({ plants: [{ ...testPlant, ...(paired ? { deviceId } : {}), imageUrl: "data:image/jpeg;base64,/9j/2Q==" }] });
-    flow.guidance({ ...latest, rawAnalysisText: null, diagnosisError: true, createdAt: readingAt });
+    flow.guidance({ ...latest, rawAnalysisText: null, diagnosisError: true, createdAt: readingAt, telemetrySnapshot: paired ? report.telemetrySnapshot : null });
     let resolve!: (report: ScanResponse) => void;
     let scans = 0;
     flow.scan(async request => {

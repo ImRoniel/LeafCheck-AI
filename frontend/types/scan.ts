@@ -1,5 +1,17 @@
 import type { HealthStatus } from "./plant";
 
+export interface DiagnosisTelemetrySnapshot {
+  deviceId: string;
+  timestamp: string;
+  capturedAt?: string;
+  temperature: number;
+  humidity: number;
+  soilMoisture: number | null;
+  soilMoistureRaw: number | null;
+  lightLux: number | null;
+  simulated?: boolean;
+}
+
 /** Request body: plantId is now optional for scan-first flow */
 export interface ScanRequest {
   imageBase64?: string;
@@ -29,6 +41,7 @@ export interface ScanResponse {
   diagnosisError?: boolean;
   diagnosisMessage?: string;
   diagnosisCode?: string;
+  telemetrySnapshot?: DiagnosisTelemetrySnapshot | null;
   plant: { id: string; name: string; species: string; deviceId?: string | null } | null;
   identification: {
     speciesName: string;
@@ -67,6 +80,7 @@ export interface ArchiveEntry {
   healthStatus: string;
   rawAnalysisText: string | null;
   diagnosisError?: boolean;
+  telemetrySnapshot?: DiagnosisTelemetrySnapshot | null;
   speciesName: string | null;
   notificationTime: string | null;
   notificationReason: string | null;

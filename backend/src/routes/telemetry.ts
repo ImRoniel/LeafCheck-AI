@@ -12,7 +12,8 @@ import { asyncRoute } from "../lib/http.js";
 import { ownedDevice } from "../lib/ownership.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
-import type { HardwareTelemetryPayload, TelemetryPayload } from "../types/sensor.js";
+import type { HardwareTelemetryPayload } from "../types/sensor.js";
+import { serializeTelemetry } from "../lib/telemetry-payload.js";
 
 export const telemetryRouter = Router();
 // Only reads require user authentication. Firmware POST uses the hardware MAC address.
@@ -39,7 +40,7 @@ function validateTelemetryPayload(body: unknown): string[] {
     return ["Request body must be a JSON object."];
   }
 
-  const fields = ["deviceId", "temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLux"];
+  const fields = ["deviceId", "temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLux", "lightLevel"];
   if (Object.keys(b).some((key) => !fields.includes(key))) {
     errors.push("Unexpected telemetry fields.");
   }
@@ -50,7 +51,7 @@ function validateTelemetryPayload(body: unknown): string[] {
   }
 
   // Required numeric fields
-  const requiredNumbers = ["temperature", "humidity", "soilMoisture", "lightLux"] as const;
+  const requiredNumbers = ["temperature", "humidity", "soilMoisture"] as const;
   for (const field of requiredNumbers) {
     if (typeof b[field] !== "number" || !Number.isFinite(b[field] as number)) {
       errors.push(`${field} must be a finite number.`);
@@ -83,13 +84,19 @@ function validateTelemetryPayload(body: unknown): string[] {
     }
   }
   for (const field of ["soilMoisture", "soilMoistureRaw"] as const) {
+    // Older firmware supplies percentage in soilMoisture; explicit raw ADC takes precedence.
+    if (field === "soilMoisture" && typeof b.soilMoistureRaw === "number") continue;
     if (typeof b[field] === "number" && !Number.isInteger(b[field])) {
       errors.push(`${field} must be an integer.`);
     }
   }
-  if (typeof b.lightLux === "number" && b.lightLux < 0) {
-    errors.push("lightLux must be non-negative.");
+  if (b.lightLux === undefined && b.lightLevel === undefined) errors.push("lightLux or lightLevel is required.");
+  for (const field of ["lightLux", "lightLevel"] as const) {
+    if (b[field] !== undefined && (typeof b[field] !== "number" || !Number.isFinite(b[field]) || (b[field] as number) < 0)) {
+      errors.push(`${field} must be a finite non-negative number.`);
+    }
   }
+  if (b.lightLux !== undefined && b.lightLevel !== undefined && b.lightLux !== b.lightLevel) errors.push("lightLux and lightLevel must agree when both are supplied.");
 
   return errors;
 }
@@ -119,6 +126,7 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     soilMoisture,
     soilMoistureRaw,
     lightLux,
+    lightLevel,
   } = req.body as HardwareTelemetryPayload;
 
   try {
@@ -146,13 +154,13 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     // Step 3: Insert into MongoDB with server-authoritative timestamp
     const reading = await prisma.sensorReading.create({
       data: {
-        deviceId: device.id,
+        deviceId: device.macAddress,
         temperature,
         humidity,
         // Keep calibrated percentage unavailable until calibration exists.
         soilMoisture: null,
         soilMoistureRaw: soilMoistureRaw ?? soilMoisture,
-        lightLevel: lightLux,
+        lightLux: lightLux ?? lightLevel,
         timestamp: new Date(), // Server-authoritative
       },
     });
@@ -173,7 +181,9 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
 telemetryRouter.get(
   "/:deviceId/latest",
   async (req: Request, res: Response) => {
-    const deviceId = req.params.deviceId as string;
+    const device: Awaited<ReturnType<typeof ownedDevice>> = res.locals.device;
+    const isDemo = device.macAddress.startsWith("DEMO:");
+    const deviceId = isDemo ? device.id : device.macAddress;
 
     try {
       const reading = await prisma.sensorReading.findFirst({
@@ -186,40 +196,7 @@ telemetryRouter.get(
         return;
       }
 
-      // Map Prisma SensorReading → TelemetryPayload (frontend contract)
-      const payload: TelemetryPayload = {
-        deviceId: reading.deviceId,
-        timestamp: reading.timestamp.toISOString(),
-        soilMoisture: {
-          percentage: reading.soilMoisture ?? null,
-          rawAnalogValue: reading.soilMoistureRaw ?? null,
-          status:
-            reading.soilMoisture == null
-              ? "unavailable"
-              : reading.soilMoisture > 70
-              ? "overwatered"
-              : reading.soilMoisture < 30
-                ? "dry"
-                : "optimal",
-        },
-        lightLevel: {
-          lux: reading.lightLevel ?? null,
-          status:
-            reading.lightLevel == null
-              ? "unavailable"
-              : reading.lightLevel < 500
-              ? "insufficient"
-              : reading.lightLevel > 50_000
-                ? "excessive"
-                : "optimal",
-        },
-        environment: {
-          temperatureCelsius: reading.temperature,
-          humidityPercentage: reading.humidity,
-        },
-      };
-
-      res.json(payload);
+      res.json(serializeTelemetry(reading, device.id, isDemo));
     } catch (error) {
       console.error("[Telemetry] GET latest error:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -268,7 +245,7 @@ telemetryRouter.get(
           soilMoistureRaw: isDemo
             ? reading.soilMoistureRaw ?? null
             : reading.soilMoistureRaw ?? reading.soilMoisture ?? null,
-          lightLevel: isDemo ? reading.lightLevel ?? null : reading.lightLux ?? null,
+          lightLevel: isDemo ? reading.lightLevel ?? null : reading.lightLux ?? reading.lightLevel ?? null,
         })),
         pagination: {
           total,

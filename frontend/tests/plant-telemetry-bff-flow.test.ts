@@ -13,8 +13,8 @@ for (const paired of [false, true]) {
     flow.metadata({ plants: [{ ...testPlant, deviceId: paired ? device.id : undefined }] });
     const node = flow.render();
     const card = elements(node).find(child => child.type === "PlantDiagnosisCard");
-    assert.equal(card?.props.hasSensor, paired);
-    assert.match(JSON.stringify(card), new RegExp(paired ? "Sensor-Enhanced AI" : "Image-Only AI"));
+    assert.equal(card?.props.hasSensor, false); // Current server pairing has not loaded yet.
+    assert.match(JSON.stringify(card), /Image-Only AI/); // Pairing cannot relabel a saved diagnosis.
     press(node, "Scan Plant");
     assert.deepEqual(JSON.parse(JSON.stringify(flow.navigations)), [{ pathname: "/(tabs)/scanner", params: {
       plantId, ...(paired ? { deviceId: device.id } : {}),

@@ -13,6 +13,7 @@ import { useAuth } from "@/context/auth";
 import type { ArchiveEntry, PlantTelemetry as SensorState } from "@/types";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 export default function PlantProfile() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
@@ -42,16 +43,24 @@ export default function PlantProfile() {
     setReevaluating(false);
     setReevaluationError(null);
     if (!validId || typeof id !== "string" || auth.status !== "authenticated") return () => controller.abort();
-    setLoading(true);
-    Promise.resolve().then(() => fetchPlantTelemetry(id, { signal: controller.signal }))
+    let inFlight = false;
+    const loadReadings = () => {
+      if (inFlight || controller.signal.aborted || AppState.currentState !== "active") return;
+      inFlight = true;
+      setLoading(true);
+      Promise.resolve().then(() => fetchPlantTelemetry(id, { signal: controller.signal }))
       .then((payload) => {
-        if (!controller.signal.aborted) setSensor({ id, generation: auth.generation, payload });
+        if (!controller.signal.aborted) { setSensor({ id, generation: auth.generation, payload }); setFailure(null); }
       })
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) setFailure({ id, generation: auth.generation, message: cause instanceof Error ? cause.message : "Unable to load sensor readings." });
       })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .finally(() => { inFlight = false; if (!controller.signal.aborted) setLoading(false); });
+    };
+    loadReadings();
+    const interval = setInterval(loadReadings, 30_000);
     return () => {
+      clearInterval(interval);
       controller.abort();
       reevaluation.current?.abort();
       reevaluation.current = null;
@@ -85,6 +94,7 @@ export default function PlantProfile() {
       setUpdatedDiagnosis({ id: plant.id, generation: auth.generation, latest: {
         id: report.diagnostic.id, plantId: plant.id, userId: null,
         healthStatus: report.diagnostic.healthStatus, rawAnalysisText: report.diagnostic.rawAnalysisText, diagnosisError: false,
+        telemetrySnapshot: report.telemetrySnapshot ?? null,
         speciesName: report.identification.speciesName,
         notificationTime: report.notification?.notifyAt ?? null, notificationReason: report.notification?.reason ?? null,
         createdAt: report.diagnostic.createdAt ?? new Date().toISOString(),
@@ -114,10 +124,10 @@ export default function PlantProfile() {
         {editing === plant.id && <EditPlantForm key={`edit:${plant.id}`} plant={plant} onCancel={() => setEditing(null)} onSaved={() => setEditing(null)} />}
         {deleting === plant.id && <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} initiallyConfirming onCancel={() => setDeleting(null)} />}
         <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} authenticated={auth.status === "authenticated"} />
-        <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={latest} loading={guidance.loading} error={Boolean(guidance.error)} hasSensor={Boolean(plant.deviceId) || Boolean(payload?.paired)} canReuseImage={Boolean(plant.imageUrl)} telemetryTimestamp={payload?.paired ? payload.telemetry?.timestamp : undefined} reevaluating={reevaluating} reevaluationError={reevaluationError} onReevaluate={() => { void reevaluate(); }} onRetry={() => { void reevaluate(); }}
+        <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={latest} loading={guidance.loading} error={Boolean(guidance.error)} hasSensor={Boolean(payload?.paired)} canReuseImage={Boolean(plant.imageUrl)} telemetryTimestamp={payload?.paired ? payload.telemetry?.timestamp : undefined} reevaluating={reevaluating} reevaluationError={reevaluationError} onReevaluate={() => { void reevaluate(); }} onRetry={() => { void reevaluate(); }} onReload={retryGuidance}
           onScan={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id, ...(plant.deviceId ? { deviceId: plant.deviceId } : {}) } })}
           onHistory={() => router.push({ pathname: "/archives", params: { plantId: plant.id } })} />
-        <PlantCareTasksCard key={`tasks:${plant.id}`} tasks={guidance.data?.pending ?? []} loading={guidance.loading} error={Boolean(guidance.error)} onViewAll={() => router.push("/(tabs)/tasks")} />
+        <PlantCareTasksCard key={`tasks:${plant.id}`} tasks={guidance.data.pending} loading={guidance.tasksLoading} error={Boolean(guidance.tasksError)} onViewAll={() => router.push("/(tabs)/tasks")} />
       </>}
     </Screen>
   );

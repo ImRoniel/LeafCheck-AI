@@ -8,7 +8,10 @@ test("sensor-enhanced scan results parse and display raw ADC and lux", async () 
   const h = scannerHarness();
   const telemetry = { temperature: 32.19, humidity: 76.34, soilMoisture: null,
     soilMoistureRaw: 2625, lightLevel: 0.83, timestamp: "2026-10-12T00:00:00Z" };
-  h.behavior.scan = async () => parseScan({ ...report, telemetry });
+  const telemetrySnapshot = { deviceId: "LC-A50528", timestamp: telemetry.timestamp,
+    capturedAt: telemetry.timestamp, simulated: false, temperature: telemetry.temperature,
+    humidity: telemetry.humidity, soilMoisture: null, soilMoistureRaw: 2625, lightLux: 0.83 };
+  h.behavior.scan = async () => parseScan({ ...report, telemetry, telemetrySnapshot });
   h.ready(); h.press("Capture and scan plant"); await h.settle();
   assert.match(h.text, /Sensor-Enhanced AI/);
   assert.match(h.text, /2625 ADC/);

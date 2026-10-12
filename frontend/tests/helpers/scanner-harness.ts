@@ -6,6 +6,7 @@ import ts from "typescript";
 import { createScanFlow } from "../../services/scan-flow";
 import * as errors from "../../services/errors";
 import * as scanErrors from "../../services/scan-errors";
+import * as profileGuidance from "../../services/plant-profile-guidance";
 import type { Plant, ScanRequest, ScanResponse } from "../../types";
 import type { CapturedImageMetadata, PreScanResult } from "../../types/pre-scan-validation";
 
@@ -166,6 +167,7 @@ export function scannerHarness() {
         if (name.endsWith("services/scan-flow")) return { createScanFlow: () => flow };
         if (name.endsWith("services/errors")) return errors;
         if (name.endsWith("services/scan-errors")) return scanErrors;
+        if (name.endsWith("services/plant-profile-guidance")) return profileGuidance;
         if (name.endsWith("services/pre-scan-validation")) return { validatePreScan: (image: CapturedImageMetadata, signal?: AbortSignal) => {
           validations++;
           if (signal) validationSignals.push(signal);

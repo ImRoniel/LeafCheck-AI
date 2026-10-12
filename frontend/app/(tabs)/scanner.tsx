@@ -15,6 +15,7 @@ import { measurement } from "@/components/telemetry-history";
 import { useAppData } from "@/context/app-data";
 import { useAuth } from "@/context/auth";
 import { scanSpaceLocation } from "@/services/spaces";
+import { diagnosisBadgeLabel } from "@/services/plant-profile-guidance";
 import { useScan } from "@/hooks/use-scan";
 import { validatePreScan } from "@/services/pre-scan-validation";
 import {
@@ -391,7 +392,7 @@ export default function Camera() {
           <View style={s.divider} />
 
           <Text style={s.reportSectionTitle}>Diagnostic Report</Text>
-          {report.plant && <Text style={s.reportMeta}>{report.telemetry ? "Sensor-Enhanced AI" : "Image-Only AI"}</Text>}
+          {report.plant && <Text style={s.reportMeta}>{diagnosisBadgeLabel(report.telemetrySnapshot, report.diagnostic.createdAt)}</Text>}
           {report.diagnosisError ? <>
             <Notice>Scan saved. AI diagnosis failed. Retry to generate the diagnosis.</Notice>
             <Pressable accessibilityRole="button" accessibilityLabel="Open plant to retry AI diagnosis" style={s.secondaryButton}

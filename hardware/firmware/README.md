@@ -50,9 +50,14 @@ After BH1750 initialization/reinitialization, its maximum conversion-time readin
 check must pass before a reading is used. Recovery may skip an extra cycle.
 Legitimate zero lux, zero degrees C, and zero percent soil moisture remain valid.
 
-Existing payload fields, rounding, HTTP response handling, and WiFi reconnection
-behavior are unchanged. Timestamps remain server-assigned. Skipped cycles appear
-as gaps in telemetry rather than false zeros.
+The upload sends `lightLux` in lux and both `soilMoisture` and `soilMoistureRaw`
+as integer raw ADC values. The calibrated percentage is used for local validation,
+not uploaded as a physical moisture percentage. The backend also accepts legacy
+`lightLevel` uploads and uses an explicit `soilMoistureRaw` when older firmware
+sends a percentage alongside it. Physical readings are stored under the registered
+device's MAC address (for example, `LC-A50528`), rather than its relational UUID.
+Timestamps remain server-assigned. Skipped cycles appear as gaps in telemetry
+rather than false zeros. HTTP response handling and WiFi reconnection are unchanged.
 
 ## Build and manual verification
 

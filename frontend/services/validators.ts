@@ -247,11 +247,18 @@ export const parseAnalysis = parse<AIDiagnosisResponse>(
     error: optional(text),
   }),
 );
+const diagnosisSnapshotCheck = object({
+  deviceId: nonempty, timestamp: date, temperature: range(-40, 125), humidity: range(0, 100),
+  capturedAt: optional(date),
+  soilMoisture: nullable(range(0, 100)), soilMoistureRaw: nullable(integer(0, 4095)), lightLux: nullable(range(0)),
+  simulated: optional(boolean),
+});
 const scanCheck = object({
   success: enumeration(true),
   subjectKind: optional(enumeration("living_plant", "artificial_plant", "non_plant")),
   photoSaveFailed: optional(boolean),
   diagnosisError: optional(boolean), diagnosisMessage: optional(text), diagnosisCode: optional(text),
+  telemetrySnapshot: optional(nullable(diagnosisSnapshotCheck)),
   plant: nullable(object({ id: nonempty, name: text, species: text, deviceId: optional(nullable(uuid)) })),
   identification: nullable(object({ speciesName: nonempty, commonName: nullable(text), confidence: range(0, 1) })),
   diagnostic: object({ id: nonempty, healthStatus: health, rawAnalysisText: nullable(text), telemetryFreshness: text, createdAt: optional(date) }),
@@ -287,6 +294,7 @@ export const parseArchives = parse<ArchiveEntry[]>(
       healthStatus: text,
       rawAnalysisText: nullable(text),
       diagnosisError: optional(boolean),
+      telemetrySnapshot: optional(nullable(diagnosisSnapshotCheck)),
       speciesName: nullable(text),
       notificationTime: nullable(text),
       notificationReason: nullable(text),

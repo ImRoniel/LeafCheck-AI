@@ -13,6 +13,7 @@ export type {
 export type { AIDiagnosisRequest, AIDiagnosisResponse } from "./ai";
 export type {
   ArchiveEntry,
+  DiagnosisTelemetrySnapshot,
   CareTask,
   CareTaskOutput,
   NotificationOutput,
