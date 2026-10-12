@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { rootRoute, loadComponent, available } from './startup-test-helpers';
 test('completed installations exclude introductory routes for authenticated sessions', () => {
-  assert.deepEqual(available(rootRoute({ status: 'authenticated' }).route), ['setup', '(tabs)', 'profile', 'device-connection', 'plant-profile', 'settings', 'archives', 'modal']);
+  assert.deepEqual(available(rootRoute({ status: 'authenticated' }).route).sort(), ['setup', '(tabs)', 'profile', 'device-connection', 'plant-profile', 'settings', 'archives', 'modal'].sort());
 });
 test('anonymous, pending setup, completed and skipped setup retain route guards', () => {
   assert.ok(available(rootRoute({ status: 'anonymous' }).route).includes('(auth)'));

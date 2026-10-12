@@ -1,8 +1,39 @@
-import { CollectionState } from '@/components/plant-list';
-import { Action, Notice, Screen, ui } from '@/components/screen';
-import { useAppData } from '@/context/app-data';
-import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
-function Mapping({ id, name, device }: { id: string; name: string; device: string }) { const { saveDevice } = useAppData(); const [value, setValue] = useState(device); const [message, setMessage] = useState(''); const [saving, setSaving] = useState(false); return <View style={ui.card}><Text style={ui.heading}>{name}</Text><Text style={ui.text}>Plant ID: {id}</Text><TextInput style={ui.input} accessibilityLabel={`Device ID for ${name}`} autoCapitalize="none" autoCorrect={false} maxLength={200} value={value} onChangeText={setValue} placeholder="Device ID (optional)" /><Action label={saving ? 'Saving…' : 'Save local mapping'} disabled={saving} onPress={() => { setSaving(true); setMessage(''); void saveDevice(id, value).then(() => setMessage(value.trim() ? 'Saved on this device only. Mapping is unverified.' : 'Mapping removed. Scans will be image-only.')).catch(e => setMessage(e.message)).finally(() => setSaving(false)); }} />{message && <Notice>{message}</Notice>}</View>; }
-export default function Settings() { const data = useAppData(); const { plantId } = useLocalSearchParams<{ plantId?: string }>(); return <Screen title="Device settings" back refresh={() => void data.refresh()} loading={data.loading}><Notice>Mappings are stored only on this device. They are not discovered, paired, or verified by the server. Clear a device ID to use image-only scans.</Notice>{data.storageError && <Notice>{data.storageError}</Notice>}<CollectionState />{data.plants.filter(p => !plantId || p.id === plantId).map(p => <Mapping key={`${p.id}:${data.devices[p.id] ?? ''}`} id={p.id} name={p.name} device={data.devices[p.id] ?? ''} />)}<Action label="Account / notification settings — unavailable" disabled /></Screen>; }
+import { DashboardSensorStatusSheet } from "@/components/DashboardSensorStatusSheet";
+import { Screen } from "@/components/screen";
+import { SettingsSection } from "@/components/SettingsSection";
+import { SettingsRow } from "@/components/SettingsRow";
+import { useAuth } from "@/context/auth";
+import Constants from "expo-constants";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+
+export default function Settings() {
+  const auth = useAuth();
+  const router = useRouter();
+  const [sensorSheet, setSensorSheet] = useState(false);
+  const authenticated = auth.status === "authenticated";
+  return <>
+    <Screen title="Settings" back backgroundColor="#F4F9F4">
+      {authenticated && <SettingsSection title="SENSORS">
+        <SettingsRow label="Connected sensors" icon="hardware-chip-outline" onPress={() => setSensorSheet(true)} />
+        <SettingsRow label="Pair a new sensor" icon="add-circle-outline" onPress={() => router.push("/device-connection/scanner")} />
+      </SettingsSection>}
+      <SettingsSection title="LEGAL">
+        <SettingsRow label="AI & sensor limitations" icon="document-text-outline" onPress={() => router.push("/terms")} />
+      </SettingsSection>
+      <SettingsSection title="ABOUT">
+        <SettingsRow label="About LeafCheck AI" detail={`Version ${Constants.expoConfig?.version ?? "1.0.0"}`} icon="leaf-outline" />
+      </SettingsSection>
+      {authenticated && <SettingsSection title="Coming soon">
+        <SettingsRow label="Notifications" icon="notifications-outline" muted />
+        <SettingsRow label="Appearance" icon="color-palette-outline" muted />
+        <SettingsRow label="Temperature units" icon="thermometer-outline" muted />
+        <SettingsRow label="Help & Support" icon="help-circle-outline" muted />
+        <SettingsRow label="Privacy policy" icon="shield-checkmark-outline" muted />
+      </SettingsSection>}
+    </Screen>
+    {authenticated && sensorSheet && <DashboardSensorStatusSheet onClose={() => setSensorSheet(false)}
+      onOpenPlant={id => { setSensorSheet(false); router.push({ pathname: "/plant-profile", params: { id } }); }}
+      onManageDevices={() => { setSensorSheet(false); router.push("/device-connection/manage"); }} />}
+  </>;
+}

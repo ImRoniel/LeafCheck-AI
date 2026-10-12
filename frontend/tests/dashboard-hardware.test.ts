@@ -6,6 +6,7 @@ import { runInNewContext } from "node:vm";
 import * as React from "react";
 import ts from "typescript";
 import * as summaryService from "../services/dashboard-summary";
+import * as sensorOverviewService from "../services/sensor-overview";
 import type { Plant } from "../types/plant";
 import type { DashboardSensor } from "../services/dashboard-summary";
 
@@ -33,9 +34,11 @@ function load(path: string, overrides: Record<string, unknown> = {}) {
         if (name === "react/jsx-runtime") return loadModule(name);
         if (name === "react-native") return web;
         if (name === "./animated-pressable") return { AnimatedPressable: web.Pressable };
+        if (name === "@/components/animated-pressable") return { AnimatedPressable: web.Pressable };
         if (name === "@expo/vector-icons") return { Ionicons: () => null };
         if (name === "./task-sheet") return { TaskSheet: web.View };
         if (name === "@/services/dashboard-summary") return summaryService;
+        if (name === "@/services/sensor-overview") return sensorOverviewService;
         if (name.startsWith("./")) return load(`components/${name.slice(2)}.tsx`, overrides);
         throw new Error(`Unexpected import: ${name}`);
       },
@@ -111,6 +114,7 @@ test("plant highlights use real photos, saved status and plant-specific navigati
 test("greeting is personalized and compact with no mock mode messaging", () => {
   const { GreetingHeader } = load("components/greeting-header.tsx", {
     "@/context/profile": { useProfile: () => ({ name: "Roniel Cuaresma" }) }, "./profile-button": { ProfileButton: () => null },
+    "expo-router": { useRouter: () => ({ push: () => {} }) },
   });
   const markup = renderToStaticMarkup(GreetingHeader({ plantCount: 11, ready: true, now: new Date(2026, 9, 12, 8) } as never));
   assert.match(markup, /Good morning/); assert.match(markup, /Roniel/); assert.match(markup, /11 plants/);
@@ -128,20 +132,26 @@ test("plant photo errors fall back without hiding a replacement image", () => {
   assert.equal(nextImage.props.source.uri, "https://images.test/new.jpg");
 });
 
-test("device management presents physical hardware separately from local demo assignments", () => {
+test("device management presents physical and unlinked demo sensors from the account inventory", () => {
+  const device = { id: "sensor", userId: "owner", name: "Window sensor", macAddress: "LC-A50528", status: "ONLINE", createdAt: now.toISOString(), updatedAt: now.toISOString() };
   const { default: ManageDevices } = load("app/device-connection/manage.tsx", {
     "@/components/screen": { Screen: web.View, Notice: web.Text, Action: ({ label }: { label: string }) => React.createElement(web.Text, {}, label), ui: {} },
     "@/context/app-data": { useAppData: () => ({ plants: [plant], guest: false, loaded: true, error: null }) },
-    "@/context/local-state": { useLocalState: () => ({ data: { connectedDevices: [{ id: "mock", name: "Demo sensor", assignedType: "plant", targetName: "Test" }] } }) },
-    "@/hooks/use-dashboard-data": { useDashboardTelemetry: () => ({ sensors: [physical] }) },
+    "@/context/auth": { useAuth: () => ({ status: "authenticated", generation: 1 }) },
+    "@/hooks/use-sensor-overview": { useSensorOverview: () => ({ ready: true, entries: [
+      { device, plants: [{ id: plant.id, name: plant.name }], demo: false, readingError: false, telemetry: { timestamp: new Date().toISOString() } },
+      { device: { ...device, id: "demo", name: "Demo sensor", macAddress: "DEMO:fern" }, plants: [], demo: true, readingError: false, telemetry: null },
+    ] }) },
+    "@/services/api": { api: {} },
     "@/hooks/use-device-activity": { useDeviceActivity: () => true },
     "@/services/dashboard-summary": summaryService,
     "expo-router": { useRouter: () => ({ push: () => {} }) },
     react: { ...React, useEffect: () => {}, useRef: () => ({ current: null }), useState: (value: unknown) => [value, () => {}] },
   });
   const markup = renderToStaticMarkup(ManageDevices({} as never));
-  assert.match(markup, /Linked sensors/); assert.match(markup, /LC-A50528/); assert.match(markup, /Receiving readings/);
-  assert.match(markup, /Local demo assignments/);
+  assert.match(markup, /LC-A50528/); assert.match(markup, /Receiving readings/);
+  assert.match(markup, /Demo sensor/); assert.match(markup, /Not linked to a plant/);
+  assert.doesNotMatch(markup, /Local demo assignments/);
   assert.doesNotMatch(markup, /No physical hardware is connected|Demo assignments for this account only/);
 });
 

@@ -83,9 +83,11 @@ function Routes({ hasToken }: { hasToken: boolean }) {
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Screen name="terms" />
+      <Stack.Protected guard={authenticated || auth.isGuest}>
+        <Stack.Screen name="settings" />
+      </Stack.Protected>
       <Stack.Protected guard={authenticated}>
         <Stack.Screen name="plant-profile" />
-        <Stack.Screen name="settings" />
         <Stack.Screen name="archives" />
         <Stack.Screen name="modal" options={{
           presentation: "modal",
