@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, type PermissionResponse } from "expo-camera";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
 import type { RefObject } from "react";
 import {
   ActivityIndicator,
@@ -20,17 +21,18 @@ type Props = {
   enabled: boolean;
   focused: boolean;
   ready: boolean;
+  flash: "off" | "on";
   busy: boolean;
   photoUri?: string;
   serviceFailure?: boolean;
   error: string;
   status: string;
-  existingPlant: boolean;
   onClose: () => void;
   onPermission: () => void;
   onReady: () => void;
   onMountError: () => void;
   onCapture: () => void;
+  onToggleFlash: () => void;
   onRetake: () => void;
 };
 
@@ -43,15 +45,16 @@ export function ScanViewfinder({
   enabled,
   busy,
   ready,
+  flash,
   error,
   focused,
-  existingPlant,
   status,
   onClose,
   onPermission,
   onReady,
   onMountError,
   onCapture,
+  onToggleFlash,
   onRetake,
 }: Props) {
   return (
@@ -70,43 +73,29 @@ export function ScanViewfinder({
           style={StyleSheet.absoluteFill}
           facing="back"
           mode="picture"
+          flash={flash}
           onCameraReady={onReady}
           onMountError={onMountError}
         />
       ) : null}
 
+      <LinearGradient pointerEvents="none" colors={["rgba(4,14,8,0.6)", "rgba(4,14,8,0.28)", "rgba(4,14,8,0)"]} locations={[0, 0.4, 1]} style={s.topFade} />
+      <LinearGradient pointerEvents="none" colors={["rgba(4,14,8,0)", "rgba(4,14,8,0.28)", "rgba(4,14,8,0.72)"]} locations={[0, 0.5, 1]} style={s.bottomFade} />
+
       {/* Only the controls receive safe-area padding; the live feed never does. */}
       <SafeAreaView style={s.overlay} pointerEvents="box-none">
         <View style={s.header}>
-          <View style={s.titleRow}>
-            <Text accessibilityRole="header" style={s.title}>
-              Scan plant
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close plant scanner"
-              onPress={onClose}
-              style={s.close}
-            >
-              <Ionicons name="close" size={26} color="#FFFFFF" />
-            </Pressable>
-          </View>
-          <Text
-            style={s.subtitle}
-            textBreakStrategy="balanced"
-            android_hyphenationFrequency="none"
-          >
-            {existingPlant
-              ? "Check your plant’s health."
-              : "Get to know your plant."}
+          <Text style={s.instruction} textBreakStrategy="balanced" android_hyphenationFrequency="none">
+            Fill the frame with leaves
           </Text>
-          <Text
-            style={s.subtitle}
-            textBreakStrategy="balanced"
-            android_hyphenationFrequency="none"
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close plant scanner"
+            onPress={onClose}
+            style={s.close}
           >
-            Fill the frame with leaves.
-          </Text>
+            <Ionicons name="close" size={26} color="#FFFFFF" />
+          </Pressable>
         </View>
 
         <View style={s.center} pointerEvents="none">
@@ -185,16 +174,26 @@ export function ScanViewfinder({
                       ? "Tap to scan"
                       : "Getting camera ready…"}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Capture and scan plant"
-                  accessibilityState={{ disabled: !ready || !enabled }}
-                  disabled={!ready || !enabled}
-                  onPress={onCapture}
-                  style={[s.shutter, (!ready || !enabled) && s.disabled]}
-                >
-                  <View style={s.shutterInner} />
-                </Pressable>
+                <View style={s.captureRow}>
+                  <View style={s.sideControl}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={flash === "on" ? "Turn off flash" : "Turn on flash"}
+                      accessibilityState={{ selected: flash === "on", disabled: !ready || !enabled }} disabled={!ready || !enabled}
+                      onPress={onToggleFlash} style={[s.flashButton, (!ready || !enabled) && s.disabled]}>
+                      <Ionicons name={flash === "on" ? "flashlight" : "flashlight-outline"} size={24} color="#FFFFFF" />
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Capture and scan plant"
+                    accessibilityState={{ disabled: !ready || !enabled }}
+                    disabled={!ready || !enabled}
+                    onPress={onCapture}
+                    style={[s.shutter, (!ready || !enabled) && s.disabled]}
+                  >
+                    <View style={s.shutterInner} />
+                  </Pressable>
+                  <View style={s.sideControl} pointerEvents="none" />
+                </View>
               </View>
             ))}
         </ScrollView>
@@ -205,29 +204,29 @@ export function ScanViewfinder({
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#08120C" },
+  topFade: { position: "absolute", top: 0, left: 0, right: 0, height: "28%", minHeight: 160, maxHeight: 240 },
+  bottomFade: { position: "absolute", bottom: 0, left: 0, right: 0, height: "35%", minHeight: 180, maxHeight: 300 },
   overlay: { flex: 1, justifyContent: "space-between" },
   header: {
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 16,
-    backgroundColor: "rgba(4, 14, 8, 0.72)",
-  },
-  titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
   },
-  title: { color: "#FFFFFF", fontSize: 26, fontWeight: "700", flex: 1 },
   close: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(0,0,0,0.4)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
   },
-  subtitle: { color: "#F1F7F2", fontSize: 16, lineHeight: 24, flexShrink: 1 },
+  instruction: { color: "#F1F7F2", fontSize: 15, lineHeight: 22, fontWeight: "500", flex: 1, textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   center: {
     flex: 1,
     minHeight: 0,
@@ -273,7 +272,6 @@ const s = StyleSheet.create({
     flexGrow: 0,
     flexShrink: 1,
     maxHeight: "60%",
-    backgroundColor: "rgba(4, 14, 8, 0.72)",
   },
   controlsContent: {
     padding: 20,
@@ -307,6 +305,9 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
   shutterRow: { alignItems: "center", gap: 12 },
+  captureRow: { flexDirection: "row", alignItems: "center", width: "100%" },
+  sideControl: { flex: 1, alignItems: "center" },
+  flashButton: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)", borderWidth: 1, borderColor: "rgba(255,255,255,0.65)" },
   hint: { color: "#FFFFFF", fontSize: 14, textAlign: "center" },
   shutter: {
     width: 80,

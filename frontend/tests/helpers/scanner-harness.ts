@@ -176,6 +176,7 @@ export function scannerHarness() {
         if (name === "expo-camera") return { CameraView: "CameraView", useCameraPermissions: () => [permission, () => behavior.permission()] };
         if (name === "expo-haptics") return { NotificationFeedbackType: { Success: "success" }, notificationAsync: async () => { haptics++; } };
         if (name === "expo-status-bar") return { StatusBar: "StatusBar" };
+        if (name === "expo-linear-gradient") return { LinearGradient: "LinearGradient" };
         if (name === "@expo/vector-icons") return { Ionicons: "Ionicons" };
         if (name === "react-native-safe-area-context") return { SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
         if (name.endsWith("components/telemetry-history")) return { measurement: (value: unknown, unit: string) => value == null ? "Unavailable" : `${value} ${unit}` };

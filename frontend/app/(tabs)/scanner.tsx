@@ -92,6 +92,7 @@ export default function Camera() {
   const [cameraVersion, setCameraVersion] = useState(0);
   const [closed, setClosed] = useState(false);
   const [ready, setReady] = useState(false);
+  const [flash, setFlash] = useState<"off" | "on">("off");
   const [capturing, setCapturing] = useState(false);
   const [validating, setValidating] = useState(false);
   const validationController = useRef<AbortController | null>(null);
@@ -125,6 +126,7 @@ export default function Camera() {
     invalidateOperations();
     setCameraVersion(cameraGeneration.current);
     setReady(false);
+    setFlash("off");
     setCapturing(false);
     setValidating(false);
   }, [invalidateOperations]);
@@ -305,6 +307,7 @@ export default function Camera() {
         enabled={enabled}
         focused={focused}
         ready={ready}
+        flash={flash}
         busy={busy}
         photoUri={photo?.uri}
         serviceFailure={scanNeedsServiceRecovery(flow.error)}
@@ -318,7 +321,6 @@ export default function Camera() {
                 ? "Saving your plant…"
                 : "Taking your photo…"
         }
-        existingPlant={!!plantId}
         onClose={() => {
           enabledRef.current = false;
           setClosed(true);
@@ -355,6 +357,9 @@ export default function Camera() {
         }}
         onCapture={() => {
           if (currentCamera()) void capture();
+        }}
+        onToggleFlash={() => {
+          if (currentCamera() && readyRef.current && !lock.current) setFlash(value => value === "off" ? "on" : "off");
         }}
         onRetake={resetSession}
       />
