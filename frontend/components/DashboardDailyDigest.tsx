@@ -13,7 +13,7 @@ export function DashboardDailyDigest({ summary, sensors, ready, careReady, scans
   const receiving = sensors.filter(sensor => sensor.status === "receiving");
   const physical = sensors.filter(sensor => !sensor.demo);
   const newest = receiving.map(sensor => sensor.timestamp).filter((value): value is string => value !== null).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
-  const sensorLabel = sensors.length === 1 ? `${sensorStatusLabel(sensors[0].status)}${!sensors[0].demo && sensors[0].address ? ` · ${sensors[0].address}` : ""}`
+  const sensorLabel = !sensors.length ? "Check connected devices and latest readings" : sensors.length === 1 ? `${sensorStatusLabel(sensors[0].status)}${!sensors[0].demo && sensors[0].address ? ` · ${sensors[0].address}` : ""}`
     : receiving.length ? `${receiving.length} of ${physical.length} sensors receiving readings`
     : physical.length ? `${physical.length} sensors · check reading status`
     : `${sensors.length} demo sensors · simulated readings`;
@@ -24,14 +24,14 @@ export function DashboardDailyDigest({ summary, sensors, ready, careReady, scans
       {careReady ? (summary.dueToday > 0 ? row(`${summary.dueToday}${summary.tasksLimited ? "+" : ""} care ${summary.dueToday === 1 && !summary.tasksLimited ? "task" : "tasks"} due today`, "calendar-outline", onTasks)
         : summary.overdue > 0 ? row(`${summary.overdue}${summary.tasksLimited ? "+" : ""} overdue care ${summary.overdue === 1 && !summary.tasksLimited ? "task" : "tasks"}`, "calendar-outline", onTasks)
         : summary.tasksLimited ? row("Review care tasks", "calendar-outline", onTasks)
-        : <Text style={s.note}>{summary.attention.length ? "No scheduled care due today." : "No urgent care due."}</Text>)
+        : <Text style={s.note}>No scheduled care due today.</Text>)
         : row(careError ? "Care tasks unavailable · Retry" : "Checking care tasks…", "calendar-outline", onRetry)}
       {!guest && (scansReady ? row(`${summary.scannedToday}${summary.scansLimited ? "+" : ""} ${summary.scannedToday === 1 && !summary.scansLimited ? "plant" : "plants"} scanned today`, "scan-outline", onScans)
         : row(scansError ? "Scan activity unavailable · Retry" : "Checking scan activity…", "scan-outline", onRetry))}
     </>}
-    {sensors.length > 0 && <Pressable accessibilityRole="button" accessibilityLabel="View sensor readings" onPress={onSensors} style={s.sensor}>
+    {!guest && <Pressable accessibilityRole="button" accessibilityLabel="View sensor status" onPress={onSensors} style={s.sensor}>
       <Ionicons name="radio-outline" size={18} color={receiving.length ? "#278448" : "#1A4D2E"} />
-      <View style={s.sensorBody}><Text style={s.sensorText}>{sensorLabel}</Text>
+      <View style={s.sensorBody}><Text style={s.sensorText}>View Sensor Status</Text><Text style={[s.timestamp, sensors.some(sensor => sensor.status === "error") && s.sensorError]}>{sensorLabel}</Text>
         {(newest || (sensors.length === 1 && sensors[0].timestamp)) && <Text style={s.timestamp}>{readingTimeLabel(newest ?? sensors[0].timestamp, now)}</Text>}
         {physical.length > 0 && sensors.some(sensor => sensor.demo) && <Text style={s.timestamp}>Demo readings listed separately</Text>}
       </View><Ionicons name="chevron-forward" size={16} color="#278448" />
@@ -44,5 +44,6 @@ const s = StyleSheet.create({
   row: { flexDirection: "row", minHeight: 48, alignItems: "center", gap: 10, paddingVertical: 8 }, rowText: { flex: 1, color: "#1A4D2E", fontSize: 14, lineHeight: 21, fontWeight: "600" },
   rowIcon: { backgroundColor: "#E7F4E9", borderRadius: 12, padding: 5 }, warningIcon: { backgroundColor: "#FFF0D9", borderWidth: 1, borderColor: "#F2BD75" },
   note: { color: "#278448", fontSize: 14, lineHeight: 21, paddingVertical: 10 }, sensor: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: 1, borderTopColor: "#DCECDD", paddingTop: 12, marginTop: 8, paddingBottom: 4 },
+  sensorError: { color: "#A14E16" },
   sensorBody: { flex: 1, gap: 3 }, sensorText: { fontSize: 13, lineHeight: 19, color: "#1A4D2E" }, timestamp: { fontSize: 12, lineHeight: 18, color: "#506557" },
 });

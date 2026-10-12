@@ -76,7 +76,7 @@ test("digest presents physical address, freshness and compact activity without d
   assert.match(markup, /Daily Digest/); assert.match(markup, /Receiving readings/);
   assert.match(markup, /LC-A50528/); assert.match(markup, /Updated 2 min ago/);
   assert.doesNotMatch(markup, /Demo|Mode: Auto|No sensors detected|needs water|Coming soon/);
-  assert.ok(press(node, "View sensor readings")); assert.equal(opened, 1);
+  assert.ok(press(node, "View sensor status")); assert.equal(opened, 1);
 });
 test("demo and stale labels never promise live physical data", () => {
   const { DashboardDailyDigest } = load("components/DashboardDailyDigest.tsx");
@@ -108,14 +108,6 @@ test("plant highlights use real photos, saved status and plant-specific navigati
   assert.match(renderToStaticMarkup(node), /Your garden/);
   assert.ok(press(node, "View all plants")); assert.equal(viewed, 1);
 });
-test("sensor sheet keeps physical and demo identities separate and exposes exact timestamps", () => {
-  const { DashboardSensorStatusSheet } = load("components/DashboardSensorStatusSheet.tsx");
-  let id = "";
-  const node = DashboardSensorStatusSheet({ sensors: [physical, { ...physical, plant: { ...plant, id: "demo", name: "Demo plant" }, demo: true, address: "DEMO:demo", status: "demo" }], onClose: () => {}, onOpenPlant: (value: string) => { id = value; }, onRetry: () => {} } as never);
-  const markup = renderToStaticMarkup(node);
-  assert.match(markup, /LC-A50528/); assert.match(markup, /Demo readings/); assert.match(markup, /Last reading/);
-  assert.ok(press(node, "Open Fern growing conditions")); assert.equal(id, plant.id);
-});
 test("greeting is personalized and compact with no mock mode messaging", () => {
   const { GreetingHeader } = load("components/greeting-header.tsx", {
     "@/context/profile": { useProfile: () => ({ name: "Roniel Cuaresma" }) }, "./profile-button": { ProfileButton: () => null },
@@ -124,34 +116,6 @@ test("greeting is personalized and compact with no mock mode messaging", () => {
   assert.match(markup, /Good morning/); assert.match(markup, /Roniel/); assert.match(markup, /11 plants/);
   assert.doesNotMatch(markup, /Mock|Mode:|Hello|Private collection/);
 });
-test("home composes digest and highlights, drops setup banners, and navigates from the actual linked sensor", () => {
-  const routes: unknown[] = [];
-  const { default: Home } = load("app/(tabs)/index.tsx", {
-    "@/components/DashboardDailyDigest": { DashboardDailyDigest: (props: typeof digestProps) => React.createElement(web.Pressable, { onPress: props.onSensors, accessibilityLabel: "View sensor readings" }, React.createElement(web.Text, {}, "Daily Digest")) },
-    "@/components/DashboardPlantHighlights": { DashboardPlantHighlights: () => React.createElement(web.Text, {}, "Your garden") },
-    "@/components/DashboardSensorStatusSheet": { DashboardSensorStatusSheet: () => null },
-    "@/components/greeting-header": { GreetingHeader: () => null },
-    "@/components/screen": { Screen: web.View, Action: () => null },
-    "@/hooks/use-dashboard-data": { useDashboardData: () => ({ data: { plants: [plant], guest: false, loaded: true }, summary, sensors: [physical], now, ready: true, careReady: true, scansReady: true, refreshing: false, refresh: async () => {} }) },
-    "expo-router": { useRouter: () => ({ push: (route: unknown) => routes.push(route) }) },
-    react: { ...React, useState: (initial: unknown) => [initial, () => {}] },
-  });
-  const node = Home({} as never);
-  const markup = renderToStaticMarkup(node);
-  assert.match(markup, /Daily Digest/); assert.match(markup, /Your garden/);
-  assert.doesNotMatch(markup, /Scan Plant|Pair Sensor|Coming soon|Alerts|Demo assignments/);
-  // The component element callback is inspected directly; native rendering is tested above.
-  function find(node: React.ReactNode): React.ReactElement<{ onSensors?: () => void; children?: React.ReactNode }> | undefined {
-    for (const child of React.Children.toArray(node)) {
-      if (!React.isValidElement<{ onSensors?: () => void; children?: React.ReactNode }>(child)) continue;
-      if (child.props.onSensors) return child;
-      const nested = find(child.props.children); if (nested) return nested;
-    }
-  }
-  find(node)!.props.onSensors!();
-  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/plant-profile", params: { id: plant.id } }]);
-});
-
 test("plant photo errors fall back without hiding a replacement image", () => {
   let failedUri: string | undefined;
   const { DashboardPlantCard } = load("components/DashboardPlantCard.tsx", { react: { ...React, useState: () => [failedUri, (value: string) => { failedUri = value; }] } });
@@ -188,7 +152,7 @@ test("dashboard attention, View all and empty-garden actions activate the canoni
   const digest = load("components/DashboardDailyDigest.tsx");
   const highlights = load("components/DashboardPlantHighlights.tsx");
   for (const guest of [false, true]) {
-    const navigated: string[] = [];
+    const navigated: unknown[] = [];
     const pushed: unknown[] = [];
     const plants = Array.from({ length: 5 }, (_, index) => ({ ...plant, id: `p${index}`, healthStatus: "warning" as const }));
     const collection = { plants, guest, loaded: true };
@@ -200,7 +164,7 @@ test("dashboard attention, View all and empty-garden actions activate the canoni
       "@/components/greeting-header": { GreetingHeader: () => null },
       "@/components/screen": { Screen: "Screen", Action: "Action" },
       "@/hooks/use-dashboard-data": { useDashboardData: () => ({ data: collection, summary: attentionSummary, sensors: [], now, ready: true, careReady: true, scansReady: !guest, refreshing: false, refresh: async () => {} }) },
-      "expo-router": { useRouter: () => ({ navigate: (route: string) => navigated.push(route), push: (route: unknown) => pushed.push(route) }) },
+      "expo-router": { useRouter: () => ({ navigate: (route: unknown) => navigated.push(route), push: (route: unknown) => pushed.push(route) }) },
       react: { ...React, useState: (initial: unknown) => [initial, () => {}] },
     });
     const home = Home({} as never);
@@ -211,7 +175,7 @@ test("dashboard attention, View all and empty-garden actions activate the canoni
     collection.plants = [];
     const add = nodes(Home({} as never)).find(node => node.props.label === "Add your first plant")!;
     assert.ok(add); add.props.onPress!();
-    assert.deepEqual(navigated, ["/(tabs)/spaces", "/(tabs)/spaces", "/(tabs)/spaces"]);
+    assert.deepEqual(JSON.parse(JSON.stringify(navigated)), [{ pathname: "/(tabs)/spaces", params: { filter: "needs-attention" } }, { pathname: "/(tabs)/spaces", params: { filter: "" } }, { pathname: "/(tabs)/spaces", params: { filter: "" } }]);
     assert.equal(pushed.length, 0, "collection actions must activate the existing tab without pushing the legacy route");
   }
 });

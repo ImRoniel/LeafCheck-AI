@@ -62,8 +62,10 @@ export function BottomNav({ state, navigation }: BottomTabBarProps) {
             target: route.key,
             canPreventDefault: true,
           });
-          if (active?.key !== route.key && !event.defaultPrevented)
-            navigation.navigate(route.name);
+          if (!event.defaultPrevented) {
+            if (item.name === "spaces") navigation.navigate(route.name, { filter: "" });
+            else if (active?.key !== route.key) navigation.navigate(route.name);
+          }
         }}
         onLongPress={() => {
           if (route)

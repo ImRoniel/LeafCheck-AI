@@ -8,7 +8,7 @@ import { pairPlantDevice } from "../lib/plant-pairing.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import { Plant } from "../types/plant.js";
-import type { TelemetryPayload } from "../types/sensor.js";
+import { serializeTelemetry } from "../lib/telemetry-payload.js";
 
 export const plantsRouter = Router();
 plantsRouter.use(requireAuth);
@@ -180,29 +180,7 @@ plantsRouter.get(
       where: { deviceId: queryDeviceId },
       orderBy: { timestamp: "desc" },
     });
-    let telemetry: TelemetryPayload | null = null;
-    if (reading) {
-      const lux = isDemo ? reading.lightLevel ?? null : reading.lightLux ?? null;
-      telemetry = {
-        // Keep the app response tied to the authorized relational device.
-        deviceId: device.id,
-        timestamp: reading.timestamp.toISOString(),
-        soilMoisture: {
-          percentage: isDemo ? reading.soilMoisture ?? null : null,
-          rawAnalogValue: isDemo ? reading.soilMoistureRaw ?? null : reading.soilMoistureRaw ?? reading.soilMoisture ?? null,
-          status: !isDemo || reading.soilMoisture == null ? "unavailable" : reading.soilMoisture > plant.maxMoisture ? "overwatered"
-            : reading.soilMoisture < plant.minMoisture ? "dry" : "optimal",
-        },
-        lightLevel: {
-          lux,
-          status: lux == null ? "unavailable" : lux < 500 ? "insufficient" : lux > 50_000 ? "excessive" : "optimal",
-        },
-        environment: {
-          temperatureCelsius: reading.temperature,
-          humidityPercentage: reading.humidity,
-        },
-      };
-    }
+    const telemetry = reading ? serializeTelemetry(reading, device.id, isDemo, plant.minMoisture, plant.maxMoisture) : null;
     res.json({ paired: true, device: serializeDevice(device), telemetry });
   }),
 );

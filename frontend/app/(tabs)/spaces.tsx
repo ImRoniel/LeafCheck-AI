@@ -1,3 +1,4 @@
+import { NeedsAttentionPlantList } from "@/components/NeedsAttentionPlantList";
 import { SpaceManagement } from "@/components/space-management";
 import { SpaceMenuButton, type SpaceMenuAnchor } from "@/components/space-menu-button";
 import { ProfileButton } from "@/components/profile-button";
@@ -6,13 +7,14 @@ import { useAppData } from "@/context/app-data";
 import { useSpaces } from "@/context/spaces";
 import { useLocalState } from "@/context/local-state";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScrollView, RefreshControl, KeyboardAvoidingView, Platform, Modal, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRef, useState } from "react";
 
 export default function SpacesScreen() {
   const router = useRouter();
+  const { filter } = useLocalSearchParams<{ filter?: string }>();
   const insets = useSafeAreaInsets();
   const { spaces, plantsBySpace, addSpace, ready, error: storageError, retry, archivedSpaces, restoreSpace } = useSpaces();
   const appData = useAppData();
@@ -37,6 +39,11 @@ export default function SpacesScreen() {
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to create space."); }
     finally { pending.current = false; setBusy(false); }
   };
+
+  if (filter === "needs-attention") return <NeedsAttentionPlantList plants={appData.plants} ready={appData.loaded} loading={appData.loading} error={appData.error}
+    onRefresh={() => void appData.refresh()} onClear={() => router.setParams({ filter: "" })}
+    onOpen={plant => router.push(appData.guest ? { pathname: "/(tabs)/space-detail", params: { space: plant.location?.trim() || "Unassigned" } }
+      : { pathname: "/plant-profile", params: { id: plant.id } })} />;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 14, paddingBottom: 0 }]}>

@@ -13,3 +13,12 @@ export interface Device {
 export type PlantTelemetry =
   | { paired: false; device: null; telemetry: null }
   | { paired: true; device: Device; telemetry: TelemetryPayload | null };
+
+/** Owner-scoped account inventory, with each device's latest received sample. */
+export interface SensorOverviewEntry {
+  device: Device;
+  plants: { id: string; name: string }[];
+  demo: boolean;
+  readingError: boolean;
+  telemetry: TelemetryPayload | null;
+}

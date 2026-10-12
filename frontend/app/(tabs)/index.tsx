@@ -26,15 +26,15 @@ export default function Home() {
       {dashboard.error && <View style={s.error}><Text accessibilityLiveRegion="polite" style={s.note}>{dashboard.error}{data.loaded ? " Showing saved plants." : ""}</Text><Action label="Retry dashboard" variant="secondary" onPress={refresh} /></View>}
       <DashboardDailyDigest summary={summary} sensors={sensors} now={now} ready={dashboard.ready} careReady={dashboard.careReady}
         scansReady={dashboard.scansReady} guest={data.guest} careError={dashboard.careError} scansError={dashboard.scansError}
-        onAttention={() => router.navigate("/(tabs)/spaces")}
+        onAttention={() => router.navigate({ pathname: "/(tabs)/spaces", params: { filter: "needs-attention" } })}
         onTasks={() => router.push({ pathname: "/(tabs)/tasks", params: { period: summary.dueToday ? "Today" : "All dates" } })}
         onScans={() => router.push("/archives")}
-        onSensors={() => sensors.length === 1 ? openPlant(sensors[0].plant.id) : setSensorSheet(true)} onRetry={refresh} />
+        onSensors={() => setSensorSheet(true)} onRetry={refresh} />
       {data.loaded && (data.plants.length > 0 ? <DashboardPlantHighlights items={summary.highlights} onOpenPlant={openPlant}
-        onViewAll={() => router.navigate("/(tabs)/spaces")} />
-        : !data.error && <View style={s.empty}><Text accessibilityRole="header" style={s.emptyTitle}>Your garden starts here</Text><Text style={s.note}>Add a plant and make room for a little green.</Text><Action label="Add your first plant" onPress={() => router.navigate("/(tabs)/spaces")} /></View>)}
+        onViewAll={() => router.navigate({ pathname: "/(tabs)/spaces", params: { filter: "" } })} />
+        : !data.error && <View style={s.empty}><Text accessibilityRole="header" style={s.emptyTitle}>Your garden starts here</Text><Text style={s.note}>Add a plant and make room for a little green.</Text><Action label="Add your first plant" onPress={() => router.navigate({ pathname: "/(tabs)/spaces", params: { filter: "" } })} /></View>)}
     </Screen>
-    {sensorSheet && <DashboardSensorStatusSheet sensors={sensors} onClose={() => setSensorSheet(false)} onOpenPlant={openPlant} onRetry={refresh} />}
+    {sensorSheet && <DashboardSensorStatusSheet onClose={() => setSensorSheet(false)} onOpenPlant={openPlant} />}
   </View>;
 }
 const s = StyleSheet.create({

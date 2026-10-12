@@ -188,7 +188,7 @@ test("each navigation item opens its own route with reference Home/Spaces icons 
       assert.equal(tabIcon(tab).props.size, 24);
       assert.equal(tabIcon(tab).props.color, tab.props.accessibilityState?.selected ? "#1B6B36" : "#506557");
       tab.props.onPress!();
-      assert.equal(navigated.includes(routes[index]), active !== routes[index]);
+      assert.equal(navigated.includes(routes[index]), active !== routes[index] || routes[index] === "spaces");
     });
   }
 });

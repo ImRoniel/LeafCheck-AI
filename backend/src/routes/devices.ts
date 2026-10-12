@@ -4,10 +4,40 @@ import { serializeDevice } from "../lib/device.js";
 import type { Device } from "../generated/postgres-client/index.js";
 import { requireAuth } from "../lib/auth.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
+import { prisma } from "../lib/prisma.js";
+import { serializeTelemetry } from "../lib/telemetry-payload.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 
 export const devicesRouter = Router();
 devicesRouter.use(requireAuth);
+
+/** All owned devices, including unlinked devices; telemetry errors stay local to a row. */
+devicesRouter.get("/overview", asyncRoute(async (_req, res) => {
+  const userId: string = res.locals.auth.user.id;
+  const devices = await prismaPg.device.findMany({
+    where: { userId }, orderBy: [{ name: "asc" }, { id: "asc" }],
+    include: { plants: { where: { userId }, select: { id: true, name: true, minMoisture: true, maxMoisture: true } } },
+  });
+  const entries: { device: ReturnType<typeof serializeDevice>; plants: { id: string; name: string }[];
+    demo: boolean; readingError: boolean; telemetry: ReturnType<typeof serializeTelemetry> | null }[] = [];
+  for (let offset = 0; offset < devices.length; offset += 4) {
+    const batch = await Promise.all(devices.slice(offset, offset + 4).map(async device => {
+      const demo = device.macAddress.startsWith("DEMO:");
+      const plants = device.plants.map(plant => ({ id: plant.id, name: plant.name }));
+      try {
+        const reading = await prisma.sensorReading.findFirst({
+          where: { deviceId: demo ? device.id : device.macAddress }, orderBy: { timestamp: "desc" },
+        });
+        return { device: serializeDevice(device), plants, demo, readingError: false,
+          telemetry: reading ? serializeTelemetry(reading, device.id, demo, device.plants[0]?.minMoisture, device.plants[0]?.maxMoisture) : null };
+      } catch {
+        return { device: serializeDevice(device), plants, demo, readingError: true, telemetry: null };
+      }
+    }));
+    entries.push(...batch);
+  }
+  res.json(entries);
+}));
 
 devicesRouter.post("/claim", asyncRoute(async (req, res) => {
   const body = bodyObject(req.body, ["macAddress", "name"]);

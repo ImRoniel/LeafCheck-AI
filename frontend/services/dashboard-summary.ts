@@ -1,3 +1,4 @@
+import { isPlantNeedingAttention } from "./plant-attention";
 import type { Plant } from "../types/plant";
 import type { PlantTelemetry } from "../types/device";
 import type { GardenCareTask } from "../types/care-task";
@@ -71,6 +72,6 @@ export function summarizeDashboard(plants: readonly Plant[], pending: readonly G
   }).sort((a, b) => b.rank - a.rank || a.plant.name.localeCompare(b.plant.name) || a.plant.id.localeCompare(b.plant.id));
   const today = archives.filter(entry => owned.has(entry.plantId) && Date.parse(entry.createdAt) >= start.getTime() && Date.parse(entry.createdAt) < end.getTime());
   const scansLimited = archives.length >= 50 && !archives.some(entry => Date.parse(entry.createdAt) < start.getTime());
-  return { attention: ranked.filter(item => item.attention), highlights: ranked.slice(0, 3), dueToday, overdue,
+  return { attention: ranked.filter(item => isPlantNeedingAttention(item.plant)), highlights: ranked.slice(0, 3), dueToday, overdue,
     scannedToday: new Set(today.map(entry => entry.plantId)).size, scansLimited, tasksLimited };
 }

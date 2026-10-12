@@ -77,3 +77,21 @@ test("new routes refresh once and respect cancellation and timeout", async () =>
   abort.abort();
   await assert.rejects(api.claimDevice(device.macAddress, undefined, { signal: abort.signal }), (e: unknown) => e instanceof ApiError && e.kind === "cancelled");
 });
+
+test("account sensor overview validates inventory, accepts explicit demos and preserves identity on reading errors", async () => {
+  const entry = { device, plants: [{ id: plantId, name: "Fern" }], demo: false, readingError: false, telemetry };
+  const requests: { url: string; init?: RequestInit }[] = [];
+  const response = [entry, { ...entry, device: { ...device, macAddress: `DEMO:${plantId}` }, demo: true, readingError: true, telemetry: null }];
+  const api = createApiClient({ baseUrl: "http://test", fetch: async (url, init) => { requests.push({ url: String(url), init }); return Response.json(response); } });
+  const signal = new AbortController().signal;
+  assert.deepEqual(await api.fetchSensorOverview({ accessToken: "access", signal }), response);
+  assert.equal(requests[0].url, "http://test/api/devices/overview");
+  assert.equal(new Headers(requests[0].init?.headers).get("Authorization"), "Bearer access");
+  const invalid = [{ ...entry, telemetry: { ...telemetry, deviceId: plantId } }, { ...entry, demo: true }, { ...entry, plants: [{ id: "not-a-uuid", name: "Fern" }] }];
+  for (const bad of invalid) {
+    const api = createApiClient({ fetch: async () => Response.json([bad]) });
+    await assert.rejects(api.fetchSensorOverview(), validation);
+  }
+  const empty = createApiClient({ fetch: async () => Response.json([]) });
+  assert.deepEqual(await empty.fetchSensorOverview(), []);
+});

@@ -1,3 +1,4 @@
+import type { SensorOverviewEntry } from "../types/device";
 import type {
   AIDiagnosisResponse,
   ArchiveEntry,
@@ -179,6 +180,23 @@ export const parseDevice = parse<Device>(object({
     normalizeMac(value as string);
   }, userId: uuid, status: enumeration("ONLINE", "OFFLINE"), createdAt: date, updatedAt: date,
 }));
+export const parseSensorOverview = (value: unknown): SensorOverviewEntry[] => {
+  array(object({ device: object({ id: uuid, name: nonempty, macAddress: nonempty, userId: uuid,
+    status: enumeration("ONLINE", "OFFLINE"), createdAt: date, updatedAt: date }),
+    plants: array(object({ id: uuid, name: nonempty })), demo: boolean, readingError: boolean,
+    telemetry: nullable(telemetryCheck),
+  }))(value, "response");
+  const entries = value as SensorOverviewEntry[];
+  for (const entry of entries) {
+    const address = entry.device.macAddress;
+    if (entry.demo) {
+      if (!address.startsWith("DEMO:")) fail("response.device.macAddress");
+      uuid(address.slice(5), "response.device.macAddress");
+    } else normalizeMac(address);
+    if (entry.telemetry && entry.telemetry.deviceId !== entry.device.id) fail("response.telemetry.deviceId");
+  }
+  return entries;
+};
 export function parsePlantTelemetry(value: unknown): PlantTelemetry {
   object({ paired: boolean })(value, "response");
   const payload = value as Record<string, unknown>;

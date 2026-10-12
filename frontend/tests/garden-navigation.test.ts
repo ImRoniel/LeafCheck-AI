@@ -182,26 +182,26 @@ test("bottom navigation emits tab events, respects prevention and keeps Scan an 
   assert.deepEqual(events, ["tabPress", "tabPress"]);
 });
 
-test("My Spaces stays selected on Spaces and Space Details and opens the Spaces route", () => {
+test("My Spaces stays selected and clears the attention filter, including when already on Spaces", () => {
   const { BottomNav } = load("components/bottom-nav.tsx", {
     "expo-router": { useRouter: () => ({ navigate: () => {} }) },
     "@expo/vector-icons": { Ionicons: () => null },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
   });
   for (const active of ["spaces", "space-detail"]) {
-    const navigated: string[] = [];
+    const navigated: { name: string; params: { filter: string } }[] = [];
     const routes = ["index", "spaces", "tasks", "space-detail"].map(name => ({ name, key: name }));
     const tree = BottomNav({
       state: { index: routes.findIndex(route => route.name === active), routes },
       navigation: {
         emit: () => ({ defaultPrevented: false }),
-        navigate: (name: string) => navigated.push(name),
+        navigate: (name: string, params: { filter: string }) => navigated.push({ name, params }),
       },
     } as never);
     const tab = elements(tree).find(node => node.props.accessibilityLabel === "My Spaces")!;
     assert.equal(tab.props.accessibilityState?.selected, true);
     tab.props.onPress?.();
-    assert.deepEqual(navigated, active === "spaces" ? [] : ["spaces"]);
+    assert.deepEqual(JSON.parse(JSON.stringify(navigated)), [{ name: "spaces", params: { filter: "" } }]);
   }
 });
 

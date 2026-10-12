@@ -280,6 +280,7 @@ export function createApiClient(
       ),
     fetchUserPlants: (options?: RequestOptions) =>
       request("/api/plants", v.parsePlants, options),
+    fetchSensorOverview: (options?: RequestOptions) => request("/api/devices/overview", v.parseSensorOverview, options),
     claimDevice: (macAddress: string, name?: string, options?: RequestOptions) => {
       const mac = v.normalizeMac(macAddress);
       if (name !== undefined) {
@@ -436,6 +437,7 @@ export function createApiClient(
 export type ApiClient = ReturnType<typeof createApiClient>;
 export const api = createApiClient();
 export const {
+  fetchSensorOverview,
   claimDevice,
   pairDeviceToPlant,
   fetchPlantTelemetry,

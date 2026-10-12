@@ -59,7 +59,7 @@ test("a response for an old device cannot label a newly paired sensor live", () 
 test("attention ranks saved critical/warning ahead of tasks, deduplicates plants and caps previews", () => {
   const plants = [plant, { ...plant, id: "critical", healthStatus: "critical" as const }, { ...plant, id: "warning", healthStatus: "warning" as const }, { ...plant, id: "late" }];
   const summary = summarizeDashboard(plants, [task("late", new Date(now.getTime() - 60_000).toISOString()), task("late", now.toISOString())], [], now);
-  assert.equal(summary.attention.length, 3);
+  assert.equal(summary.attention.length, 2);
   assert.deepEqual(summary.highlights.map(item => item.plant.id), ["critical", "warning", "late"]);
   assert.match(summary.highlights[0].reason, /saved critical/);
   assert.equal(summary.dueToday, 2);

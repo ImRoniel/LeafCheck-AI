@@ -43,6 +43,7 @@ before(async () => {
     device,
     authSession: {findUnique: async ({where}) => ({id: where.id, userId: where.id, user: {id: where.id, isActive: true}, expiresAt: new Date(Date.now() + 60000), revokedAt: null})},
   }}});
+  mock.module(new URL('../src/lib/prisma.js', import.meta.url).href, {namedExports: {prisma: {}}});
   for (const name of ['telemetry','plants','ai','scan','auth','users']) {
     mock.module(new URL(`../src/routes/${name}.js`, import.meta.url).href, {namedExports: {[`${name}Router`]: express.Router()}});
   }

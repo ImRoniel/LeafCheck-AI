@@ -96,3 +96,35 @@ test("guest/blur disable all dashboard polling; old account samples never enter 
   assert.equal(h.render().careReady, true);
   assert.ok(h.requests.every(item => !item.enabled));
 });
+
+test("sensor overview polling passes cancellation signals and fences stale account inventory", async () => {
+  const auth = { generation: 1, status: "authenticated" };
+  let active = true;
+  let snapshot: { key: string; entries: unknown[] } | null = null;
+  let requestedKey = "";
+  let enabled = false;
+  let load!: (signal: AbortSignal) => Promise<{ key: string; entries: unknown[] }>;
+  let passedSignal: AbortSignal | undefined;
+  const exports: { useSensorOverview?: () => { entries: unknown[]; ready: boolean } } = {};
+  runInNewContext(ts.transpileModule(readFileSync("hooks/use-sensor-overview.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, {
+    exports, require(name: string) {
+      if (name === "@/context/auth") return { useAuth: () => auth };
+      if (name === "./use-device-activity") return { useDeviceActivity: () => active };
+      if (name === "@/services/api") return { api: { fetchSensorOverview: async ({ signal }: { signal: AbortSignal }) => { passedSignal = signal; return [{ deviceId: "owned" }]; } } };
+      if (name === "@/services/use-polling-resource") return { usePollingResource: (key: string, loader: typeof load, options: { enabled: boolean }) => {
+        requestedKey = key; load = loader; enabled = options.enabled;
+        return { data: snapshot, loading: false, error: null, refresh: async () => {} };
+      } };
+      throw new Error(`Unexpected import ${name}`);
+    },
+  });
+  assert.equal(exports.useSensorOverview!().ready, false); assert.ok(enabled);
+  const signal = new AbortController().signal;
+  snapshot = await load(signal); assert.equal(passedSignal, signal);
+  assert.equal(exports.useSensorOverview!().entries.length, 1);
+  auth.generation++;
+  assert.equal(exports.useSensorOverview!().entries.length, 0);
+  active = false; exports.useSensorOverview!(); assert.equal(enabled, false); assert.equal(requestedKey, "");
+  active = true; auth.status = "guest";
+  assert.equal(exports.useSensorOverview!().entries.length, 0); assert.equal(enabled, false);
+});

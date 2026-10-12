@@ -93,6 +93,7 @@ function load(path: string, overrides: Record<string, unknown>) {
         useWindowDimensions: () => ({ width: 390, height: 844 }),
         StyleSheet: { create: (styles: unknown) => styles },
       };
+      if (name === "@/components/NeedsAttentionPlantList") return { NeedsAttentionPlantList: "NeedsAttentionPlantList" };
       throw new Error(`Unexpected import: ${name}`);
     },
   });
@@ -477,7 +478,7 @@ test("space suggestions fill an editable name without creating a space and prese
       "@/context/local-state": { useLocalState: () => ({ data: { onboarding: { status: "complete" } } }) },
       "@expo/vector-icons": { Ionicons: "Icon" },
       "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
-      "expo-router": { useRouter: () => ({}) },
+      "expo-router": { useLocalSearchParams: () => ({}), useRouter: () => ({}) },
     });
     const render = () => { state.reset(); return elements(module.default()); };
     render().find(node => node.props.accessibilityLabel === "Create a space")!.props.onPress!();
@@ -512,7 +513,7 @@ test("space-card counts stay beside their names and update with the current plan
     "@/context/local-state": { useLocalState: () => ({}) },
     "@expo/vector-icons": { Ionicons: "Icon" },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
-    "expo-router": { useRouter: () => ({}) },
+    "expo-router": { useLocalSearchParams: () => ({}), useRouter: () => ({}) },
   });
   const render = () => { state.reset(); return elements(module.default()); };
   for (const count of [0, 1, 2, 1]) {
