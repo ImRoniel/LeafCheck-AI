@@ -1,7 +1,8 @@
 import { NeedsAttentionPlantList } from "@/components/NeedsAttentionPlantList";
 import { SpaceManagement } from "@/components/space-management";
 import { SpaceMenuButton, type SpaceMenuAnchor } from "@/components/space-menu-button";
-import { ProfileButton } from "@/components/profile-button";
+import { BrandScreenHeader } from "@/components/BrandScreenHeader";
+import { UnassignedPlantsSection } from "@/components/UnassignedPlantsSection";
 import { AnimatedPressable as Pressable } from "@/components/animated-pressable";
 import { useAppData } from "@/context/app-data";
 import { useSpaces } from "@/context/spaces";
@@ -17,6 +18,8 @@ export default function SpacesScreen() {
   const { filter } = useLocalSearchParams<{ filter?: string }>();
   const insets = useSafeAreaInsets();
   const { spaces, plantsBySpace, addSpace, ready, error: storageError, retry, archivedSpaces, restoreSpace } = useSpaces();
+  const namedSpaces = spaces.filter(space => space.trim().toLowerCase() !== "unassigned");
+  const unassignedPlants = spaces.filter(space => space.trim().toLowerCase() === "unassigned").flatMap(space => plantsBySpace[space] ?? []);
   const appData = useAppData();
   const local = useLocalState();
   const pending = useRef(false);
@@ -48,31 +51,33 @@ export default function SpacesScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 14, paddingBottom: 0 }]}>
       <View style={styles.header}>
-        <View><Text style={styles.my}>MY</Text><Text style={styles.spacesTitle}>SPACES</Text></View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Pressable hitSlop={3} accessibilityRole="button" accessibilityLabel="Open Archive" disabled={!ready} accessibilityState={{ disabled: !ready }} onPress={() => { setError(""); setShowArchives(true); }} style={styles.archiveButton}><Ionicons name="archive-outline" size={22} color="#278448" /></Pressable><ProfileButton /></View>
+        <BrandScreenHeader first="MY" second="SPACES" subtitle="A little space for every plant" />
+        <Pressable hitSlop={3} accessibilityRole="button" accessibilityLabel="Open Archive" disabled={!ready} accessibilityState={{ disabled: !ready }} onPress={() => { setError(""); setShowArchives(true); }} style={styles.archiveButton}><Ionicons name="archive-outline" size={22} color="#278448" /></Pressable>
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.spaceList, { paddingBottom: insets.bottom + 170 }]} refreshControl={<RefreshControl refreshing={appData.loading} onRefresh={() => void appData.refresh()} />}>
         {appData.guest && local.data.onboarding.status === "pending" && <Pressable accessibilityRole="button" accessibilityLabel="Set up my garden" style={styles.cancel} onPress={() => router.push("/setup/experience")}><Text>Setup</Text></Pressable>}
         {(!ready || storageError) && <Pressable onPress={() => void retry()}><Text>{storageError || "Loading spaces..."}{storageError ? " Tap to retry." : ""}</Text></Pressable>}
         {!!appData.error && <Text style={styles.error}>{appData.error}</Text>}
-        {ready && !storageError && !appData.loading && !appData.error && !spaces.length && <View style={styles.empty}><Text style={{ textAlign: "center", color: "#506557" }}>No My Spaces yet.</Text></View>}
-        {spaces.map((space) => {
+        {ready && !storageError && !appData.loading && !appData.error && !namedSpaces.length && !unassignedPlants.length && <View style={styles.empty}><Text style={{ textAlign: "center", color: "#506557" }}>No My Spaces yet.</Text></View>}
+        {namedSpaces.map((space) => {
           const plantCount = plantsBySpace[space]?.length ?? 0;
           const countLabel = `${plantCount} ${plantCount === 1 ? "plant" : "plants"}`;
           return (
           <View key={space} style={styles.spaceCard}>
             <Pressable style={styles.cardOpen} onPress={() => router.push({ pathname: "/(tabs)/space-detail", params: { space } })} accessibilityRole="button" accessibilityLabel={`Open ${space}`} accessibilityHint={`${countLabel}. View this space's plants.`} />
-            {space !== "Unassigned" && <SpaceMenuButton style={styles.menuDots} onOpen={anchor => setManaged({ space, anchor })} label={`Manage ${space}`} />}
+            <SpaceMenuButton style={styles.menuDots} onOpen={anchor => setManaged({ space, anchor })} label={`Manage ${space}`} />
             <View pointerEvents="box-none" style={styles.cardFooter}>
               <View pointerEvents="none" style={styles.spaceIdentity}>
                 <Text style={styles.spaceName}>{space}</Text>
                 <Text style={styles.plantCount} accessibilityLabel={`${countLabel} in ${space}`}>{countLabel}</Text>
               </View>
-              <Pressable style={styles.addPlant} accessibilityRole="button" accessibilityLabel={`Add a Plant to ${space}`} onPress={event => { event.stopPropagation(); router.push({ pathname: "/(tabs)/space-detail", params: { space, add: "manual" } }); }}><View style={styles.addPlantPill}><Text numberOfLines={1} style={styles.addPlantText}>Add a Plant</Text></View></Pressable>
             </View>
           </View>
           );
         })}
+        <UnassignedPlantsSection plants={unassignedPlants} onOpen={plant => router.push(appData.guest
+          ? { pathname: "/(tabs)/space-detail", params: { space: "Unassigned" } }
+          : { pathname: "/plant-profile", params: { id: plant.id } })} />
         {!!error && !modalVisible && <Text style={styles.error}>{error}</Text>}
       </ScrollView>
       <Pressable disabled={!ready} style={[styles.plus, { bottom: insets.bottom + 94 }]} onPress={() => { setError(""); setModalVisible(true); }} accessibilityRole="button" accessibilityLabel="Create a space"><Ionicons name="add" size={35} color="#20B64D" /></Pressable>
@@ -117,8 +122,6 @@ export default function SpacesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF", paddingHorizontal: 16 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, marginHorizontal: 6, paddingTop: 6 },
-  my: { fontSize: 36, lineHeight: 39, color: "#111111", fontWeight: "300" },
-  spacesTitle: { fontSize: 36, lineHeight: 39, color: "#20B64D", fontWeight: "300" },
   spaceList: { flexGrow: 1, gap: 12, alignItems: "center", paddingHorizontal: 4 },
   empty: { flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center", minHeight: 180 },
   archiveButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#EAF7EE", borderWidth: 1, borderColor: "#B9E5C6", alignItems: "center", justifyContent: "center" },
@@ -129,9 +132,6 @@ const styles = StyleSheet.create({
   spaceName: { fontSize: 27, color: "#171717", flexShrink: 1 },
   plantCount: { fontSize: 12, color: "#278448", fontWeight: "600", flexShrink: 0 },
   cardFooter: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" },
-  addPlant: { minHeight: 44, minWidth: 112, flexShrink: 0, justifyContent: "center", maxWidth: "100%" },
-  addPlantPill: { minWidth: 112, alignItems: "center", backgroundColor: "#278448", borderRadius: 50, paddingHorizontal: 16, paddingVertical: 6 },
-  addPlantText: { fontSize: 12, color: "#FFFFFF", textAlign: "center" },
   plus: { position: "absolute", right: 31, bottom: 91, width: 55, height: 55, borderRadius: 28, borderWidth: 2, borderColor: "#20B64D", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", zIndex: 2 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center", padding: 24 },
   modalCard: { width: "100%", borderRadius: 22, backgroundColor: "#FFFFFF", padding: 22 },

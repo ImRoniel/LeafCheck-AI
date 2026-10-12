@@ -65,7 +65,8 @@ test("Spaces filter opens a plant list and clears back to the canonical space ca
   let filter = "needs-attention"; const routes: unknown[] = [];
   const { default: Spaces } = load("app/(tabs)/spaces.tsx", {
     "@/components/NeedsAttentionPlantList": { NeedsAttentionPlantList: "AttentionList" }, "@/components/space-management": { SpaceManagement: "SpaceManagement" },
-    "@/components/space-menu-button": { SpaceMenuButton: "Menu" }, "@/components/profile-button": { ProfileButton: "Profile" }, "@/components/animated-pressable": { AnimatedPressable: web.Pressable },
+    "@/components/space-menu-button": { SpaceMenuButton: "Menu" }, "@/components/BrandScreenHeader": { BrandScreenHeader: "BrandHeader" },
+    "@/components/UnassignedPlantsSection": { UnassignedPlantsSection: "UnassignedPlants" }, "@/components/animated-pressable": { AnimatedPressable: web.Pressable },
     "@/context/app-data": { useAppData: () => ({ plants: [plant], loaded: true, loading: false, error: null, guest: false }) },
     "@/context/local-state": { useLocalState: () => ({ data: { onboarding: { status: "completed" } } }) },
     "@/context/spaces": { useSpaces: () => ({ spaces: ["Unassigned"], plantsBySpace: { Unassigned: [plant] }, ready: true, archivedSpaces: [] }) },
@@ -76,7 +77,11 @@ test("Spaces filter opens a plant list and clears back to the canonical space ca
   const node = Spaces({} as never); assert.equal(node.type, "AttentionList");
   (node.props as Props & { onOpen: (plant: Plant) => void }).onOpen(plant);
   assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/plant-profile", params: { id: plant.id } }]);
-  node.props.onClear!(); assert.equal(filter, ""); assert.notEqual(Spaces({} as never).type, "AttentionList");
+  node.props.onClear!(); assert.equal(filter, "");
+  const spaces = Spaces({} as never);
+  assert.notEqual(spaces.type, "AttentionList");
+  assert.ok(elements(spaces).some(node => node.type === "UnassignedPlants"));
+  assert.ok(!elements(spaces).some(node => node.props.accessibilityLabel === "Open Unassigned"));
 });
 test("sensor modal lists identities, linked/unlinked devices and zero-valued metrics", () => {
   const overview = { ready: true, loading: false, error: null, entries: [entry, { ...entry, device: { ...entry.device, id: "other", macAddress: "LC-000001" }, plants: [], telemetry: null }], refresh: async () => {} };

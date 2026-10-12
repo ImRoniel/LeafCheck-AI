@@ -215,6 +215,9 @@ test("loading and partial refresh errors never show false empty success; refresh
 
 test("compact summary is informational, manual and upcoming sections start collapsed, urgent undated tasks stay visible", async () => {
   const h = await harness(false);
+  assert.ok(h.render().some(node => node.props.accessibilityLabel === "Care Tasks" && node.props.accessibilityRole === "header"));
+  assert.ok(h.render().some(node => node.props.children === "Tasks"));
+  assert.ok(h.render().some(node => node.props.children === "Keep your plants healthy and happy"));
   h.data.plants[0].healthStatus = "warning";
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   h.remote.tasks = [{ ...h.task(), dueDate: tomorrow.toISOString() }];

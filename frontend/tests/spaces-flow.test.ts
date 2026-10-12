@@ -10,6 +10,7 @@ import { createLocalStateStore, localStateKey } from "../services/local-state-st
 import * as spaces from "../services/spaces";
 import * as profilePhoto from "../services/profile-photo";
 import * as validators from "../services/validators";
+import type { Plant } from "../types/plant";
 
 const requireModule = createRequire(`${process.cwd()}/package.json`);
 type Props = {
@@ -27,6 +28,8 @@ type Props = {
   name?: string;
   initialRouteName?: string;
   value?: Record<string, unknown>;
+  horizontal?: boolean;
+  source?: { uri: string };
 };
 function elements(node: React.ReactNode): React.ReactElement<Props>[] {
   return React.Children.toArray(node).flatMap(child => React.isValidElement<Props>(child)
@@ -94,6 +97,9 @@ function load(path: string, overrides: Record<string, unknown>) {
         StyleSheet: { create: (styles: unknown) => styles },
       };
       if (name === "@/components/NeedsAttentionPlantList") return { NeedsAttentionPlantList: "NeedsAttentionPlantList" };
+      for (const component of ["BrandScreenHeader", "UnassignedPlantsSection", "DashboardPlantCard"]) {
+        if (name === `@/components/${component}` || name === `./${component}`) return load(`components/${component}.tsx`, overrides);
+      }
       throw new Error(`Unexpected import: ${name}`);
     },
   });
@@ -302,7 +308,7 @@ test("token-authenticated entry opens Dashboard and keeps setup optional", () =>
   assert.deepEqual(replacements, []); // No redirect loop on later login visits.
 });
 
-test("Guest cards open the selected space and its manual-add flow, persist data, and have no Garden entry", async () => {
+test("Guest cards open the selected space, retain detail manual-add flows and archive controls, and omit redundant actions", async () => {
   let raw: string | null = null;
   let failRestore = false;
   const storage = {
@@ -369,10 +375,8 @@ test("Guest cards open the selected space and its manual-add flow, persist data,
   assert.equal(archiveButton.props.style.borderWidth, 1);
   renderSpaces().find(node => node.props.accessibilityLabel === "Open Bedroom")!.props.onPress!();
   assert.deepEqual(JSON.parse(JSON.stringify(navigations[0])), { pathname: "/(tabs)/space-detail", params: { space: "Bedroom" } });
-  let stopped = false;
-  (renderSpaces().find(node => node.props.accessibilityLabel === "Add a Plant to Bedroom")!.props.onPress as any)({ stopPropagation() { stopped = true; } });
-  assert.ok(stopped);
-  assert.deepEqual(JSON.parse(JSON.stringify(navigations[1])), { pathname: "/(tabs)/space-detail", params: { space: "Bedroom", add: "manual" } });
+  assert.ok(!renderSpaces().some(node => node.props.accessibilityLabel === "Add a Plant to Bedroom"));
+  assert.ok(!renderSpaces().some(node => node.type === "ProfileButton"));
   const anchor = { x: 275, y: 154, width: 75, height: 32 };
   renderSpaces().find(node => node.props.label === "Manage Bedroom")!.props.onOpen!(anchor);
   const management = renderSpaces().find(node => node.type === "SpaceManagement")!;
@@ -418,19 +422,9 @@ test("Guest cards open the selected space and its manual-add flow, persist data,
   assert.equal(card.props.style.maxWidth, "100%");
   assert.equal(card.props.style.backgroundColor, "#FFFFFF");
   assert.ok(card.props.style.shadowOpacity > 0);
-  const addPlantButton = elements(card).find(node => node.props.accessibilityLabel === "Add a Plant to Bedroom")!;
-  assert.ok(addPlantButton.props.style.minWidth >= 112);
-  assert.equal(addPlantButton.props.style.flexShrink, 0);
-  assert.ok(addPlantButton.props.style.minHeight >= 44);
-  const addPlantPill = elements(addPlantButton).find(node => node.type === "View")!;
-  assert.ok(addPlantPill.props.style.minWidth >= 112);
-  assert.ok(addPlantPill.props.style.paddingHorizontal >= 16);
-  const addPlantLabel = elements(addPlantButton).find(node => node.type === "Text")!;
-  assert.equal(addPlantLabel.props.children, "Add a Plant");
-  assert.equal((addPlantLabel.props as any).numberOfLines, 1);
-  assert.ok(addPlantLabel.props.style.fontSize >= 12);
+  assert.ok(!elements(card).some(node => node.props.children === "Add a Plant"));
   const footer = elements(card).find(node => node.type === "View" && node.props.style?.flexWrap === "wrap")!;
-  assert.ok(footer); // Space identity and the wider pill can wrap on narrow screens.
+  assert.ok(footer);
   const menu = elements(card).find(node => node.props.label === "Manage Bedroom")!;
   assert.equal(menu.props.style.position, "absolute");
   assert.equal(menu.props.style.right, 4);
@@ -525,6 +519,54 @@ test("space-card counts stay beside their names and update with the current plan
     assert.ok(nameRow);
     const counter = elements(nameRow).find(node => node.props.accessibilityLabel === `${countLabel} in Bedroom`)!;
     assert.equal(counter.props.children, countLabel);
+  }
+});
+
+test("unassigned plants appear only in a horizontal overflow carousel and preserve plant navigation in both sessions", () => {
+  for (const guest of [true, false]) {
+    const state = hooks();
+    const routes: unknown[] = [];
+    const base: Plant = { id: "fern", name: "Fern", species: "Fern", location: "Bedroom", healthStatus: "healthy",
+      createdAt: "2026-10-12T00:00:00Z", updatedAt: "2026-10-12T00:00:00Z" };
+    let plants: Plant[] = [base,
+      { ...base, id: "monstera", name: "Monstera", location: undefined, healthStatus: "warning", imageUrl: "https://images.test/monstera.jpg" },
+      { ...base, id: "snake", name: "Snake", location: "  " },
+      { ...base, id: "basil", name: "Basil", location: "Unassigned", healthStatus: "critical" },
+      { ...base, id: "aloe", name: "Aloe", location: undefined, healthStatus: "unknown" }];
+    const module = load("app/(tabs)/spaces.tsx", {
+      react: state.react,
+      "@/components/space-management": { SpaceManagement: "SpaceManagement" },
+      "@/components/space-menu-button": { SpaceMenuButton: "SpaceMenuButton" },
+      "@/context/spaces": { useSpaces: () => ({ ready: true, ...spaces.groupSpaces([], plants), archivedSpaces: [] }) },
+      "@/context/app-data": { useAppData: () => ({ guest, plants, loaded: true }) },
+      "@/context/local-state": { useLocalState: () => ({ data: { onboarding: { status: "complete" } } }) },
+      "@expo/vector-icons": { Ionicons: "Icon" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+      "expo-router": { useLocalSearchParams: () => ({}), useRouter: () => ({ push: (route: unknown) => routes.push(route) }) },
+    });
+    const render = () => { state.reset(); return elements(module.default()); };
+    const nodes = render();
+    assert.ok(nodes.some(node => node.props.accessibilityLabel === "Open Bedroom"));
+    assert.ok(!nodes.some(node => node.props.accessibilityLabel === "Open Unassigned" || node.props.children === "Add a Plant"));
+    const overflow = nodes.find(node => typeof node.type === "function" && node.type.name === "UnassignedPlantsSection")!;
+    const section = elements(invoke(overflow));
+    assert.ok(section.some(node => node.props.children === "Unassigned Plants"));
+    assert.equal(section.find(node => node.type === "ScrollView")?.props.horizontal, true);
+    const cards = section.filter(node => typeof node.type === "function" && node.type.name === "DashboardPlantCard");
+    assert.equal(cards.length, 4);
+    const rendered = cards.map(card => elements(invoke(card)));
+    for (const [index, label] of ["Needs Attention", "Healthy", "Critical", "Not assessed"].entries()) {
+      assert.ok(rendered[index].some(node => node.props.children === label));
+      rendered[index].find(node => node.type === "Pressable")!.props.onPress!();
+    }
+    assert.equal(rendered[0].find(node => node.type === "Image")?.props.source?.uri, plants[1].imageUrl);
+    assert.deepEqual(JSON.parse(JSON.stringify(routes)), plants.slice(1).map(plant => guest
+      ? { pathname: "/(tabs)/space-detail", params: { space: "Unassigned" } }
+      : { pathname: "/plant-profile", params: { id: plant.id } }));
+    plants = plants.slice(1);
+    assert.ok(!render().some(node => node.props.children === "No My Spaces yet."));
+    plants = [base];
+    assert.equal(invoke(render().find(node => typeof node.type === "function" && node.type.name === "UnassignedPlantsSection")!), null);
   }
 });
 
