@@ -4,13 +4,14 @@
 // POST /api/scan
 //
 // Orchestrates the scan-first diagnostic flow:
-//   1. Pl@ntNet  → identify species from image
-//   2. Resolve owned plant context without creating a new plant yet
-//   3. Parallel species-spec cache/Perenual lookup and optional MongoDB telemetry
-//   4. Gemini → image + references + telemetry freshness → JSON report
-//   5. Parse report Care actions through tasknotes-nlp-core; validate mapped tasks
-//   6. PostgreSQL transaction → plant + identification + analysis + tasks + health
-//   7. Return saved report and tasks for garden/task-screen synchronization
+//   1. Optional Pl@ntNet attempt (8-second deadline; failures become Unknown)
+//   2. Gemini → confirm living plant and identify/verify species from the image
+//   3. Resolve owned plant context without creating a new plant yet
+//   4. Parallel species-spec cache/Perenual lookup and optional MongoDB telemetry
+//   5. Gemini → image + references + telemetry freshness → JSON diagnosis
+//   6. Parse report Care actions through tasknotes-nlp-core; validate mapped tasks
+//   7. PostgreSQL transaction → plant + identification + analysis + tasks + health
+//   8. Return saved report and tasks for garden/task-screen synchronization
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { randomUUID } from "node:crypto";
@@ -26,14 +27,29 @@ import { prisma } from "../lib/prisma.js";
 import { validateScanImage } from "../lib/scan-input.js";
 import { previousScanImage } from "../lib/previous-scan-image.js";
 import { validateScanEnvelope, validateScanOutput } from "../lib/scan-output.js";
+import { detectScanSubject, parseGeminiJson } from "../lib/scan-subject.js";
 import { reportCareTasks } from "../lib/report-care-tasks.js";
 import { storeScanImage, discardScanImage, type StoredScanImage } from "../lib/scan-image-storage.js";
 import { persistScan } from "../lib/scan-persistence.js";
 import type { Prisma } from "../generated/postgres-client/index.js";
-import type { ScanRequest } from "../types/scan.js";
+import type { PlantIdentificationResult, ScanRequest, SubjectKind } from "../types/scan.js";
 
 export const scanRouter = Router();
 scanRouter.use(requireAuth);
+
+function sendNonlivingScan(res: Response, subjectKind: Exclude<SubjectKind, "living_plant">) {
+  res.status(200).json({
+    success: true, subjectKind, plant: null, identification: null,
+    diagnostic: {
+      id: randomUUID(), healthStatus: "unknown",
+      rawAnalysisText: subjectKind === "artificial_plant"
+        ? "This appears to be an artificial plant. No biological care is needed!"
+        : "This doesn't appear to be a living plant. Please take a photo of a real plant to get care guidance.",
+      telemetryFreshness: "Environmental monitoring is intended for living plants.",
+    },
+    telemetry: null, careTasks: [], notification: null,
+  });
+}
 
 // ─── Validation Middleware ────────────────────────────────────────────────────
 
@@ -99,15 +115,26 @@ scanRouter.post("/", async (req: Request, res: Response) => {
   try {
     // Fail locally before spending identification quota or touching scan caches.
     const model = geminiModel();
-    // ── Step 1: Identify species via Pl@ntNet ─────────────────────────────
-    console.log("[Scan] Step 1: Identifying species via Pl@ntNet...");
-    let identified = true;
-    const identification = await identifyPlant(imageBase64).catch((error: unknown) => {
-      // Pl@ntNet can reject artificial plants/objects before Gemini sees the photo.
-      if (!(error instanceof HttpError) || error.code !== "NO_PLANT_DETECTED") throw error;
-      identified = false;
-      return { speciesName: "Unidentified subject", commonName: null, confidence: 0, rawResponse: null };
-    });
+    // ── Step 1: Optional Pl@ntNet attempt ────────────────────────────────
+    console.log("[Scan] Step 1: Trying Pl@ntNet (8-second deadline)...");
+    let identification: PlantIdentificationResult;
+    try {
+      identification = await identifyPlant(imageBase64);
+    } catch (error: unknown) {
+      // Never expose provider URLs, API keys, image data or raw error messages.
+      console.error("[Scan] Pl@ntNet unavailable; continuing with Gemini:",
+        error instanceof HttpError ? error.code : "PLANT_IDENTIFICATION_FAILED");
+      identification = { speciesName: "Unknown", commonName: null, confidence: 0, rawResponse: null };
+    }
+
+    // ── Step 2: Gemini confirms the subject before Perenual or saving ────
+    console.log("[Scan] Step 2: Confirming the plant and species with Gemini...");
+    const subject = await detectScanSubject(model, imageBase64, identification);
+    if (subject.subjectKind !== "living_plant") {
+      sendNonlivingScan(res, subject.subjectKind);
+      return;
+    }
+    identification = subject.identification;
     console.log(
       "[Scan] Identified: %s (%s) — confidence: %s%%",
       identification.speciesName,
@@ -115,7 +142,7 @@ scanRouter.post("/", async (req: Request, res: Response) => {
       (identification.confidence * 100).toFixed(1),
     );
 
-    // ── Step 2: Resolve or auto-create the Plant ──────────────────────────
+    // ── Step 3: Resolve plant context without persisting yet ──────────────
     let plant: {
       id: string;
       name: string;
@@ -151,7 +178,7 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     const [specs, latestReading] = await Promise.all([
       // 4a. PlantSpecCache lookup (with Perenual fallback)
       (async () => {
-        if (!identified) return null;
+        if (identification.speciesName.toLowerCase() === "unknown") return null;
         let cached = await prismaPg.plantSpecCache.findUnique({
           where: { speciesName: identification.speciesName },
         });
@@ -329,40 +356,16 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
       });
     const rawText = result.response.text();
 
-    // Parse the structured JSON from Gemini
-    let geminiOutput: unknown;
-    try {
-      // Strip markdown code fences if Gemini wraps them
-      const cleaned = rawText
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```\s*$/, "")
-        .trim();
-      geminiOutput = JSON.parse(cleaned);
-    } catch {
-      // An unstructured response cannot safely determine whether a plant is real.
-      throw new HttpError(502, "SCAN_AI_UNAVAILABLE", "We couldn't complete your plant analysis. Please try again later.");
-    }
+    const geminiOutput = parseGeminiJson(rawText);
 
     if (geminiOutput !== null && typeof geminiOutput === "object" && "subjectKind" in geminiOutput &&
       (geminiOutput.subjectKind === "artificial_plant" || geminiOutput.subjectKind === "non_plant")) {
-      const subjectKind = geminiOutput.subjectKind;
       // Normalize nonliving outcomes; never persist or generate tasks from them.
-      res.status(200).json({
-        success: true, subjectKind, plant: null, identification: null,
-        diagnostic: {
-          id: randomUUID(), healthStatus: "unknown",
-          rawAnalysisText: subjectKind === "artificial_plant"
-            ? "This appears to be an artificial plant. No biological care is needed!"
-            : "This doesn't appear to be a living plant. Please take a photo of a real plant to get care guidance.",
-          telemetryFreshness: "Environmental monitoring is intended for living plants.",
-        },
-        telemetry: null, careTasks: [], notification: null,
-      });
+      sendNonlivingScan(res, geminiOutput.subjectKind);
       return;
     }
 
     validateScanEnvelope(geminiOutput);
-    if (!identified) throw new HttpError(422, "NO_PLANT_DETECTED", "Please take a clearer photo of a living plant.");
     // Ignore any provider careTasks field: the report is the sole task source.
     const output = {
       subjectKind: geminiOutput.subjectKind,

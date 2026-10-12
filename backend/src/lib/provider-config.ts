@@ -18,11 +18,5 @@ export function geminiApiKey(env: NodeJS.ProcessEnv = process.env): string {
 
 export function validateProviderConfig(env: NodeJS.ProcessEnv = process.env) {
   geminiApiKey(env);
-  const plantnet = env.PLANTNET_API_KEY?.trim();
-  if (!plantnet || /\s/.test(plantnet)) {
-    throw new ProviderConfigurationError(
-      "PLANTNET_API_KEY is required and must not contain whitespace.",
-    );
-  }
-  // Perenual is deliberately optional: scans can proceed without reference specs.
+  // Pl@ntNet and Perenual are optional. Gemini can identify and diagnose alone.
 }

@@ -50,18 +50,9 @@ test("mandatory provider validation rejects malformed credentials without exposi
     () => geminiApiKey({ GOOGLE_API_KEY: keyA }),
     /GEMINI_API_KEY is required/,
   );
-  assert.throws(
-    () => validateProviderConfig({ GEMINI_API_KEY: keyA }),
-    /PLANTNET_API_KEY/,
-  );
-  assert.throws(
-    () =>
-      validateProviderConfig({
-        GEMINI_API_KEY: keyA,
-        PLANTNET_API_KEY: "two words",
-      }),
-    /PLANTNET_API_KEY/,
-  );
+  for (const plantnet of [undefined, "", "two words"]) {
+    assert.doesNotThrow(() => validateProviderConfig({ GEMINI_API_KEY: keyA, PLANTNET_API_KEY: plantnet }));
+  }
   assert.doesNotThrow(() =>
     validateProviderConfig({
       GEMINI_API_KEY: keyA,

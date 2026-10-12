@@ -1,6 +1,7 @@
 import express from "express";
 import assert from "node:assert/strict";
 import { after, before, beforeEach, mock, test } from "node:test";
+import { HttpError } from "../src/lib/http.ts";
 
 const speciesName = "Ocimum basilicum";
 const winner = {
@@ -39,6 +40,7 @@ let healthWrites;
 let writeOrder;
 let writeFailure;
 let imageFailure, imageWrites, discardedImages, noPlantIdentification;
+let identificationError, detectionText, subjectPrompts, subjectImages, stageCalls, speciesRequests, diagnosisError;
 const captureWrite = (stage, data) => {
   writeOrder.push(stage);
   if (writeFailure === stage) throw new Error("private persistence detail");
@@ -139,7 +141,7 @@ before(async () => {
   });
   mock.module(new URL("../src/lib/plantnet.js", import.meta.url).href, {
     namedExports: {
-      identifyPlant: async () => { identifications++; if (noPlantIdentification) { const {HttpError} = await import("../src/lib/http.ts"); throw new HttpError(422, "NO_PLANT_DETECTED", "No plant"); } return ({
+      identifyPlant: async () => { stageCalls.push("plantnet"); identifications++; if (identificationError) throw identificationError; if (noPlantIdentification) { throw new HttpError(422, "NO_PLANT_DETECTED", "No plant"); } return ({
         speciesName,
         commonName: "Basil",
         confidence: 0.99,
@@ -149,7 +151,8 @@ before(async () => {
   });
   mock.module(new URL("../src/lib/perenual.js", import.meta.url).href, {
     namedExports: {
-      fetchPlantSpecs: async () => {
+      fetchPlantSpecs: async (...args) => {
+        stageCalls.push("perenual"); speciesRequests.push(args);
         fetches++;
         return perenualData;
       },
@@ -161,7 +164,17 @@ before(async () => {
         getGenerativeModel() {
           return {
             generateContent: async (contents) => {
+              const subjectCheck = contents[0].includes("subject check for a plant-care scan");
+              stageCalls.push(subjectCheck ? "subject" : "diagnosis");
               if (generationError) throw generationError;
+              if (subjectCheck) {
+                subjectPrompts.push(contents[0]); subjectImages.push(contents[1].inlineData.data);
+                let subjectKind = "living_plant";
+                try { subjectKind = JSON.parse(responseText).subjectKind ?? "living_plant"; } catch { /* The diagnosis response is tested separately. */ }
+                const text = detectionText ?? JSON.stringify({ subjectKind, speciesName, commonName: "Basil", confidence: 0.95 });
+                return { response: { text: () => text } };
+              }
+              if (diagnosisError) throw diagnosisError;
               prompts.push(contents[0]);
               sentImages.push(contents[1].inlineData.data);
               return { response: { text: () => responseText } };
@@ -205,6 +218,7 @@ beforeEach(() => {
   savedImageUrl = "data:image/jpeg;base64,/9j/2Q=="; sentImages = [];
   responseText = JSON.stringify({subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "healthy", notification: {notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up"}});
   imageFailure = false; imageWrites = 0; discardedImages = 0; noPlantIdentification = false;
+  identificationError = null; detectionText = undefined; subjectPrompts = []; subjectImages = []; stageCalls = []; speciesRequests = []; diagnosisError = null;
   guidanceQueries = [];
   taskWrites = [];
   identificationWrites = [];
@@ -681,6 +695,97 @@ test("Pl@ntNet no-match still allows Gemini to identify a nonliving object", asy
   const result = await scan(true);
   assert.equal(result.status, 200); assert.equal(result.body.subjectKind, "non_plant");
   assert.equal(fetches, 0); assert.equal(plantCreates, 0);
+});
+
+for (const [cause, error] of [
+  ["timeout", new HttpError(504, "PLANT_IDENTIFICATION_TIMEOUT", "private timeout URL")],
+  ["quota", new HttpError(429, "PLANT_IDENTIFICATION_FAILED", "private quota URL")],
+  ["server failure", new HttpError(500, "PLANT_IDENTIFICATION_FAILED", "private provider credential")],
+  ["network failure", new Error("https://provider.test?api-key=private-key")],
+  ["missing key", new HttpError(503, "PLANT_IDENTIFICATION_FAILED", "Plant identification is temporarily unavailable.")],
+]) {
+  test(`Pl@ntNet ${cause} falls back to Gemini species identification, enrichment, diagnosis and save`, async t => {
+    const errors = [];
+    t.mock.method(console, "error", (...args) => errors.push(args));
+    identificationError = error;
+    detectionText = JSON.stringify({ subjectKind: "living_plant", speciesName: "Monstera deliciosa", commonName: "Monstera", confidence: 0.88 });
+    perenualData = { ...perenualData, speciesName: "Monstera deliciosa", commonName: "Monstera" };
+    const result = await scan(true);
+    assert.equal(result.status, 201);
+    assert.match(subjectPrompts[0], /"speciesName":"Unknown"/);
+    assert.deepEqual(stageCalls, ["plantnet", "subject", "perenual", "diagnosis"]);
+    assert.deepEqual(speciesRequests, [["Monstera deliciosa", "Monstera"]]);
+    assert.deepEqual(subjectImages, ["/9j/2Q=="]); assert.deepEqual(sentImages, ["/9j/2Q=="]);
+    assert.equal(result.body.identification.speciesName, "Monstera deliciosa");
+    assert.equal(result.body.identification.confidence, 0.88);
+    assert.equal(identificationWrites[0].rawResponse.source, "gemini");
+    assert.equal(healthWrites[0].species, "Monstera deliciosa");
+    assert.equal(plantCreates, 1); assert.equal(analyses.length, 1); assert.equal(taskWrites.length, 1);
+    assert.match(JSON.stringify(errors), /continuing with Gemini/);
+    assert.doesNotMatch(JSON.stringify(errors), /private|api-key=/);
+  });
+}
+
+test("Pl@ntNet no-match does not veto a living plant identified by Gemini", async () => {
+  noPlantIdentification = true;
+  const result = await scan(true);
+  assert.equal(result.status, 201); assert.equal(result.body.identification.speciesName, speciesName);
+  assert.equal(plantCreates, 1); assert.equal(fetches, 1);
+});
+
+test("Gemini can correct a successful Pl@ntNet suggestion before the species reference lookup", async () => {
+  detectionText = JSON.stringify({ subjectKind: "living_plant", speciesName: "Monstera deliciosa", commonName: "Monstera", confidence: 0.85 });
+  perenualData = null;
+  const result = await scan(true);
+  assert.equal(result.status, 201);
+  assert.deepEqual(speciesRequests, [["Monstera deliciosa", "Monstera"]]);
+  assert.equal(result.body.plant.species, "Monstera deliciosa");
+  assert.equal(identificationWrites[0].rawResponse.source, "gemini");
+});
+
+test("Gemini checks the subject before enrichment even when Pl@ntNet identifies a species", async () => {
+  responseText = JSON.stringify({ subjectKind: "artificial_plant" });
+  const result = await scan(true);
+  assert.equal(result.status, 200); assert.equal(result.body.subjectKind, "artificial_plant");
+  assert.deepEqual(stageCalls, ["plantnet", "subject"]);
+  assert.equal(fetches, 0); assert.equal(reads.length, 0); assert.equal(imageWrites, 0); assert.equal(plantCreates, 0);
+});
+
+test("unclear living species can receive general diagnosis without querying or caching Unknown", async () => {
+  identificationError = new Error("offline");
+  detectionText = JSON.stringify({ subjectKind: "living_plant", speciesName: "Unknown", commonName: null, confidence: 0 });
+  const result = await scan(true);
+  assert.equal(result.status, 201); assert.equal(result.body.identification.speciesName, "Unknown");
+  assert.equal(fetches, 0); assert.equal(reads.length, 0); assert.equal(inserts.length, 0);
+  assert.match(prompts[0], /No ideal species specs available/);
+  assert.equal(analyses.length, 1);
+});
+
+test("failed Pl@ntNet plus failed Gemini returns only a sanitized Gemini error and saves nothing", async () => {
+  identificationError = new Error("private plantnet key");
+  generationError = Object.assign(new Error("private Gemini key"), { status: 429 });
+  const result = await scan(true);
+  assert.equal(result.status, 503); assert.equal(result.body.code, "SCAN_AI_BUSY");
+  assert.doesNotMatch(JSON.stringify(result.body), /identification service|private/);
+  assert.equal(plantCreates, 0); assert.equal(analyses.length, 0); assert.equal(fetches, 0);
+});
+
+test("fallback Gemini diagnosis failures after identification cannot save a partial scan", async () => {
+  identificationError = new Error("offline");
+  diagnosisError = new Error("private generation detail");
+  const result = await scan(true);
+  assert.equal(result.status, 502); assert.equal(result.body.code, "SCAN_AI_UNAVAILABLE");
+  assert.equal(plantCreates, 0); assert.equal(identificationWrites.length, 0); assert.equal(imageWrites, 0);
+});
+
+test("invalid Gemini subject identities stop before enrichment or persistence", async () => {
+  for (const value of ["not JSON", { subjectKind: "invalid" }, { subjectKind: "living_plant", speciesName: "Fern" },
+    { subjectKind: "living_plant", speciesName: "Fern", commonName: null, confidence: 2 }]) {
+    detectionText = typeof value === "string" ? value : JSON.stringify(value);
+    const result = await scan(true);
+    assert.equal(result.status, 502); assert.equal(result.body.code, "SCAN_AI_UNAVAILABLE");
+    assert.equal(fetches, 0); assert.equal(reads.length, 0); assert.equal(plantCreates, 0);
+  }
 });
 test("living scan saves its profile photo and returns the paired device ID", async () => {
   linkedDevice = "00000000-0000-4000-8000-000000000002";

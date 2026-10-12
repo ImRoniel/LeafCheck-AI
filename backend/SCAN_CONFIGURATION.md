@@ -14,7 +14,9 @@ Credentials are read when creating the scan model rather than at route import ti
 
 ## Other providers and expected outcomes
 
-- `PLANTNET_API_KEY`: required for identification. A provider 404 or empty species list becomes a controlled no-plant response (422), before plant creation or Gemini generation.
+- `PLANTNET_API_KEY`: optional species hint. Missing or malformed keys, no matches, timeouts, quota limits and provider errors are logged by code and fall back to an Unknown hint. The whole attempt, including image preparation and response parsing, has an 8-second deadline. Only the Pl@ntNet upload is resized to at most 1024px on either edge and less than 1MB; Gemini and saved photos retain the original JPEG.
+- Pipeline: optional Pl@ntNet → Gemini living-plant check and species identification → optional Perenual/cache and telemetry → Gemini diagnosis → save. Nonliving images return a short message before enrichment or persistence. Gemini may correct a Pl@ntNet hint; when Pl@ntNet fails, Gemini identifies the species for enrichment and saving. A living plant with unclear species can still receive general care advice; no Unknown species lookup is sent to Perenual.
+- The frontend scan request defaults to a 120-second deadline to accommodate the two Gemini stages and persistence. Explicit caller/client timeout settings and cancellation remain supported; other API requests retain their existing defaults.
 - `PERENUAL_API_KEY`: optional enrichment. Scientific-name and common-name searches are bounded by a shared timeout. Results must confirm the scientific identity before caching; no trustworthy match means diagnosis proceeds without reference specs. The Gemini prompt explicitly discloses this limitation.
 - Gemini missing/invalid credentials or upstream authentication rejection return `SCAN_AI_CONFIGURATION` with 503. Rate limits return `SCAN_AI_BUSY`; other generation failures return `SCAN_AI_UNAVAILABLE`. Raw provider responses and credential-bearing URLs are not returned or logged by the scan error handler.
 
@@ -22,6 +24,6 @@ Automated provider tests mock network responses. They do not verify the validity
 
 ## Startup validation and diagnosis
 
-Both mandatory provider keys are validated before the server listens. Gemini accepts **AIza** followed by 35 URL-safe characters or **AQ.** followed by a nonempty URL-safe suffix, without imposing the legacy length on newer keys. Missing or malformed keys cause an actionable, secret-free startup message and exit status 1. Format validation does not establish authorization, API restrictions, quota or model availability. Startup and both AI routes use the same validator.
+Only the mandatory Gemini key is validated before the server listens. Gemini accepts **AIza** followed by 35 URL-safe characters or **AQ.** followed by a nonempty URL-safe suffix, without imposing the legacy length on newer keys. A missing or malformed Gemini key causes an actionable, secret-free startup message and exit status 1. Missing optional provider keys do not prevent startup. Format validation does not establish authorization, API restrictions, quota or model availability. Startup and both AI routes use the same Gemini validator.
 
 See [the diagnosis and data-flow report](SCAN_DIAGNOSIS.md) for the reproduced upstream failure, implementation steps, and deployment remediation.

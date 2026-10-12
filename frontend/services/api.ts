@@ -405,7 +405,10 @@ export function createApiClient(
       else v.nonempty(body.imageBase64, "imageBase64");
       if (body.plantId !== undefined) v.nonempty(body.plantId, "plantId");
       if (body.deviceId !== undefined) v.nonempty(body.deviceId, "deviceId");
-      return request("/api/scan", v.parseScan, options, "POST", body);
+      // Cover optional identification, two Gemini stages, enrichment and saving.
+      return request("/api/scan", v.parseScan, {
+        ...options, timeoutMs: options?.timeoutMs ?? config.timeoutMs ?? 120_000,
+      }, "POST", body);
     },
     analyzePlant: (body: AIDiagnosisRequest, options?: RequestOptions) => {
       v.object({})(body, "analysis");

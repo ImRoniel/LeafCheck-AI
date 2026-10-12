@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
+import { randomBytes } from "node:crypto";
+import sharp from "sharp";
 import { geminiError, geminiModel } from "../src/lib/gemini.ts";
 import { fetchPlantSpecs } from "../src/lib/perenual.ts";
-import { identifyPlant } from "../src/lib/plantnet.ts";
+import { identifyPlant, preparePlantNetImage, PLANTNET_TIMEOUT_MS, MAX_PLANTNET_IMAGE_BYTES } from "../src/lib/plantnet.ts";
+
+const image = (await sharp({ create: { width: 16, height: 10, channels: 3, background: "green" } }).jpeg().toBuffer()).toString("base64");
 
 const original = { ...process.env };
 afterEach(() => {
@@ -29,7 +33,7 @@ test("Pl@ntNet 404 and empty identification are controlled no-plant outcomes", a
       "fetch",
       async () => new Response(JSON.stringify(body), { status }),
     );
-    await assert.rejects(identifyPlant("abc"), {
+    await assert.rejects(identifyPlant(image), {
       status: 422,
       code: "NO_PLANT_DETECTED",
     });
@@ -47,14 +51,14 @@ test("Pl@ntNet unexpected provider error objects and network failures remain con
         status: 500,
       }),
   );
-  await assert.rejects(identifyPlant("abc"), {
+  await assert.rejects(identifyPlant(image), {
     code: "PLANT_IDENTIFICATION_FAILED",
   });
   mock.restoreAll();
   mock.method(globalThis, "fetch", async () => {
     throw new Error("secret URL");
   });
-  await assert.rejects(identifyPlant("abc"), {
+  await assert.rejects(identifyPlant(image), {
     code: "PLANT_IDENTIFICATION_FAILED",
   });
 });
@@ -68,7 +72,83 @@ test("malformed identification metadata is rejected without returning provider d
     { species: { scientificNameWithoutAuthor: "Basil", commonNames: [42] }, score: 0.9 },
   ]) {
     mock.method(globalThis, "fetch", async () => Response.json({ results: [result] }));
-    await assert.rejects(identifyPlant("abc"), { status: 502, code: "PLANT_IDENTIFICATION_FAILED" });
+    await assert.rejects(identifyPlant(image), { status: 502, code: "PLANT_IDENTIFICATION_FAILED" });
+    mock.restoreAll();
+  }
+});
+
+test("Pl@ntNet preparation bounds both image edges and upload size without enlarging small photos", async () => {
+  const large = await sharp(randomBytes(2400 * 1200 * 3), { raw: { width: 2400, height: 1200, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+  assert.ok(large.length > MAX_PLANTNET_IMAGE_BYTES);
+  const resized = await preparePlantNetImage(large.toString("base64"));
+  const metadata = await sharp(resized).metadata();
+  assert.equal(metadata.width, 1024); assert.equal(metadata.height, 512);
+  assert.equal(metadata.format, "jpeg"); assert.ok(resized.length < MAX_PLANTNET_IMAGE_BYTES);
+  const small = await sharp(await preparePlantNetImage(image)).metadata();
+  assert.equal(small.width, 16); assert.equal(small.height, 10);
+});
+
+test("Pl@ntNet sends the prepared JPEG and clears its deadline after a successful response", async t => {
+  process.env.PLANTNET_API_KEY = "test";
+  let signal, upload;
+  mock.method(globalThis, "fetch", async (_url, options) => {
+    signal = options.signal; upload = options.body.get("images");
+    return Response.json({ results: [{ species: { scientificNameWithoutAuthor: "Ocimum basilicum" }, score: 0.9 }] });
+  });
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  assert.equal((await identifyPlant(image)).speciesName, "Ocimum basilicum");
+  assert.equal(upload.type, "image/jpeg"); assert.ok(upload.size < MAX_PLANTNET_IMAGE_BYTES);
+  assert.equal((await sharp(Buffer.from(await upload.arrayBuffer())).metadata()).format, "jpeg");
+  t.mock.timers.tick(PLANTNET_TIMEOUT_MS);
+  assert.equal(signal.aborted, false);
+});
+
+for (const stage of ["upload", "response parsing"]) {
+  test(`Pl@ntNet has a hard 8-second deadline during ${stage}, even when abort is ignored`, async t => {
+    process.env.PLANTNET_API_KEY = "test";
+    let signal, started;
+    const reachedStage = new Promise(resolve => { started = resolve; });
+    mock.method(globalThis, "fetch", async (_url, options) => {
+      signal = options.signal;
+      if (stage === "upload") { started(); return new Promise(() => {}); }
+      return { ok: true, json: () => { started(); return new Promise(() => {}); } };
+    });
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const attempt = identifyPlant(image);
+    await reachedStage;
+    t.mock.timers.tick(7999); assert.equal(signal.aborted, false);
+    const rejected = assert.rejects(attempt, { status: 504, code: "PLANT_IDENTIFICATION_TIMEOUT" });
+    t.mock.timers.tick(1);
+    await rejected;
+    assert.equal(signal.aborted, true);
+  });
+}
+
+test("the Pl@ntNet deadline also bounds stalled image preparation and sends no request", async t => {
+  process.env.PLANTNET_API_KEY = "test";
+  t.mock.method(sharp.prototype, "toBuffer", () => new Promise(() => {}));
+  const request = t.mock.method(globalThis, "fetch", async () => { throw new Error("must not upload"); });
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const attempt = identifyPlant(image);
+  const rejected = assert.rejects(attempt, { status: 504, code: "PLANT_IDENTIFICATION_TIMEOUT" });
+  t.mock.timers.tick(PLANTNET_TIMEOUT_MS);
+  await rejected;
+  assert.equal(request.mock.callCount(), 0);
+});
+
+test("Pl@ntNet quota and server failures are controlled and missing keys avoid a request", async () => {
+  process.env.PLANTNET_API_KEY = "test";
+  for (const status of [429, 500]) {
+    mock.method(globalThis, "fetch", async () => Response.json({ error: "unavailable" }, { status }));
+    await assert.rejects(identifyPlant(image), { code: "PLANT_IDENTIFICATION_FAILED" });
+    mock.restoreAll();
+  }
+  for (const key of [undefined, "", "two words"]) {
+    if (key === undefined) delete process.env.PLANTNET_API_KEY;
+    else process.env.PLANTNET_API_KEY = key;
+    const request = mock.method(globalThis, "fetch", async () => { throw new Error("should not request"); });
+    await assert.rejects(identifyPlant(image), { status: 503, code: "PLANT_IDENTIFICATION_FAILED" });
+    assert.equal(request.mock.callCount(), 0);
     mock.restoreAll();
   }
 });

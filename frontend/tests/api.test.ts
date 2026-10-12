@@ -37,6 +37,32 @@ const client = (body: unknown, status = 200) =>
   });
 const kind = (expected: string) => (error: unknown) =>
   error instanceof ApiError && error.kind === expected;
+
+test("scan deadlines accommodate fallback stages and preserve explicit timeouts and cancellation", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let requestSignal: AbortSignal | undefined;
+  const api = createApiClient({ fetch: (_url, options) => {
+    requestSignal = options?.signal ?? undefined;
+    return new Promise(() => {});
+  } });
+  const pending = api.scanPlant({ imageBase64: "abc" });
+  t.mock.timers.tick(30_000); assert.equal(requestSignal?.aborted, false);
+  t.mock.timers.tick(89_999); assert.equal(requestSignal?.aborted, false);
+  const timeout = assert.rejects(pending, kind("timeout"));
+  t.mock.timers.tick(1); await timeout; assert.equal(requestSignal?.aborted, true);
+
+  const overridden = api.scanPlant({ imageBase64: "abc" }, { timeoutMs: 10 });
+  const overrideTimeout = assert.rejects(overridden, kind("timeout"));
+  t.mock.timers.tick(10); await overrideTimeout;
+  const configured = createApiClient({ timeoutMs: 20, fetch: () => new Promise(() => {}) });
+  const configuredTimeout = assert.rejects(configured.scanPlant({ imageBase64: "abc" }), kind("timeout"));
+  t.mock.timers.tick(20); await configuredTimeout;
+
+  const controller = new AbortController();
+  const cancelled = assert.rejects(api.scanPlant({ imageBase64: "abc" }, { signal: controller.signal }), kind("cancelled"));
+  controller.abort(); await cancelled;
+  assert.equal(requestSignal?.aborted, true);
+});
 test("plant creation and deletion use normalized payloads, parsed responses and empty 204", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const api = createApiClient({

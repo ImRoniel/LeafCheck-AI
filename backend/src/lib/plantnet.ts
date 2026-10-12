@@ -9,6 +9,24 @@ import type { PlantIdentificationResult } from "../types/scan.js";
 import { HttpError } from "./http.js";
 
 const PLANTNET_BASE_URL = "https://my-api.plantnet.org/v2/identify/all";
+export const PLANTNET_TIMEOUT_MS = 8_000;
+export const MAX_PLANTNET_IMAGE_BYTES = 1_000_000;
+
+/** The original scan stays intact for Gemini and profile-photo storage. */
+export async function preparePlantNetImage(imageBase64: string): Promise<Buffer> {
+  // A missing native codec must fail this optional attempt, never server startup.
+  const { default: sharp } = await import("sharp");
+  const image = await sharp(Buffer.from(imageBase64, "base64"), { limitInputPixels: 40_000_000 })
+    .rotate()
+    .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 80, chromaSubsampling: "4:2:0" })
+    .timeout({ seconds: PLANTNET_TIMEOUT_MS / 1000 })
+    .toBuffer();
+  if (image.length >= MAX_PLANTNET_IMAGE_BYTES) {
+    throw new HttpError(413, "PLANT_IDENTIFICATION_IMAGE_TOO_LARGE", "Plant identification is temporarily unavailable.");
+  }
+  return image;
+}
 
 /**
  * Sends a plant image to the Pl@ntNet API and returns the top identification.
@@ -21,7 +39,7 @@ export async function identifyPlant(
   imageBase64: string,
 ): Promise<PlantIdentificationResult> {
   const apiKey = process.env.PLANTNET_API_KEY?.trim();
-  if (!apiKey) {
+  if (!apiKey || /\s/.test(apiKey)) {
     throw new HttpError(
       503,
       "PLANT_IDENTIFICATION_FAILED",
@@ -29,9 +47,29 @@ export async function identifyPlant(
     );
   }
 
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const error = new HttpError(504, "PLANT_IDENTIFICATION_TIMEOUT", "Plant identification timed out.");
+      reject(error);
+      controller.abort(error);
+    }, PLANTNET_TIMEOUT_MS);
+  });
+  try {
+    // Bound resizing, upload and response parsing, even if an upstream ignores abort.
+    return await Promise.race([identifyWithinDeadline(imageBase64, apiKey, controller.signal), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function identifyWithinDeadline(imageBase64: string, apiKey: string, signal: AbortSignal): Promise<PlantIdentificationResult> {
+
   // Convert base64 → binary Blob for multipart upload
-  const imageBuffer = Buffer.from(imageBase64, "base64");
-  const blob = new Blob([imageBuffer], { type: "image/jpeg" });
+  const imageBuffer = await preparePlantNetImage(imageBase64);
+  signal.throwIfAborted();
+  const blob = new Blob([Uint8Array.from(imageBuffer)], { type: "image/jpeg" });
 
   const formData = new FormData();
   formData.append("images", blob, "plant.jpg");
@@ -42,7 +80,7 @@ export async function identifyPlant(
   const response = await fetch(url, {
     method: "POST",
     body: formData,
-    signal: AbortSignal.timeout(20_000),
+    signal,
   }).catch(() => {
     throw new HttpError(
       502,
@@ -52,6 +90,7 @@ export async function identifyPlant(
   });
 
   if (!response.ok) {
+    console.warn("[Pl@ntNet] Provider unavailable", { status: response.status });
     let errorDetail = "";
     try {
       const errJson = JSON.parse(await response.text());
