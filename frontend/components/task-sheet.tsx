@@ -1,10 +1,10 @@
-import type { PropsWithChildren } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
-export function TaskSheet({ title, onClose, children }: PropsWithChildren<{ title: string; onClose: () => void }>) {
+export function TaskSheet({ title, onClose, children, headerContent, footer }: PropsWithChildren<{ title: string; onClose: () => void; headerContent?: ReactNode; footer?: ReactNode }>) {
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   return <Modal visible transparent animationType={reducedMotion ? "none" : "slide"} onRequestClose={onClose} statusBarTranslucent>
@@ -14,7 +14,9 @@ export function TaskSheet({ title, onClose, children }: PropsWithChildren<{ titl
         <View style={s.header}><Text accessibilityRole="header" style={s.title}>{title}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Close sheet" onPress={onClose} style={s.close}><Text style={s.closeText}>✕</Text></Pressable>
         </View>
-        <ScrollView contentContainerStyle={s.content}>{children}</ScrollView>
+        {headerContent}
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={s.content}>{children}</ScrollView>
+        {footer}
       </View>
     </View>
   </Modal>;

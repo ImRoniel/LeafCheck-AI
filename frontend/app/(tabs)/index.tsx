@@ -34,7 +34,8 @@ export default function Home() {
         onViewAll={() => router.navigate({ pathname: "/(tabs)/spaces", params: { filter: "" } })} />
         : !data.error && <View style={s.empty}><Text accessibilityRole="header" style={s.emptyTitle}>Your garden starts here</Text><Text style={s.note}>Add a plant and make room for a little green.</Text><Action label="Add your first plant" onPress={() => router.navigate({ pathname: "/(tabs)/spaces", params: { filter: "" } })} /></View>)}
     </Screen>
-    {sensorSheet && <DashboardSensorStatusSheet onClose={() => setSensorSheet(false)} onOpenPlant={openPlant} />}
+    {sensorSheet && <DashboardSensorStatusSheet onClose={() => setSensorSheet(false)} onOpenPlant={openPlant}
+      onManageDevices={() => { setSensorSheet(false); router.push("/device-connection/manage"); }} />}
   </View>;
 }
 const s = StyleSheet.create({

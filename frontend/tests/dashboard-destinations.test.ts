@@ -8,31 +8,32 @@ import ts from "typescript";
 import { plantsNeedingAttention } from "../services/plant-attention";
 import { summarizeDashboard } from "../services/dashboard-summary";
 import * as summaryService from "../services/dashboard-summary";
+import * as sensorOverviewService from "../services/sensor-overview";
 import { overviewReadingStatus } from "../services/sensor-overview";
 import type { Plant } from "../types/plant";
 import type { SensorOverviewEntry } from "../types/device";
 const requireModule = createRequire(`${process.cwd()}/package.json`);
 const web = requireModule("react-native-web");
 const { renderToStaticMarkup } = requireModule("react-dom/server") as { renderToStaticMarkup: (node: React.ReactNode) => string };
-type Props = { children?: React.ReactNode; accessibilityLabel?: string; onPress?: () => void; onSensors?: () => void; onOpenPlant?: (id: string) => void; onClear?: () => void; label?: string };
-const elements = (node: React.ReactNode): React.ReactElement<Props>[] => React.Children.toArray(node).flatMap(child => React.isValidElement<Props>(child) ? [child, ...elements(child.props.children)] : []);
+type Props = { children?: React.ReactNode; headerContent?: React.ReactNode; footer?: React.ReactNode; accessibilityLabel?: string; accessibilityState?: { expanded?: boolean }; onPress?: () => void; onSensors?: () => void; onOpenPlant?: (id: string) => void; onManageDevices?: () => void; onChangeText?: (text: string) => void; onClear?: () => void; label?: string };
+const elements = (node: React.ReactNode): React.ReactElement<Props>[] => React.Children.toArray(node).flatMap(child => React.isValidElement<Props>(child) ? [child, ...elements(child.props.children), ...elements(child.props.headerContent), ...elements(child.props.footer)] : []);
 const press = (node: React.ReactNode, label: string) => { const control = elements(node).find(child => child.props.accessibilityLabel === label || child.props.label === label); assert.ok(control, label); control.props.onPress!(); };
 function load(file: string, overrides: Record<string, unknown> = {}) {
   const exports: Record<string, (props: never) => React.ReactElement<Props>> = {};
   runInNewContext(ts.transpileModule(readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     exports, require(name: string) {
       if (name in overrides) return overrides[name];
-      if (name === "react") return React;
+      if (name === "react") return { ...React, useState: (value: unknown) => [value, () => {}] };
       if (name === "react/jsx-runtime") return requireModule(name);
       if (name === "react-native") return web;
       if (name === "./animated-pressable") return { AnimatedPressable: web.Pressable };
       if (name === "@expo/vector-icons") return { Ionicons: () => null };
-      if (name === "./task-sheet") return { TaskSheet: ({ title, children }: { title: string; children: React.ReactNode }) => React.createElement(web.View, {}, React.createElement(web.Text, {}, title), children) };
+      if (name === "./task-sheet") return { TaskSheet: ({ title, children, headerContent, footer }: { title: string; children: React.ReactNode; headerContent?: React.ReactNode; footer?: React.ReactNode }) => React.createElement(web.View, {}, React.createElement(web.Text, {}, title), headerContent, children, footer) };
       if (name === "./screen") return { Screen: web.View, Action: ({ label, onPress }: { label: string; onPress: () => void }) => React.createElement(web.Pressable, { onPress, accessibilityLabel: label }, React.createElement(web.Text, {}, label)) };
       if (name === "./care-task-thumbnail") return { CareTaskThumbnail: () => null };
       if (name === "@/services/plant-attention") return { plantsNeedingAttention };
       if (name === "@/services/dashboard-summary") return summaryService;
-      if (name === "@/services/sensor-overview") return { overviewReadingStatus };
+      if (name === "@/services/sensor-overview") return sensorOverviewService;
       throw new Error(`Unexpected import ${name}`);
     },
   });
@@ -81,7 +82,8 @@ test("sensor modal lists identities, linked/unlinked devices and zero-valued met
   const overview = { ready: true, loading: false, error: null, entries: [entry, { ...entry, device: { ...entry.device, id: "other", macAddress: "LC-000001" }, plants: [], telemetry: null }], refresh: async () => {} };
   const { DashboardSensorStatusSheet } = load("components/DashboardSensorStatusSheet.tsx", { "@/hooks/use-sensor-overview": { useSensorOverview: () => overview } });
   const markup = renderToStaticMarkup(DashboardSensorStatusSheet({ onClose: () => {}, onOpenPlant: () => {} } as never));
-  for (const text of [/Sensor Overview/, /LC-A50528/, /LC-000001/, /Linked plant · Fern/, /Not linked to a plant/, /Last received/, /0 °C/, /0%/, /0 ADC/, /requires calibration/]) assert.match(markup, text);
+  for (const text of [/Sensor Overview/, /LC-A50528/, /LC-000001/, /Fern/, /Unlinked devices/, /Last received/, /0 °C/, /0%/, /0 ADC/, /requires calibration/]) assert.match(markup, text);
+  assert.doesNotMatch(markup, /Device ID or plant name/);
   overview.entries[0] = { ...entry, readingError: true, telemetry: null };
   const failed = renderToStaticMarkup(DashboardSensorStatusSheet({ onClose: () => {}, onOpenPlant: () => {} } as never));
   assert.match(failed, /LC-A50528/); assert.match(failed, /Couldn’t refresh readings/); assert.match(failed, /Last reading unavailable/);
@@ -91,6 +93,54 @@ test("overview distinguishes stale, demo and failed cached readings", () => {
   assert.equal(overviewReadingStatus({ ...entry, telemetry: { ...entry.telemetry!, timestamp: new Date(now.getTime() - 31 * 60_000).toISOString() } }, now), "stale");
   assert.equal(overviewReadingStatus({ ...entry, demo: true }, now), "demo");
   assert.equal(overviewReadingStatus(entry, now, true), "error");
+});
+
+function sensorSheetHarness(entries: SensorOverviewEntry[]) {
+  const slots: unknown[] = [];
+  const managed: boolean[] = [], opened: string[] = [];
+  let cursor = 0;
+  const { DashboardSensorStatusSheet } = load("components/DashboardSensorStatusSheet.tsx", {
+    "@/hooks/use-sensor-overview": { useSensorOverview: () => ({ ready: true, loading: false, error: null, entries, refresh: async () => {} }) },
+    react: { ...React, useState: (initial: unknown) => {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = initial;
+      return [slots[index], (next: unknown) => { slots[index] = typeof next === "function" ? (next as (current: unknown) => unknown)(slots[index]) : next; }];
+    } },
+  });
+  return { managed, opened, render: () => {
+    cursor = 0;
+    return DashboardSensorStatusSheet({ onClose: () => {}, onOpenPlant: (id: string) => opened.push(id), onManageDevices: () => managed.push(true) } as never);
+  } };
+}
+
+test("large sensor inventories open attention groups first and collapse healthy groups until tapped", () => {
+  const entries = Array.from({ length: 4 }, (_, index) => ({ ...entry, device: { ...entry.device, id: `device-${index}`, macAddress: `LC-00000${index}` }, plants: [{ id: `plant-${index}`, name: `Plant ${index}` }], readingError: index === 3 }));
+  const sheet = sensorSheetHarness(entries);
+  const node = sheet.render(), markup = renderToStaticMarkup(node);
+  assert.match(markup, /4 devices · 1 needs attention/);
+  assert.match(markup, /Device ID or plant name/);
+  assert.ok(markup.indexOf("Plant 3") < markup.indexOf("Plant 0"));
+  assert.match(markup, /LC-000003/); assert.doesNotMatch(markup, /LC-000000/);
+  press(node, "Plant 0, 1 sensor");
+  assert.match(renderToStaticMarkup(sheet.render()), /LC-000000/);
+  press(sheet.render(), "Open Plant 0 growing conditions"); assert.deepEqual(sheet.opened, ["plant-0"]);
+  press(sheet.render(), "Plant 0, 1 sensor");
+  assert.doesNotMatch(renderToStaticMarkup(sheet.render()), /LC-000000/);
+});
+
+test("sensor search reveals matching collapsed readings, supports empty results and clears back to groups", () => {
+  const entries = Array.from({ length: 4 }, (_, index) => ({ ...entry, device: { ...entry.device, id: `device-${index}`, macAddress: `LC-00000${index}` }, plants: [{ id: `plant-${index}`, name: `Plant ${index}` }] }));
+  const sheet = sensorSheetHarness(entries);
+  const search = () => elements(sheet.render()).find(node => node.props.accessibilityLabel === "Search sensors by device ID or plant name")!;
+  search().props.onChangeText!(" lc-000002 ");
+  let markup = renderToStaticMarkup(sheet.render());
+  assert.match(markup, /LC-000002/); assert.doesNotMatch(markup, /Plant 0|Plant 1|Plant 3/);
+  search().props.onChangeText!("PLANT 1"); assert.match(renderToStaticMarkup(sheet.render()), /LC-000001/);
+  search().props.onChangeText!("not found");
+  markup = renderToStaticMarkup(sheet.render()); assert.match(markup, /No sensors match/); assert.doesNotMatch(markup, /No sensors claimed/);
+  press(sheet.render(), "Clear sensor search");
+  markup = renderToStaticMarkup(sheet.render()); assert.match(markup, /Plant 0/); assert.match(markup, /Plant 3/); assert.doesNotMatch(markup, /No sensors match/);
+  press(sheet.render(), "Manage all devices"); assert.deepEqual(sheet.managed, [true]);
 });
 test("sensor link opens the overview for zero, one or many sensors, including failed readings", () => {
   const { DashboardDailyDigest } = load("components/DashboardDailyDigest.tsx");
@@ -111,6 +161,9 @@ test("sensor link opens the overview for zero, one or many sensors, including fa
     assert.ok(elements(Home({} as never)).some(node => node.type === "Overview"));
     assert.equal(pushed.length, 0);
   }
+  elements(Home({} as never)).find(node => node.type === "Overview")!.props.onManageDevices!();
+  assert.equal(open, false);
+  assert.deepEqual(pushed, ["/device-connection/manage"]);
 });
 
 test("overview errors distinguish session, missing endpoint, connection and validation failures", async () => {
