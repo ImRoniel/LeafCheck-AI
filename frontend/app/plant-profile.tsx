@@ -10,7 +10,7 @@ import { useAppData } from "@/context/app-data";
 import { fetchPlantTelemetry, scanPlant } from "@/services/api";
 import { diagnosisRetryErrorMessage } from "@/services/scan-errors";
 import { useAuth } from "@/context/auth";
-import type { ArchiveEntry, PlantTelemetry as SensorState } from "@/types";
+import type { ArchiveEntry, PlantTelemetry as SensorState, ScanResponse } from "@/types";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { AppState } from "react-native";
@@ -33,7 +33,10 @@ export default function PlantProfile() {
   const reevaluation = useRef<AbortController | null>(null);
   const [reevaluating, setReevaluating] = useState(false);
   const [reevaluationError, setReevaluationError] = useState<string | null>(null);
-  const [updatedDiagnosis, setUpdatedDiagnosis] = useState<{ id: string; generation: number; latest: ArchiveEntry } | null>(null);
+  const [updatedDiagnosis, setUpdatedDiagnosis] = useState<{
+    id: string; generation: number; latest: ArchiveEntry;
+    identification: ScanResponse["identification"]; identificationReused?: boolean; identificationMessage?: string;
+  } | null>(null);
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
     setEditing(null);
@@ -74,8 +77,12 @@ export default function PlantProfile() {
   const pairSensor = () => router.push({ pathname: "/device-connection/scanner", params: { targetType: "plant", targetId: typeof id === "string" ? id : "" } });
   const retryGuidance = () => { void guidance.refresh().catch(() => undefined); };
   const savedLatest = guidance.data?.latest ?? null;
-  const localLatest = updatedDiagnosis && updatedDiagnosis.id === id && updatedDiagnosis.generation === auth.generation ? updatedDiagnosis.latest : null;
+  const localDiagnosis = updatedDiagnosis && updatedDiagnosis.id === id && updatedDiagnosis.generation === auth.generation ? updatedDiagnosis : null;
+  const localLatest = localDiagnosis?.latest ?? null;
   const latest = localLatest && (!savedLatest || Date.parse(localLatest.createdAt) >= Date.parse(savedLatest.createdAt)) ? localLatest : savedLatest;
+  // Archive rows have no scan-specific identification link. Only show confidence
+  // from the live response for the matching analysis, never another scan's value.
+  const confidenceContext = latest?.id === localLatest?.id ? localDiagnosis : null;
   const reevaluate = async () => {
     if (!plant || auth.status !== "authenticated" || reevaluation.current) return;
     const controller = new AbortController();
@@ -91,7 +98,9 @@ export default function PlantProfile() {
         await Promise.allSettled([guidance.refresh(), refresh()]);
         return;
       }
-      setUpdatedDiagnosis({ id: plant.id, generation: auth.generation, latest: {
+      setUpdatedDiagnosis({ id: plant.id, generation: auth.generation,
+        identification: report.identification, identificationReused: report.identificationReused, identificationMessage: report.identificationMessage,
+        latest: {
         id: report.diagnostic.id, plantId: plant.id, userId: null,
         healthStatus: report.diagnostic.healthStatus, rawAnalysisText: report.diagnostic.rawAnalysisText, diagnosisError: false,
         telemetrySnapshot: report.telemetrySnapshot ?? null,
@@ -125,6 +134,7 @@ export default function PlantProfile() {
         {deleting === plant.id && <DeletePlantAction key={`delete:${plant.id}`} id={plant.id} name={plant.name} initiallyConfirming onCancel={() => setDeleting(null)} />}
         <PlantTelemetry key={`telemetry:${plant.id}`} plant={plant} payload={payload} loading={loading} error={error} onRefresh={retrySensor} onPair={pairSensor} authenticated={auth.status === "authenticated"} />
         <PlantDiagnosisCard key={`diagnosis:${plant.id}`} latest={latest} loading={guidance.loading} error={Boolean(guidance.error)} hasSensor={Boolean(payload?.paired)} canReuseImage={Boolean(plant.imageUrl)} telemetryTimestamp={payload?.paired ? payload.telemetry?.timestamp : undefined} reevaluating={reevaluating} reevaluationError={reevaluationError} onReevaluate={() => { void reevaluate(); }} onRetry={() => { void reevaluate(); }} onReload={retryGuidance}
+          identification={confidenceContext?.identification} identificationReused={confidenceContext?.identificationReused} identificationMessage={confidenceContext?.identificationMessage}
           onScan={() => router.push({ pathname: "/(tabs)/scanner", params: { plantId: plant.id, ...(plant.deviceId ? { deviceId: plant.deviceId } : {}) } })}
           onHistory={() => router.push({ pathname: "/archives", params: { plantId: plant.id } })} />
         <PlantCareTasksCard key={`tasks:${plant.id}`} tasks={guidance.data.pending} loading={guidance.tasksLoading} error={Boolean(guidance.tasksError)} onViewAll={() => router.push("/(tabs)/tasks")} />

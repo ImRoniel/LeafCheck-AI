@@ -4,7 +4,7 @@ import { report, scannerHarness } from "./helpers/scanner-harness";
 import type { ScanResponse } from "../types";
 import { parseScan } from "../services/validators";
 
-test("sensor-enhanced scan results parse and display raw ADC and lux", async () => {
+test("legacy scan results disclose unverified provenance while displaying raw ADC and lux", async () => {
   const h = scannerHarness();
   const telemetry = { temperature: 32.19, humidity: 76.34, soilMoisture: null,
     soilMoistureRaw: 2625, lightLevel: 0.83, timestamp: "2026-10-12T00:00:00Z" };
@@ -13,7 +13,7 @@ test("sensor-enhanced scan results parse and display raw ADC and lux", async () 
     humidity: telemetry.humidity, soilMoisture: null, soilMoistureRaw: 2625, lightLux: 0.83 };
   h.behavior.scan = async () => parseScan({ ...report, telemetry, telemetrySnapshot });
   h.ready(); h.press("Capture and scan plant"); await h.settle();
-  assert.match(h.text, /Sensor-Enhanced AI/);
+  assert.match(h.text, /Image-Only AI \(legacy\)/);
   assert.match(h.text, /2625 ADC/);
   assert.match(h.text, /0\.83/);
   assert.doesNotMatch(h.text, /2625 %/);

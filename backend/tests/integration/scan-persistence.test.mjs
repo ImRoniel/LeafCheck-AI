@@ -5,6 +5,7 @@ import { PrismaClient } from "../../src/generated/postgres-client/index.js";
 import { persistScan } from "../../src/lib/scan-persistence.ts";
 import { reportCareTasks } from "../../src/lib/report-care-tasks.ts";
 import { pairPlantDevice } from "../../src/lib/plant-pairing.ts";
+import { latestReusableIdentification } from "../../src/lib/scan-identification.ts";
 
 // Refuse direct execution against application-configured/shared databases.
 const url = new URL(process.env.POSTGRES_URL ?? "http://invalid");
@@ -138,4 +139,31 @@ test("scan serialization retries roll back tentative plants and sessions before 
   assert.equal(after.pairings.length,before.pairings.length+1);
   assert.equal(after.analyses.length,before.analyses.length+1);
   assert.equal(after.pairings.filter(row => row.deviceId === device.id && row.unpairedAt === null)[0].plantId,saved.plant.id);
+});
+
+test("Phase D PostgreSQL JSON round-trip preserves image-only and attributed snapshots", async () => {
+  const first = await persistScan(client, {...input(), telemetrySnapshot: {source: "none"}});
+  const storedNone = await reader.aIAnalysis.findUnique({where: {id: first.analysis.id}});
+  assert.deepEqual(storedNone.telemetrySnapshot, {source: "none"});
+  const device = await client.device.create({data: {userId, macAddress: "LC-CAFE02", name: "Phase D sensor"}});
+  await pairPlantDevice(first.plant.id, userId, device.id);
+  const session = await reader.devicePairingHistory.findFirst({where: {plantId: first.plant.id, deviceId: device.id, unpairedAt: null}});
+  const telemetrySnapshot = {source: "current_session", readingId: "0123456789abcdef01234567",
+    plantId: first.plant.id, pairingId: session.id, contextVersion: 1, deviceId: device.macAddress,
+    timestamp: new Date().toISOString(), temperature: 27, humidity: 60, soilMoisture: null, soilMoistureRaw: 2500, lightLux: 100};
+  const scanned = await persistScan(client, {...input(first.plant.id), telemetrySnapshot});
+  const stored = await reader.aIAnalysis.findUnique({where: {id: scanned.analysis.id}});
+  assert.deepEqual(stored.telemetrySnapshot, telemetrySnapshot);
+  assert.deepEqual((await reader.aIAnalysis.findUnique({where: {id: first.analysis.id}})).telemetrySnapshot, {source: "none"});
+});
+
+test("Phase D PostgreSQL confidence recovery skips three synthetic zeros and enforces ownership", async () => {
+  const saved = await persistScan(client, input());
+  const original = await reader.plantIdentification.findFirst({where: {plantId: saved.plant.id}});
+  await client.plantIdentification.createMany({data: [1,2,3].map(index => ({plantId: saved.plant.id,
+    speciesName: "Ocimum basilicum", confidence: 0, rawResponse: {source: "saved-plant"},
+    createdAt: new Date(original.createdAt.getTime() + index * 1000)}))});
+  const recovered = await latestReusableIdentification(reader, saved.plant.id, userId);
+  assert.equal(recovered.id, original.id); assert.equal(recovered.confidence, original.confidence);
+  assert.equal(await latestReusableIdentification(reader, saved.plant.id, outsider), null);
 });

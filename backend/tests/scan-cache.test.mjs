@@ -5,6 +5,9 @@ import { HttpError } from "../src/lib/http.ts";
 
 const speciesName = "Ocimum basilicum";
 const newPlantId = "00000000-0000-4000-8000-000000000099";
+const existingPlantId = "00000000-0000-4000-8000-000000000001";
+const sessionId = "00000000-0000-4000-8000-000000000003";
+const readingId = "000000000000000000000001";
 let createdPlant, pairingRows;
 const winner = {
   id: "cached-winner",
@@ -33,6 +36,11 @@ let plantOwned;
 let latestReading;
 let telemetryReads;
 let telemetryQueries, sensorMac;
+let scanSession, extraReadings, previousIdentifications, identificationQueries, diagnosisGate, extraPlants;
+const currentSession = () => scanSession === null || !linkedDevice ? null : scanSession ?? {
+  id: sessionId, plantId: existingPlantId, deviceId: linkedDevice, pairedAt: new Date(0), unpairedAt: null,
+};
+const currentReadingWhere = () => ({ plantId: existingPlantId, pairingId: currentSession().id, contextVersion: 1 });
 let savedImageUrl, sentImages;
 let responseText;
 let guidanceQueries;
@@ -66,10 +74,10 @@ before(async () => {
       prismaPg: {
         $transaction: async function (operation,options) {
           assert.equal(options.isolationLevel,"Serializable");
-          const snapshot = structuredClone({ plantCreates, createdPlant, pairingRows, analyses, taskWrites, identificationWrites, healthWrites });
+          const snapshot = structuredClone({ plantCreates, createdPlant, pairingRows, analyses, taskWrites, identificationWrites, healthWrites, previousIdentifications });
           try { return await operation(this); }
           catch (error) {
-            ({ plantCreates, createdPlant, pairingRows, analyses, taskWrites, identificationWrites, healthWrites } = snapshot);
+            ({ plantCreates, createdPlant, pairingRows, analyses, taskWrites, identificationWrites, healthWrites, previousIdentifications } = snapshot);
             throw error;
           }
         },
@@ -87,7 +95,7 @@ before(async () => {
             };
             return createdPlant;
           },
-          findFirst: async ({where}) => where.id === newPlantId ? createdPlant : plantOwned ? ({
+          findFirst: async ({where}) => where.id === newPlantId ? createdPlant : plantOwned ? extraPlants.get(where.id) ?? ({
             id: "00000000-0000-4000-8000-000000000001",
             userId: "owner",
             name: "Basil",
@@ -106,13 +114,22 @@ before(async () => {
         device: { findFirst: async ({ where }) => deviceOwned ? { id: where.id, userId: "owner", macAddress: sensorMac } : null },
         devicePairingHistory: {
           findMany: async () => pairingRows.filter(row => row.unpairedAt === null),
-          findFirst: async () => null,
+          findFirst: async ({where}) => {
+            const session = currentSession();
+            return where.unpairedAt === null && session?.plantId === where.plantId && session?.deviceId === where.deviceId ? session : null;
+          },
           updateMany: async ({data}) => { for(const row of pairingRows) if(row.unpairedAt === null) Object.assign(row,data); return {count:0}; },
           create: async ({data}) => { const row = {id:`pairing-${pairingRows.length}`,unpairedAt:null,...data}; pairingRows.push(row); return row; },
         },
-        plantIdentification: { create: async ({ data }) => {
+        plantIdentification: { findMany: async query => {
+          identificationQueries.push(query);
+          assert.deepEqual(query.where, {plantId: existingPlantId, plant: {userId: "owner"}});
+          return previousIdentifications;
+        }, create: async ({ data }) => {
           identificationWrites.push(captureWrite("identification", data));
-          return { id: "identification" };
+          const row = { id: `identification-${identificationWrites.length}`, ...data };
+          previousIdentifications.unshift(row);
+          return row;
         } },
         plantSpecCache: {
           findUnique: async (args) => {
@@ -151,7 +168,10 @@ before(async () => {
     namedExports: {
       prisma: { sensorReading: { findFirst: async (query) => {
         telemetryReads++; telemetryQueries.push(query);
-        return latestReading?.deviceId === query.where.deviceId ? latestReading : null;
+        return [...extraReadings, latestReading].filter(Boolean).map(row => ({
+          id: readingId, plantId: existingPlantId, pairingId: currentSession()?.id, contextVersion: 1, ...row,
+        })).filter(row => Object.entries(query.where).every(([key, value]) => row[key] === value))
+          .sort((a,b) => b.timestamp - a.timestamp || b.id.localeCompare(a.id))[0] ?? null;
       } } },
     },
   });
@@ -193,6 +213,7 @@ before(async () => {
               if (diagnosisError) throw diagnosisError;
               prompts.push(contents[0]);
               sentImages.push(contents[1].inlineData.data);
+              if (diagnosisGate) { diagnosisGate.arrive(); await diagnosisGate.ready; }
               return { response: { text: () => responseText } };
             },
           };
@@ -232,6 +253,9 @@ beforeEach(() => {
   latestReading = null;
   telemetryReads = 0;
   telemetryQueries = []; sensorMac = "LC-A50528";
+  scanSession = undefined; extraReadings = []; diagnosisGate = null;
+  extraPlants = new Map();
+  previousIdentifications = [{id: "original-identification", confidence: 0.989, rawResponse: {results: []}}]; identificationQueries = [];
   savedImageUrl = "data:image/jpeg;base64,/9j/2Q=="; sentImages = [];
   responseText = JSON.stringify({subjectKind: "living_plant", healthStatus: "healthy", diagnosticReport: "healthy", notification: {notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up"}});
   imageFailure = false; imageWrites = 0; discardedImages = 0; noPlantIdentification = false;
@@ -253,7 +277,7 @@ beforeEach(() => {
   insert = async ({ data }) => ({ id: "created", ...data });
 });
 
-test("re-evaluation reuses the owned saved photo, fresh MAC telemetry and normal persistence without uploading", async () => {
+test("re-evaluation reuses the owned saved photo, session telemetry and confidence without uploading", async () => {
   linkedDevice = "00000000-0000-4000-8000-000000000002";
   latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 32.19, humidity: 76.34,
     soilMoistureRaw: 2625, lightLux: 0.83 };
@@ -262,7 +286,9 @@ test("re-evaluation reuses the owned saved photo, fresh MAC telemetry and normal
   assert.equal(identifications, 0); assert.equal(subjectImages.length, 0);
   assert.deepEqual(sentImages, ["/9j/2Q=="]);
   assert.match(prompts[0], /Raw ADC: 2625/);
-  assert.deepEqual(telemetryQueries[0].where, { deviceId: sensorMac });
+  assert.deepEqual(telemetryQueries[0].where, currentReadingWhere());
+  assert.equal(result.body.identification.confidence, 0.989);
+  assert.equal(result.body.identificationReused, true);
   assert.equal(imageWrites, 0);
   assert.equal(discardedImages, 0);
   assert.equal(healthWrites[0].imageUrl, undefined);
@@ -449,7 +475,7 @@ test("owned device telemetry and stale context are preserved with diagnostic tex
   assert.equal(analyses[0].userId, "owner");
 });
 
-test("paired hardware scan combines the image prompt with MAC telemetry and specific care actions", async () => {
+test("paired hardware scan combines the image prompt with session telemetry and specific care actions", async () => {
   linkedDevice = "00000000-0000-4000-8000-000000000002";
   latestReading = {
     deviceId: sensorMac, timestamp: new Date(), temperature: 32.19, humidity: 76.34,
@@ -460,7 +486,7 @@ test("paired hardware scan combines the image prompt with MAC telemetry and spec
     notification: { notifyAt: "2027-01-02T09:00:00Z", reason: "Review light exposure" } });
   const result = await scan();
   assert.equal(result.status, 201);
-  assert.deepEqual(telemetryQueries, [{ where: { deviceId: sensorMac }, orderBy: { timestamp: "desc" } }]);
+  assert.deepEqual(telemetryQueries, [{ where: currentReadingWhere(), orderBy: [{timestamp: "desc"}, {id: "desc"}] }]);
   for (const pattern of [/Temperature: 32\.19°C/, /Humidity: 76\.34%/, /Raw ADC: 2625/, /Ambient Light: 0\.83 lux/,
     /Use this environmental data together with the image/, /Do not infer dry or wet soil/, /FRESH/]) assert.match(prompts[0], pattern);
   assert.doesNotMatch(prompts[0], /2625%/);
@@ -468,27 +494,37 @@ test("paired hardware scan combines the image prompt with MAC telemetry and spec
     soilMoisture: null, soilMoistureRaw: 2625, lightLevel: 0.83, timestamp: latestReading.timestamp.toISOString() });
   assert.match(result.body.careTasks[0].title, /brighter indirect light/);
   assert.equal(taskWrites[0].analysisId, result.body.diagnostic.id);
+  assert.equal(result.body.telemetrySnapshot.plantId, existingPlantId);
+  assert.equal(result.body.telemetrySnapshot.pairingId, sessionId);
+  assert.equal(result.body.telemetrySnapshot.readingId, readingId);
+  assert.equal(result.body.telemetrySnapshot.contextVersion, 1);
+  assert.equal(result.body.telemetrySnapshot.source, "current_session");
+  assert.deepEqual(analyses[0].telemetrySnapshot, result.body.telemetrySnapshot);
+  assert.equal(result.body.identificationReused, false);
 });
 
-test("request device identifier resolves an owned MAC even without a plant ID", async () => {
+test("a new plant's first scan stays image-only even when its requested sensor has readings", async () => {
   const deviceId = "00000000-0000-4000-8000-000000000002";
   latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 25, humidity: 50,
     soilMoisture: 2500, soilMoistureRaw: 0, lightLux: 0 };
   const result = await scan(true, { deviceId });
   assert.equal(result.status, 201);
-  assert.deepEqual(telemetryQueries[0].where, { deviceId: sensorMac });
-  assert.equal(result.body.telemetry.soilMoistureRaw, 0);
-  assert.equal(result.body.telemetry.lightLevel, 0);
-  assert.match(prompts[0], /Ambient Light: 0 lux/);
+  assert.equal(telemetryReads, 0);
+  assert.equal(result.body.telemetry, null);
+  assert.deepEqual(result.body.telemetrySnapshot, {source: "none"});
+  assert.deepEqual(analyses[0].telemetrySnapshot, {source: "none"});
+  assert.equal(result.body.plant.deviceId, deviceId);
+  assert.equal(pairingRows.length, 1);
+  assert.doesNotMatch(prompts[0], /Actual Sensor Readings|Ambient Light: 0 lux/);
 });
 
-test("demo scans retain calibrated percentages, UUID lookup and simulated context", async () => {
+test("demo scans retain calibrated percentages, session attribution and simulated context", async () => {
   linkedDevice = "00000000-0000-4000-8000-000000000002"; sensorMac = "DEMO:plant";
   latestReading = { deviceId: linkedDevice, timestamp: new Date(), temperature: 25, humidity: 50,
     soilMoisture: 50, lightLevel: 1000 };
   const result = await scan();
   assert.equal(result.status, 201);
-  assert.deepEqual(telemetryQueries[0].where, { deviceId: linkedDevice });
+  assert.deepEqual(telemetryQueries[0].where, currentReadingWhere());
   assert.match(prompts[0], /Simulated Sensor Readings/);
   assert.match(prompts[0], /Calibrated Soil Moisture: 50%/);
   assert.equal(result.body.telemetry.soilMoisture, 50);
@@ -505,7 +541,7 @@ test("unpaired scans stay image-only and paired sensors without readings disclos
   result = await scan();
   assert.equal(result.status, 201);
   assert.equal(result.body.telemetry, null);
-  assert.match(prompts[1], /Sensor data is unavailable/);
+  assert.match(prompts[1], /No telemetry data found for this plant's active pairing session/);
   assert.doesNotMatch(prompts[1], /Actual Sensor Readings/);
 });
 
@@ -865,7 +901,7 @@ for (const [name, error] of [["quota", Object.assign(new Error("Too many request
   });
 }
 
-test("diagnosis retry reuses the saved image and current MAC readings, preserving prior health on failure", async () => {
+test("diagnosis retry reuses the saved image and current session readings, preserving prior health on failure", async () => {
   linkedDevice = "00000000-0000-4000-8000-000000000002";
   existingHealthStatus = "warning";
   latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 29, humidity: 60, soilMoistureRaw: 2500, lightLux: 100 };
@@ -881,7 +917,7 @@ test("diagnosis retry reuses the saved image and current MAC readings, preservin
   assert.equal(imageWrites, 1); assert.deepEqual(sentImages, ["/9j/2Q=="]);
   for (const value of [/Actual Sensor Readings/, /Temperature: 31/, /Humidity: 72/, /Raw ADC: 2625/, /Ambient Light: 0.83 lux/, /FRESH/]) assert.match(prompts[0], value);
   assert.equal(retried.body.telemetry.soilMoistureRaw, 2625);
-  assert.ok(telemetryQueries.every(query => query.where.deviceId === "LC-A50528"));
+  assert.ok(telemetryQueries.every(query => query.where.plantId === existingPlantId && query.where.pairingId === sessionId && query.where.contextVersion === 1));
   assert.equal(analyses.length, 2); assert.equal(taskWrites.length, 1);
 });
 
@@ -898,4 +934,152 @@ test("failed diagnosis does not turn a failed database transaction into a succes
   const result = await scan(true);
   assert.equal(result.status, 500); assert.equal(result.body.success, false);
   assert.equal(plantCreates, 0); assert.equal(analyses.length, 0); assert.equal(discardedImages, 1);
+});
+
+test("Phase D: moving one sensor between plants and returning selects each new active session", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  const plant2Id = "00000000-0000-4000-8000-000000000004";
+  latestReading = { id: readingId, deviceId: sensorMac, plantId: existingPlantId, pairingId: sessionId, contextVersion: 1,
+    timestamp: new Date(), temperature: 21, humidity: 50 };
+  const first = await scan();
+  assert.equal(first.status, 201); assert.equal(first.body.telemetrySnapshot.pairingId, sessionId);
+  extraReadings.push(latestReading);
+  extraPlants.set(existingPlantId, { id: existingPlantId, userId: "owner", name: "Basil", species: speciesName, deviceId: null });
+  extraPlants.set(plant2Id, { id: plant2Id, userId: "owner", name: "Plant2", species: speciesName, deviceId: linkedDevice });
+  scanSession = { id: "00000000-0000-4000-8000-000000000005", plantId: plant2Id, deviceId: linkedDevice, unpairedAt: null };
+  latestReading = { ...latestReading, id: "000000000000000000000002", plantId: plant2Id, pairingId: scanSession.id, temperature: 32 };
+  const second = await scan(false, { plantId: plant2Id });
+  assert.equal(second.status, 201); assert.equal(second.body.telemetrySnapshot.plantId, plant2Id);
+  assert.equal(second.body.telemetrySnapshot.pairingId, scanSession.id);
+  assert.match(prompts[1], /Temperature: 32°C/); assert.doesNotMatch(prompts[1], /Temperature: 21°C/);
+  extraReadings.push(latestReading);
+  extraPlants.set(existingPlantId, { ...extraPlants.get(existingPlantId), deviceId: linkedDevice });
+  scanSession = { ...scanSession, id: "00000000-0000-4000-8000-000000000006", plantId: existingPlantId };
+  latestReading = { ...latestReading, id: "000000000000000000000003", plantId: existingPlantId, pairingId: scanSession.id, temperature: 23 };
+  const returned = await scan();
+  assert.equal(returned.status, 201); assert.equal(returned.body.telemetrySnapshot.pairingId, scanSession.id);
+  assert.equal(returned.body.telemetry.temperature, 23);
+  assert.match(prompts[2], /Temperature: 23°C/); assert.doesNotMatch(prompts[2], /Temperature: 21°C|Temperature: 32°C/);
+  assert.deepEqual(analyses.map(row => row.telemetrySnapshot.pairingId), [sessionId, second.body.telemetrySnapshot.pairingId, scanSession.id]);
+});
+
+test("Phase D: a legacy pointer without an active session stays image-only despite same-MAC readings", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  scanSession = null;
+  latestReading = { deviceId: sensorMac, temperature: 39, humidity: 80, timestamp: new Date() };
+  const result = await scan();
+  assert.equal(result.status, 201); assert.equal(telemetryReads, 0);
+  assert.deepEqual(result.body.telemetrySnapshot, {source: "none"});
+  assert.deepEqual(analyses[0].telemetrySnapshot, {source: "none"});
+  assert.equal(result.body.telemetry, null);
+  assert.match(prompts[0], /No active pairing session/); assert.doesNotMatch(prompts[0], /Actual Sensor Readings|Temperature: 39/);
+});
+
+test("Phase D: an empty active session never falls back to closed, legacy, or unpaired readings", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  extraReadings = [
+    {deviceId: sensorMac, plantId: existingPlantId, pairingId: "closed-session", contextVersion: 1, temperature: 35, humidity: 80, timestamp: new Date()},
+    {deviceId: sensorMac, plantId: undefined, pairingId: undefined, contextVersion: undefined, temperature: 36, humidity: 80, timestamp: new Date()},
+    {deviceId: sensorMac, plantId: null, pairingId: null, contextVersion: 1, temperature: 37, humidity: 80, timestamp: new Date()},
+  ];
+  const result = await scan();
+  assert.equal(result.status, 201); assert.equal(telemetryReads, 1);
+  assert.deepEqual(result.body.telemetrySnapshot, {source: "none"}); assert.equal(result.body.telemetry, null);
+  assert.deepEqual(analyses[0].telemetrySnapshot, {source: "none"});
+  assert.match(prompts[0], /active pairing session/); assert.doesNotMatch(prompts[0], /Actual Sensor Readings|Temperature: 3[567]/);
+});
+
+test("Phase D: a newer Plant2-tagged reading cannot enter Plant1's scan", async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  latestReading = { deviceId: sensorMac, timestamp: new Date(Date.now()-1000), temperature: 21, humidity: 50 };
+  extraReadings = [{ id: "000000000000000000000002", deviceId: sensorMac,
+    plantId: "00000000-0000-4000-8000-000000000004", pairingId: sessionId, contextVersion: 1,
+    timestamp: new Date(), temperature: 39, humidity: 80 }];
+  let result = await scan();
+  assert.equal(result.status, 201); assert.equal(result.body.telemetry.temperature, 21);
+  assert.equal(result.body.telemetrySnapshot.plantId, existingPlantId);
+  assert.match(prompts[0], /Temperature: 21°C/); assert.doesNotMatch(prompts[0], /Temperature: 39°C/);
+  latestReading = null;
+  result = await scan();
+  assert.deepEqual(result.body.telemetrySnapshot, {source: "none"});
+  assert.doesNotMatch(prompts[1], /Temperature: 39°C/);
+});
+
+test("Phase D: a move during Gemini diagnosis preserves the resolved reading and session", {timeout: 10000}, async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  latestReading = { deviceId: sensorMac, timestamp: new Date(), temperature: 24, humidity: 60 };
+  let arrive, release;
+  const reached = new Promise(resolve => { arrive = resolve; });
+  diagnosisGate = { arrive, ready: new Promise(resolve => { release = resolve; }) };
+  const pending = scan();
+  await reached;
+  extraPlants.set(existingPlantId, { id: existingPlantId, userId: "owner", name: "Basil", species: speciesName, deviceId: null });
+  scanSession = { id: "00000000-0000-4000-8000-000000000005", plantId: "00000000-0000-4000-8000-000000000004", deviceId: linkedDevice, unpairedAt: null };
+  latestReading = { deviceId: sensorMac, plantId: scanSession.plantId, pairingId: scanSession.id,
+    timestamp: new Date(), temperature: 38, humidity: 80 };
+  release();
+  const result = await pending;
+  assert.equal(result.status, 201); assert.equal(result.body.plant.deviceId, null);
+  assert.equal(result.body.telemetrySnapshot.plantId, existingPlantId);
+  assert.equal(result.body.telemetrySnapshot.pairingId, sessionId);
+  assert.equal(result.body.telemetrySnapshot.readingId, readingId);
+  assert.equal(result.body.telemetrySnapshot.source, "current_session");
+  assert.equal(result.body.telemetry.temperature, 24);
+  assert.deepEqual(analyses[0].telemetrySnapshot, result.body.telemetrySnapshot);
+  assert.equal(telemetryReads, 1);
+  assert.match(prompts[0], /Temperature: 24°C/); assert.doesNotMatch(prompts[0], /Temperature: 38°C/);
+});
+
+test("Phase D: reuse recovers the fourth-latest real confidence after three synthetic zeros", async () => {
+  previousIdentifications = [1,2,3].map(index => ({id: `synthetic-${index}`, confidence: 0, rawResponse: {source: "saved-plant"}}))
+    .concat([{id: "real-identification", confidence: 0.989, rawResponse: {results: []}}]);
+  const result = await scan(false, {reusePreviousImage: true});
+  assert.equal(result.status, 201); assert.equal(result.body.identification.confidence, 0.989);
+  assert.equal(result.body.identificationReused, true); assert.equal(identifications, 0);
+  assert.equal(identificationWrites[0].confidence, 0.989);
+  assert.equal(identificationWrites[0].rawResponse.previousIdentificationId, "real-identification");
+  assert.match(prompts[0], /Identification Confidence: 98\.9%/);
+  assert.deepEqual(identificationQueries[0].orderBy, [{createdAt: "desc"}, {id: "desc"}]);
+});
+
+for (const confidence of [0, 0.00001]) test(`Phase D: real Pl@ntNet confidence ${confidence} is preserved on reuse`, async () => {
+  previousIdentifications = [{id: "real-low-confidence", confidence, rawResponse: {results: [{score: confidence}]}},
+    {id: "older-high-confidence", confidence: 0.989, rawResponse: {results: []}}];
+  const result = await scan(false, {reusePreviousImage: true});
+  assert.equal(result.status, 201); assert.equal(result.body.identification.confidence, confidence);
+  assert.equal(result.body.identificationReused, true); assert.equal(identificationWrites[0].confidence, confidence);
+});
+
+for (const synthetic of [false, true]) test(`Phase D: ${synthetic ? "all synthetic" : "missing"} prior identifications return explicit unavailable confidence`, async () => {
+  previousIdentifications = synthetic ? [1,2,3].map(index => ({id: `synthetic-${index}`, confidence: 0, rawResponse: {source: "saved-plant"}})) : [];
+  const result = await scan(false, {reusePreviousImage: true});
+  assert.equal(result.status, 201); assert.equal(result.body.identification.confidence, 0);
+  assert.equal(result.body.identificationReused, false);
+  assert.match(result.body.identificationMessage, /Previous identification confidence is unavailable/);
+  assert.equal(identifications, 0);
+});
+
+test("Phase D: a fresh identification's confidence carries into a later saved-image scan", async () => {
+  previousIdentifications = [];
+  const fresh = await scan();
+  const reused = await scan(false, {reusePreviousImage: true});
+  assert.equal(fresh.status, 201); assert.equal(reused.status, 201);
+  assert.equal(reused.body.identification.confidence, fresh.body.identification.confidence);
+  assert.equal(reused.body.identificationReused, true);
+  assert.equal(identifications, 1); assert.equal(identificationWrites.length, 2);
+});
+
+test("Phase D: old unscoped archive snapshots load as legacy without inferred plant attribution", async () => {
+  const snapshot = {deviceId: sensorMac, timestamp: new Date().toISOString(), temperature: 26, humidity: 60,
+    soilMoisture: 2500, lightLux: 50};
+  for (const telemetrySnapshot of [snapshot, {source: "none"}, null]) analyses.push({plantId: existingPlantId, userId: "owner",
+    isArchived: true, healthStatus: "healthy", rawAnalysisText: "Saved diagnosis.", telemetrySnapshot});
+  const response = await fetch(`${baseUrl}/api/scan/archives`);
+  assert.equal(response.status, 200);
+  const [legacy, none, empty] = await response.json();
+  assert.equal(legacy.telemetrySnapshot.source, "legacy");
+  assert.equal(legacy.telemetrySnapshot.plantId, undefined); assert.equal(legacy.telemetrySnapshot.pairingId, undefined);
+  assert.equal(legacy.telemetrySnapshot.soilMoistureRaw, 2500);
+  assert.deepEqual(none.telemetrySnapshot, {source: "none"}); assert.equal(empty.telemetrySnapshot, null);
+  assert.equal(analyses[0].telemetrySnapshot.source, undefined);
 });

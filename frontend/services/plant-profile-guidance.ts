@@ -6,13 +6,24 @@ export function telemetryIsFresh(timestamp: unknown, now = Date.now()): boolean 
   return Number.isFinite(age) && age >= -60_000 && age <= 30 * 60_000;
 }
 
-export function diagnosisBadgeLabel(snapshot: DiagnosisTelemetrySnapshot | null | undefined, diagnosedAt: unknown): string {
-  if (!snapshot) return "Image-Only AI";
-  if (snapshot.simulated === true) return "Demo-Assisted AI";
-  const physical = snapshot.simulated === false || /^(?:LC-[0-9a-f]{6}|[0-9a-f]{2}(?::[0-9a-f]{2}){5}|[0-9a-f]{2}(?:-[0-9a-f]{2}){5})$/i.test(snapshot.deviceId);
-  if (!physical) return "Image-Only AI"; // Legacy snapshots with unverified provenance.
-  const at = timestampMillis(snapshot.capturedAt) ?? timestampMillis(diagnosedAt);
-  return at !== null && telemetryIsFresh(snapshot.timestamp, at) ? "Sensor-Enhanced AI" : "Image + Older Sensor Readings";
+export function diagnosisBadgePresentation(snapshot: DiagnosisTelemetrySnapshot | null | undefined) {
+  // Ownership at capture time is independent of freshness and today's pairing.
+  switch (snapshot ? snapshot.source ?? "legacy" : "none") {
+    case "current_session": return { label: "Sensor-Enhanced AI", backgroundColor: "#E8F5E9", color: "#278448" };
+    case "historical_session": return { label: "Image + Older Sensor Readings", backgroundColor: "#FFF3D6", color: "#8B6914" };
+    case "legacy": return { label: "Image-Only AI (legacy)", backgroundColor: "#F1F1F1", color: "#707770" };
+    case "none": return { label: "Image-Only AI", backgroundColor: "#EEF2F0", color: "#43544B" };
+  }
+}
+
+export function diagnosisBadgeLabel(snapshot: DiagnosisTelemetrySnapshot | null | undefined, _diagnosedAt?: unknown): string {
+  return diagnosisBadgePresentation(snapshot).label;
+}
+
+export function identificationConfidenceLabel(confidence: number, reused = false): string {
+  if (confidence === 0 && !reused) return "N/A";
+  const percentage = confidence * 100;
+  return `${percentage.toFixed(percentage > 0 && percentage < 0.1 ? 3 : 1)}%`;
 }
 
 export function timestampMillis(value: unknown): number | null {

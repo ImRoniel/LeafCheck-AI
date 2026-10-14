@@ -247,17 +247,35 @@ export const parseAnalysis = parse<AIDiagnosisResponse>(
     error: optional(text),
   }),
 );
-const diagnosisSnapshotCheck = object({
+const diagnosisMeasurementCheck = object({
   deviceId: nonempty, timestamp: date, temperature: range(-40, 125), humidity: range(0, 100),
   capturedAt: optional(date),
   soilMoisture: nullable(range(0, 100)), soilMoistureRaw: nullable(integer(0, 4095)), lightLux: nullable(range(0)),
   simulated: optional(boolean),
+  readingId: optional((v, p) => { text(v, p); if (!/^[0-9a-f]{24}$/i.test(v as string)) fail(p); }),
+  plantId: optional(uuid), pairingId: optional(uuid), contextVersion: optional(enumeration(1)),
+  source: optional(enumeration("current_session", "historical_session", "legacy")),
 });
+const diagnosisSnapshotCheck: Check = (value, path) => {
+  object({})(value, path);
+  const data = value as Record<string, unknown>;
+  if (data.source === "none") {
+    const readingFields = ["deviceId", "timestamp", "capturedAt", "temperature", "humidity", "soilMoisture", "soilMoistureRaw", "lightLux", "lightLevel", "simulated", "readingId", "plantId", "pairingId", "contextVersion"];
+    if (readingFields.some(field => data[field] !== undefined)) fail(`${path}.source`);
+    return;
+  }
+  diagnosisMeasurementCheck(value, path);
+  const hasAttribution = data.plantId !== undefined || data.pairingId !== undefined || data.contextVersion !== undefined;
+  if (data.source === "current_session" || data.source === "historical_session") {
+    if (data.plantId === undefined || data.pairingId === undefined || data.contextVersion !== 1) fail(`${path}.provenance`);
+  } else if (hasAttribution) fail(`${path}.provenance`);
+};
 const scanCheck = object({
   success: enumeration(true),
   subjectKind: optional(enumeration("living_plant", "artificial_plant", "non_plant")),
   photoSaveFailed: optional(boolean),
   diagnosisError: optional(boolean), diagnosisMessage: optional(text), diagnosisCode: optional(text),
+  identificationReused: optional(boolean), identificationMessage: optional(nonempty),
   telemetrySnapshot: optional(nullable(diagnosisSnapshotCheck)),
   plant: nullable(object({ id: nonempty, name: text, species: text, deviceId: optional(nullable(uuid)) })),
   identification: nullable(object({ speciesName: nonempty, commonName: nullable(text), confidence: range(0, 1) })),

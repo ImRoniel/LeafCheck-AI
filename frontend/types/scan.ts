@@ -1,6 +1,8 @@
 import type { HealthStatus } from "./plant";
 
-export interface DiagnosisTelemetrySnapshot {
+export type DiagnosisTelemetrySource = "current_session" | "historical_session" | "legacy" | "none";
+
+export interface DiagnosisMeasurementSnapshot {
   deviceId: string;
   timestamp: string;
   capturedAt?: string;
@@ -10,7 +12,14 @@ export interface DiagnosisTelemetrySnapshot {
   soilMoistureRaw: number | null;
   lightLux: number | null;
   simulated?: boolean;
+  readingId?: string;
+  plantId?: string;
+  pairingId?: string;
+  contextVersion?: 1;
+  source?: Exclude<DiagnosisTelemetrySource, "none">;
 }
+
+export type DiagnosisTelemetrySnapshot = DiagnosisMeasurementSnapshot | { source: "none" };
 
 /** Request body: plantId is now optional for scan-first flow */
 export interface ScanRequest {
@@ -41,6 +50,8 @@ export interface ScanResponse {
   diagnosisError?: boolean;
   diagnosisMessage?: string;
   diagnosisCode?: string;
+  identificationReused?: boolean;
+  identificationMessage?: string;
   telemetrySnapshot?: DiagnosisTelemetrySnapshot | null;
   plant: { id: string; name: string; species: string; deviceId?: string | null } | null;
   identification: {

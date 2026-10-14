@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { before, beforeEach, after, mock, test } from "node:test";
 import express from "express";
 import { matchesWhere } from "./helpers/mongo-filter.mjs";
@@ -19,7 +19,7 @@ before(async () => {
     create: async ({ data }) => {
       assert.equal(inTransaction,false,"MongoDB writes must follow PostgreSQL commit");
       if (insertGate) { insertGate.arrive(); await insertGate.ready; }
-      const row = { id: randomUUID(), ...data }; rows.push(row); return row;
+      const row = { id: randomBytes(12).toString("hex"), ...data }; rows.push(row); return row;
     },
     findFirst: async query => { queries.push(query); return rows.filter(row => matches(query, row)).sort((a,b) => b.timestamp-a.timestamp)[0] ?? null; },
     findMany: async query => rows.filter(row => matches(query, row)).slice(query.skip, query.skip + query.take),
@@ -30,7 +30,7 @@ before(async () => {
       findFirst: async ({ where }) => where.id === deviceId && where.userId === userId ? device : null,
       findMany: async () => [{ ...device, plants: [plant] }] },
     plant: { findFirst: async ({ where }) => where.id === plantId && where.userId === userId ? plant : null, update: async () => plant },
-    plantSpecCache: { findUnique: async () => null }, plantIdentification: { create: async () => ({}) },
+    plantSpecCache: { findUnique: async () => null }, plantIdentification: { findMany: async () => [], create: async () => ({}) },
     aIAnalysis: { create: async ({ data }) => ({ id: randomUUID(), createdAt: new Date(), ...data }) },
     careTask: { create: async ({ data }) => data },
     devicePairingHistory: { findFirst: async ({where}) => {

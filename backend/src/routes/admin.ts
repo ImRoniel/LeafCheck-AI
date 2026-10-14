@@ -183,7 +183,8 @@ adminRouter.get("/users/:id", asyncRoute(async (req, res) => {
       devices: collection(devices.map(({ status, ...device }) => ({ ...device, storedStatus: status,
         source: device.macAddress.startsWith("DEMO:") ? "DEMO" : "PHYSICAL" })), deviceTotal),
       analyses: collection(analyses.map(({ rawAnalysisText, telemetrySnapshot, ...analysis }) => {
-        const snapshot = diagnosisTelemetrySnapshot(telemetrySnapshot);
+        const normalized = diagnosisTelemetrySnapshot(telemetrySnapshot);
+        const snapshot = normalized?.source === "none" ? null : normalized;
         const source = snapshot?.simulated === true ? "DEMO" : snapshot?.simulated === false
           ? readingIsFresh(snapshot.timestamp, Date.parse(snapshot.capturedAt ?? analysis.createdAt.toISOString()))
             ? "PHYSICAL_FRESH" : "PHYSICAL_STALE"

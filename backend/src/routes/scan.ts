@@ -34,6 +34,8 @@ import { detectScanSubject, parseGeminiJson } from "../lib/scan-subject.js";
 import { reportCareTasks } from "../lib/report-care-tasks.js";
 import { storeScanImage, discardScanImage, type StoredScanImage } from "../lib/scan-image-storage.js";
 import { persistScan } from "../lib/scan-persistence.js";
+import { latestPlantContext } from "../lib/plant-telemetry.js";
+import { latestReusableIdentification } from "../lib/scan-identification.js";
 import type { Prisma } from "../generated/postgres-client/index.js";
 import type { GeminiStructuredOutput, PlantIdentificationResult, ScanRequest, SubjectKind } from "../types/scan.js";
 
@@ -128,11 +130,17 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     }
     // ── Step 1: Optional Pl@ntNet attempt ────────────────────────────────
     let identification: PlantIdentificationResult;
+    let identificationReused = false;
+    let identificationMessage: string | undefined;
     if (reusePreviousImage && existing) {
       console.log("[Scan] Reusing saved plant identity and photo for diagnosis.");
       // A diagnosis retry reuses owned identity/photo, without identification quota.
-      identification = { speciesName: existing.species, commonName: existing.name, confidence: 0,
-        rawResponse: { source: "saved-plant", plantId: existing.id } };
+      const previous = await latestReusableIdentification(prismaPg, existing.id, userId);
+      identificationReused = previous !== null;
+      if (!previous) identificationMessage = "Previous identification confidence is unavailable. Take a new photo to identify this plant again.";
+      identification = { speciesName: existing.species, commonName: existing.name, confidence: previous?.confidence ?? 0,
+        rawResponse: { source: "saved-plant", plantId: existing.id, identificationReused,
+          ...(previous ? { previousIdentificationId: previous.id } : {}) } };
     } else {
       console.log("[Scan] Step 1: Trying Pl@ntNet (8-second deadline)...");
       try {
@@ -178,10 +186,15 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     }
 
     // ── Step 4: Concurrent fetch — specs + latest telemetry ───────────────
-    const resolvedDeviceId = deviceId ?? plant.deviceId ?? undefined;
-    const sensorDevice = resolvedDeviceId ? await ownedDevice(resolvedDeviceId, userId) : null;
+    // A new plant is paired only during persistence; its first diagnosis is
+    // image-only. Existing plants use exactly the session observed here, even
+    // if the sensor moves while MongoDB or Gemini is still working.
+    const context = existing ? await latestPlantContext(existing.id, userId) : null;
+    const sensorDevice = context?.device ?? null;
     const isDemo = sensorDevice?.macAddress.startsWith("DEMO:") ?? false;
-    const queryDeviceId = sensorDevice ? (isDemo ? sensorDevice.id : sensorDevice.macAddress) : null;
+    const sessionContext = context?.session ? Object.freeze({
+      plantId: context.plant.id, pairingId: context.session.id, capturedAt: new Date().toISOString(),
+    }) : null;
     console.log("[Scan] Step 4: Fetching specs and telemetry concurrently...");
     const [specs, latestReading] = await Promise.all([
       // 4a. PlantSpecCache lookup (with Perenual fallback)
@@ -247,10 +260,10 @@ scanRouter.post("/", async (req: Request, res: Response) => {
       })(),
 
       // 4b. Latest MongoDB SensorReading
-      queryDeviceId
+      sessionContext
         ? prisma.sensorReading.findFirst({
-            where: { deviceId: queryDeviceId },
-            orderBy: { timestamp: "desc" },
+            where: { plantId: sessionContext.plantId, pairingId: sessionContext.pairingId, contextVersion: 1 },
+            orderBy: [{ timestamp: "desc" }, { id: "desc" }],
           })
         : Promise.resolve(null),
     ]);
@@ -258,9 +271,11 @@ scanRouter.post("/", async (req: Request, res: Response) => {
     // ── Step 5: Calculate telemetry freshness ─────────────────────────────
     let freshnessContext: string;
     if (!latestReading) {
-      freshnessContext = resolvedDeviceId
-        ? "No telemetry data found for this device. Sensor data is unavailable."
-        : "No device associated with this plant. Environmental analysis is based on image only.";
+      freshnessContext = sessionContext
+        ? "No telemetry data found for this plant's active pairing session. Environmental analysis is based on image only."
+        : sensorDevice
+          ? "No active pairing session is available for this plant. Environmental analysis is based on image only."
+          : "No device associated with this plant's current context. Environmental analysis is based on image only.";
     } else {
       const ageMs = Date.now() - latestReading.timestamp.getTime();
       const ageMinutes = Math.round(ageMs / 60_000);
@@ -300,12 +315,14 @@ Ideal Environmental Specs for ${specs.speciesName} (${specs.commonName ?? "unkno
       lightLevel: isDemo ? latestReading.lightLevel ?? null : latestReading.lightLux ?? latestReading.lightLevel ?? null,
       timestamp: latestReading.timestamp.toISOString(),
     } : null;
-    const telemetrySnapshot = telemetry && queryDeviceId ? {
-      deviceId: queryDeviceId, timestamp: telemetry.timestamp, capturedAt: new Date().toISOString(), simulated: isDemo,
+    const telemetrySnapshot = telemetry && latestReading && sessionContext ? Object.freeze({
+      deviceId: latestReading.deviceId, timestamp: telemetry.timestamp, capturedAt: sessionContext.capturedAt, simulated: isDemo,
       temperature: telemetry.temperature, humidity: telemetry.humidity,
       soilMoisture: telemetry.soilMoisture, soilMoistureRaw: telemetry.soilMoistureRaw,
       lightLux: telemetry.lightLevel,
-    } : null;
+      readingId: latestReading.id, plantId: sessionContext.plantId, pairingId: sessionContext.pairingId,
+      contextVersion: 1 as const, source: "current_session" as const,
+    }) : Object.freeze({ source: "none" as const });
     const telemetryBlock = telemetry
       ? `
 ${isDemo ? "Simulated Sensor Readings (demo data)" : "Actual Sensor Readings (from ESP32 hardware)"}:
@@ -413,7 +430,7 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
         confidence: identification.confidence,
         rawResponse: identification.rawResponse as Prisma.InputJsonValue,
       },
-      telemetrySnapshot: telemetrySnapshot ?? undefined,
+      telemetrySnapshot,
       idealSpecs: specs
         ? JSON.parse(JSON.stringify(specs)) as Prisma.InputJsonValue : undefined,
     }).catch(async (error: unknown) => {
@@ -442,6 +459,8 @@ For artificial_plant and non_plant, notification must be null, overriding the ex
         commonName: identification.commonName,
         confidence: identification.confidence,
       },
+      identificationReused,
+      ...(identificationMessage ? { identificationMessage } : {}),
       diagnostic: {
         id: analysis.id,
         healthStatus: saved.healthStatus,

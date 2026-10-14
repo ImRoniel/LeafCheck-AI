@@ -15,7 +15,7 @@ import { measurement } from "@/components/telemetry-history";
 import { useAppData } from "@/context/app-data";
 import { useAuth } from "@/context/auth";
 import { scanSpaceLocation } from "@/services/spaces";
-import { diagnosisBadgeLabel } from "@/services/plant-profile-guidance";
+import { diagnosisBadgePresentation, identificationConfidenceLabel } from "@/services/plant-profile-guidance";
 import { useScan } from "@/hooks/use-scan";
 import { validatePreScan } from "@/services/pre-scan-validation";
 import {
@@ -272,6 +272,7 @@ export default function Camera() {
   };
 
   const report = flow.report;
+  const diagnosisBadge = diagnosisBadgePresentation(report?.telemetrySnapshot);
   const cameraToken = cameraVersion;
   const currentCamera = () => alive.current && enabledRef.current
     && cameraToken === cameraGeneration.current;
@@ -390,14 +391,16 @@ export default function Camera() {
             {report.identification.speciesName}
           </Text>
           <Text style={s.reportConfidence}>
-            Confidence: {(report.identification.confidence * 100).toFixed(1)}%
+            Confidence: {identificationConfidenceLabel(report.identification.confidence, report.identificationReused)}
+            {report.identificationReused && <Text style={{ fontSize: 12, color: "#707770" }}> (reused from original scan)</Text>}
           </Text>
+          {report.identificationMessage && <Text style={s.reportMeta}>{report.identificationMessage}</Text>}
           </> : <Text style={s.reportSpecies}>{report.subjectKind === "artificial_plant" ? "Artificial plant" : "Not a living plant"}</Text>}
 
           <View style={s.divider} />
 
           <Text style={s.reportSectionTitle}>Diagnostic Report</Text>
-          {report.plant && <Text style={s.reportMeta}>{diagnosisBadgeLabel(report.telemetrySnapshot, report.diagnostic.createdAt)}</Text>}
+          {report.plant && <Text style={[s.reportMeta, { backgroundColor: diagnosisBadge.backgroundColor, color: diagnosisBadge.color }]}>{diagnosisBadge.label}</Text>}
           {report.diagnosisError ? <>
             <Notice>Scan saved. AI diagnosis failed. Retry to generate the diagnosis.</Notice>
             <Pressable accessibilityRole="button" accessibilityLabel="Open plant to retry AI diagnosis" style={s.secondaryButton}

@@ -12,9 +12,10 @@ const latest: ArchiveEntry = { id: "old", plantId, userId: accountId, healthStat
   rawAnalysisText: "No device associated with this plant", speciesName: "Fern", notificationTime: null,
   notificationReason: null, createdAt, plant: { id: plantId, name: "Fern", species: "Fern" } };
 const report: ScanResponse = { success: true, plant: latest.plant,
-  identification: { speciesName: "Fern", commonName: null, confidence: 1 },
+  identification: { speciesName: "Fern", commonName: null, confidence: 0.989 }, identificationReused: true,
   diagnostic: { id: "new", healthStatus: "warning", rawAnalysisText: "Light is low. Move to indirect light.", telemetryFreshness: "FRESH", createdAt: new Date(Date.now() + 1000).toISOString() },
-  telemetrySnapshot: { deviceId: "LC-A50528", temperature: 32, humidity: 76, soilMoisture: null, soilMoistureRaw: 2625, lightLux: 0.83, timestamp: readingAt, simulated: false },
+  telemetrySnapshot: { deviceId: "LC-A50528", temperature: 32, humidity: 76, soilMoisture: null, soilMoistureRaw: 2625, lightLux: 0.83, timestamp: readingAt, simulated: false,
+    readingId: "0123456789abcdef01234567", plantId, pairingId: deviceId, contextVersion: 1, source: "current_session" },
   telemetry: { temperature: 32, humidity: 76, soilMoisture: null, soilMoistureRaw: 2625, lightLevel: 0.83, timestamp: readingAt },
   careTasks: [], notification: null };
 const setup = () => {
@@ -46,11 +47,32 @@ test("re-evaluation stays on the profile, prevents duplicate requests and replac
   assert.equal((updated?.props.latest as ArchiveEntry).id, "new");
   assert.equal((updated?.props.latest as ArchiveEntry).createdAt, report.diagnostic.createdAt);
   assert.match(JSON.stringify(updated), /Light is low/);
+  assert.match(JSON.stringify(updated), /98\.9%/);
+  assert.match(JSON.stringify(updated), /\(reused from original scan\)/);
   assert.doesNotMatch(JSON.stringify(updated), /No device associated|Re-evaluating/);
   assert.equal(flow.guidanceRefreshes(), 1);
   assert.equal(flow.collectionReads(), 1);
   assert.deepEqual(flow.navigations, []);
   flow.dispose();
+});
+
+for (const confidence of [0, 0.00001]) test(`profile displays genuine confidence ${confidence} without a false reuse label`, async t => {
+  const flow = setup(); t.after(flow.dispose);
+  flow.scan(async () => ({...report, identification: {...report.identification!, confidence}, identificationReused: false,
+    identificationMessage: confidence === 0 ? "Previous identification confidence is unavailable." : undefined}));
+  flow.render(); await nextTurn(); press(flow.render(), "Re-evaluate with Sensor Data"); await nextTurn();
+  const card = elements(flow.render()).find(node => node.type === "PlantDiagnosisCard")!;
+  assert.match(JSON.stringify(card), confidence === 0 ? /N\/A/ : /0\.001%/);
+  assert.doesNotMatch(JSON.stringify(card.props.children), /reused from original scan|0\.0%/);
+});
+
+test("profile does not attach live confidence to a different archived diagnosis", async t => {
+  const flow = setup(); t.after(flow.dispose); flow.scan(async () => report);
+  flow.render(); await nextTurn(); press(flow.render(), "Re-evaluate with Sensor Data"); await nextTurn();
+  flow.guidance({...latest, id: "newer-archive", createdAt: new Date(Date.now()+10_000).toISOString()});
+  const card = elements(flow.render()).find(node => node.type === "PlantDiagnosisCard")!;
+  assert.equal((card.props.latest as ArchiveEntry).id, "newer-archive");
+  assert.doesNotMatch(JSON.stringify(card.props.children), /98\.9%|reused from original scan/);
 });
 test("failed re-evaluation retains the old report and allows retry", async () => {
   const flow = setup(); flow.scan(async () => { throw new Error("AI unavailable"); });

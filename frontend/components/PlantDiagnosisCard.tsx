@@ -1,31 +1,41 @@
-import type { ArchiveEntry } from "@/types";
-import { diagnosisBadgeLabel, diagnosisPresentation, hasNewerTelemetry, telemetryIsFresh } from "@/services/plant-profile-guidance";
+import type { ArchiveEntry, ScanResponse } from "@/types";
+import { diagnosisBadgePresentation, diagnosisPresentation, hasNewerTelemetry, identificationConfidenceLabel, telemetryIsFresh } from "@/services/plant-profile-guidance";
 import { Text, View } from "react-native";
 import { DiagnosticReport } from "./DiagnosticReport";
 import { Action, ui } from "./screen";
 
-export function PlantDiagnosisCard({ latest, loading, error, hasSensor = false, canReuseImage = false, telemetryTimestamp, reevaluating = false, reevaluationError, onReevaluate, onRetry, onReload, onScan, onHistory }: {
+export function PlantDiagnosisCard({ latest, loading, error, identification, identificationReused = false, identificationMessage, hasSensor = false, canReuseImage = false, telemetryTimestamp, reevaluating = false, reevaluationError, onReevaluate, onRetry, onReload, onScan, onHistory }: {
   latest: ArchiveEntry | null; loading: boolean; error: boolean;
   hasSensor?: boolean;
   canReuseImage?: boolean; telemetryTimestamp?: string; reevaluating?: boolean;
   reevaluationError?: string | null; onReevaluate?: () => void;
   onRetry: () => void; onScan: () => void; onHistory: () => void;
   onReload?: () => void;
+  identification?: ScanResponse["identification"];
+  identificationReused?: boolean; identificationMessage?: string;
 }) {
   const report = diagnosisPresentation(latest?.rawAnalysisText ?? "");
   const needsDiagnosis = Boolean(latest?.diagnosisError) || (!report.text && !error && !loading && canReuseImage);
+  const snapshot = latest?.telemetrySnapshot;
+  const readingSnapshot = snapshot && snapshot.source !== "none" ? snapshot : null;
   const canReevaluate = !needsDiagnosis && hasSensor && Boolean(latest) && telemetryIsFresh(telemetryTimestamp)
-    && hasNewerTelemetry(telemetryTimestamp, latest?.telemetrySnapshot?.timestamp);
-  const badgeLabel = diagnosisBadgeLabel(latest?.telemetrySnapshot, latest?.createdAt);
-  const badge = <Text style={{ alignSelf: "flex-start", backgroundColor: "#E8F5E9", color: "#278448", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, fontSize: 12 }}>
-    {badgeLabel}
+    && hasNewerTelemetry(telemetryTimestamp, readingSnapshot?.timestamp);
+  const presentation = diagnosisBadgePresentation(snapshot);
+  const badge = <Text style={{ alignSelf: "flex-start", backgroundColor: presentation.backgroundColor, color: presentation.color, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, fontSize: 12 }}>
+    {presentation.label}
   </Text>;
   return <View style={ui.card}>
     <Text accessibilityRole="header" style={ui.heading}>AI Diagnosis</Text>
     {!needsDiagnosis && badge}
     {needsDiagnosis ? <Text accessibilityLiveRegion="polite" style={ui.text}>Scan saved. AI diagnosis failed. Retry to generate the diagnosis.</Text> : latest ? <>
       <Text style={ui.text}>Latest scan · {new Date(latest.createdAt).toLocaleString()}</Text>
-      {latest.telemetrySnapshot && <Text style={ui.text}>Readings used · {new Date(latest.telemetrySnapshot.timestamp).toLocaleString()}</Text>}
+      {readingSnapshot && <Text style={ui.text}>Readings used · {new Date(readingSnapshot.timestamp).toLocaleString()}</Text>}
+      {readingSnapshot?.simulated && <Text style={ui.text}>Simulated demo readings</Text>}
+      {identification && <Text style={ui.text}>
+        Confidence: {identificationConfidenceLabel(identification.confidence, identificationReused)}
+        {identificationReused && <Text style={{ fontSize: 12, color: "#707770" }}> (reused from original scan)</Text>}
+      </Text>}
+      {identificationMessage && <Text style={ui.text}>{identificationMessage}</Text>}
       <DiagnosticReport key={latest.id} text={report.text || "No diagnostic text was saved."} readMoreLabel="Read Full Diagnosis" />
       {report.recommendations.length > 0 && <>
         <Text style={ui.text}>Recommended care</Text>

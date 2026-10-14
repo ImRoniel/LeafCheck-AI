@@ -281,7 +281,7 @@ test("user detail caps related lists, includes legacy analyses and disjoint sess
   for (let index = 0; index < 12; index++) {
     records.plant.push(plant(id(100 + index), { imageUrl: index === 0 ? null : "PRIVATE_IMAGE" }));
     records.device.push(device(id(200 + index), index === 0 ? `DEMO:${id(100)}` : `LC-${String(index).padStart(6, "0")}`));
-    const snapshot = index === 0 ? null : { deviceId: index === 4 ? id(777) : "LC-A50528", timestamp: earlier.toISOString(),
+    const snapshot = index === 0 ? null : index === 5 ? {source: "none"} : { deviceId: index === 4 ? id(777) : "LC-A50528", timestamp: earlier.toISOString(),
       capturedAt: index === 2 ? now.toISOString() : earlier.toISOString(), temperature: 27, humidity: 60,
       ...(index === 3 ? { simulated: true } : {}) };
     records.aIAnalysis.push({ id: id(300 + index), plantId: id(100 + index), userId: null, healthStatus: "warning",
@@ -314,6 +314,8 @@ test("user detail caps related lists, includes legacy analyses and disjoint sess
   assert.equal(detail.analyses.items[0].diagnosisError, true);
   assert.equal(detail.analyses.items[1].diagnosisError, false);
   assert.equal(detail.analyses.items[1].telemetryTimestamp, earlier.toISOString());
+  assert.equal(detail.analyses.items[5].telemetrySource, "IMAGE_ONLY");
+  assert.equal(detail.analyses.items[5].telemetryTimestamp, null);
   checkPrivacy(result.body); checkTransactions();
   checkError(await get(`/users/${id(999)}`), 404, "NOT_FOUND");
 });
