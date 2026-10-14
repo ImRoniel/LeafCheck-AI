@@ -4,6 +4,7 @@ import { after, before, test } from "node:test";
 import { PrismaClient } from "../../src/generated/postgres-client/index.js";
 import { persistScan } from "../../src/lib/scan-persistence.ts";
 import { reportCareTasks } from "../../src/lib/report-care-tasks.ts";
+import { pairPlantDevice } from "../../src/lib/plant-pairing.ts";
 
 // Refuse direct execution against application-configured/shared databases.
 const url = new URL(process.env.POSTGRES_URL ?? "http://invalid");
@@ -26,7 +27,9 @@ after(async () => { await client.$disconnect(); await reader.$disconnect(); });
 const stages = { plant: ["plant", "create"], identification: ["plantIdentification", "create"], analysis: ["aIAnalysis", "create"], tasks: ["careTask", "create"], health: ["plant", "update"] };
 function failing(stage) {
   const [model, method] = stages[stage];
-  return { $transaction: (operation) => client.$transaction(async (tx) => operation(new Proxy(tx, {
+  return { $transaction: (operation,options) => {
+    assert.equal(options.isolationLevel,"Serializable");
+    return client.$transaction(async (tx) => operation(new Proxy(tx, {
     get(target, key) {
       const value = Reflect.get(target, key);
       if (key !== model) return value;
@@ -36,10 +39,10 @@ function failing(stage) {
         return async (...args) => { await fn.apply(delegate, args); throw new Error(`injected ${stage} failure after write`); };
       } });
     },
-  }))) };
+  })),options); } };
 }
 async function snapshot() {
-  return { plants: await reader.plant.findMany({ orderBy: { id: "asc" } }), identifications: await reader.plantIdentification.findMany({ orderBy: { id: "asc" } }), analyses: await reader.aIAnalysis.findMany({ orderBy: { id: "asc" } }), tasks: await reader.careTask.findMany({ orderBy: { id: "asc" } }) };
+  return { plants: await reader.plant.findMany({ orderBy: { id: "asc" } }), pairings: await reader.devicePairingHistory.findMany({orderBy:{id:"asc"}}), identifications: await reader.plantIdentification.findMany({ orderBy: { id: "asc" } }), analyses: await reader.aIAnalysis.findMany({ orderBy: { id: "asc" } }), tasks: await reader.careTask.findMany({ orderBy: { id: "asc" } }) };
 }
 
 test("commit persists trusted task links and allows fresh-client reads; rescans preserve history", async () => {
@@ -92,4 +95,47 @@ test("foreign plant and malformed output cannot write or set task ownership/stat
   const saved = await persistScan(client, malicious);
   const tasks = await reader.careTask.findMany({ where: { analysisId: saved.analysis.id } });
   assert.ok(tasks.every((item) => item.userId === userId && item.status === "PENDING"));
+});
+
+test("scan-created pairing moves the device and commits its new session with the report", async () => {
+  const device = await client.device.create({data:{name:"Scan sensor",macAddress:"LC-CAFE01",userId}});
+  const original = await client.plant.create({data:{name:"Original",species:"Fern",userId}});
+  await pairPlantDevice(original.id,userId,device.id,client);
+  const previous = await reader.devicePairingHistory.findFirst({where:{deviceId:device.id,unpairedAt:null}});
+  const saved = await persistScan(client,{...input(),deviceId:device.id});
+  assert.equal(saved.plant.deviceId,device.id);
+  assert.equal((await reader.plant.findUnique({where:{id:original.id}})).deviceId,null);
+  const current = await reader.devicePairingHistory.findFirst({where:{deviceId:device.id,unpairedAt:null}});
+  const closed = await reader.devicePairingHistory.findUnique({where:{id:previous.id}});
+  assert.equal(current.plantId,saved.plant.id); assert.notEqual(current.id,previous.id);
+  assert.equal(current.pairedAt.getTime(),closed.unpairedAt.getTime());
+  assert.equal((await reader.aIAnalysis.findUnique({where:{id:saved.analysis.id}})).plantId,saved.plant.id);
+});
+
+for (const stage of ["identification","analysis","tasks"]) test(`scan-created pairing rolls back its move/session when ${stage} fails`, async () => {
+  const device = await client.device.findUnique({where:{macAddress:"LC-CAFE01"}});
+  const before = await snapshot();
+  await assert.rejects(persistScan(failing(stage),{...input(),deviceId:device.id}),/injected/);
+  assert.deepEqual(await snapshot(),before);
+});
+
+test("scan serialization retries roll back tentative plants and sessions before retrying", async () => {
+  const device = await client.device.findUnique({where:{macAddress:"LC-CAFE01"}});
+  const before = await snapshot();
+  let attempts = 0;
+  const retrying = {$transaction(operation,options) {
+    assert.equal(options.isolationLevel,"Serializable");
+    return client.$transaction(async tx => {
+      const result = await operation(tx);
+      if (++attempts < 3) throw Object.assign(new Error("injected commit conflict"),{code:"P2034"});
+      return result;
+    },options);
+  }};
+  const saved = await persistScan(retrying,{...input(),deviceId:device.id});
+  assert.equal(attempts,3);
+  const after = await snapshot();
+  assert.equal(after.plants.length,before.plants.length+1);
+  assert.equal(after.pairings.length,before.pairings.length+1);
+  assert.equal(after.analyses.length,before.analyses.length+1);
+  assert.equal(after.pairings.filter(row => row.deviceId === device.id && row.unpairedAt === null)[0].plantId,saved.plant.id);
 });

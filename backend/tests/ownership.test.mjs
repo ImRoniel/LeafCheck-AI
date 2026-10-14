@@ -32,6 +32,14 @@ before(async () => {
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
     namedExports: {
       prismaPg: {
+        $transaction: async function (operation,options) {
+          assert.equal(options.isolationLevel,"Serializable");
+          return operation(this);
+        },
+        devicePairingHistory: { findFirst: async ({where}) => {
+          assert.deepEqual(where,{deviceId,unpairedAt:null});
+          return null;
+        } },
         plant: {
           findFirst: async ({ where }) =>
             where.id === plantId && where.userId === "owner" ? plant : null,

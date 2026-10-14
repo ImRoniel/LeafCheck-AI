@@ -17,6 +17,7 @@ const plant = {
   updatedAt: new Date(),
 };
 const devices = new Map();
+let histories = [], inTransaction = false, pairer;
 let rows = [],
   writes = 0,
   failMongo = false,
@@ -26,7 +27,6 @@ let rows = [],
   generator;
 let queue = Promise.resolve();
 const pg = {
-  $queryRaw: async () => [],
   authSession: {
     findUnique: async ({ where }) => ({
       id: where.id,
@@ -40,11 +40,25 @@ const pg = {
       where.id === plant.id && where.userId === plant.userId
         ? { ...plant }
         : null,
+    updateMany: async () => ({count:0}),
     update: async ({ where, data }) => {
       assert.equal(where.userId, "owner");
       writes++;
       Object.assign(plant, data);
       return { ...plant };
+    },
+  },
+  devicePairingHistory: {
+    findMany: async ({where}) => histories.filter(row => historyMatches(row,where)),
+    findFirst: async ({where}) => histories.filter(row => historyMatches(row,where))
+      .sort((a,b) => (b.unpairedAt ?? 0)-(a.unpairedAt ?? 0))[0] ?? null,
+    updateMany: async ({where,data}) => {
+      const matches = histories.filter(row => historyMatches(row,where));
+      for (const row of matches) Object.assign(row,data);
+      return {count:matches.length};
+    },
+    create: async ({data}) => {
+      const row = {id:randomUUID(),unpairedAt:null,...data}; histories.push(row); return row;
     },
   },
   device: {
@@ -64,12 +78,26 @@ const pg = {
       return devices.get(where.id);
     },
   },
-  $transaction: async (callback) => {
-    const pending = queue.then(() => callback(pg));
+  $transaction: async (callback,options) => {
+    assert.equal(options.isolationLevel,"Serializable");
+    const pending = queue.then(async () => {
+      const snapshot = structuredClone({plant, devices:[...devices], histories});
+      inTransaction = true;
+      try { return await callback(pg); }
+      catch (error) {
+        Object.assign(plant,snapshot.plant); histories = snapshot.histories;
+        devices.clear(); for (const [id,device] of snapshot.devices) devices.set(id,device);
+        throw error;
+      } finally { inTransaction = false; }
+    });
     queue = pending.catch(() => {});
     return pending;
   },
 };
+function historyMatches(row,where) {
+  const identity = where.OR ? where.OR.some(filter => Object.entries(filter).every(([key,value]) => row[key] === value)) : row.deviceId === where.deviceId;
+  return identity && (where.unpairedAt === null ? row.unpairedAt === null : row.unpairedAt !== null);
+}
 before(async () => {
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
     namedExports: { prismaPg: pg },
@@ -78,11 +106,13 @@ before(async () => {
     namedExports: {
       prisma: {
         $transaction: async (operations) => {
+          assert.equal(inTransaction,false,"demo MongoDB replacement must follow PostgreSQL commit");
           if (failMongo) throw new Error("simulated storage failure");
           for (const operation of operations) operation();
         },
         sensorReading: {
           create: async ({ data }) => {
+            assert.equal(inTransaction,false);
             if (failMongo) throw new Error("private storage failure");
             writes++;
             rows.push(data);
@@ -91,7 +121,7 @@ before(async () => {
           deleteMany:
             ({ where }) =>
             () => {
-              rows = rows.filter((r) => r.deviceId !== where.deviceId);
+              rows = rows.filter(r => !Object.entries(where).every(([key,value]) => r[key] === value));
             },
           createMany:
             ({ data }) =>
@@ -120,6 +150,7 @@ before(async () => {
   };
   generator = (await import("../src/lib/demo-telemetry.ts"))
     .generateDemoReadings;
+  pairer = (await import("../src/lib/plant-pairing.ts")).pairPlantDevice;
   const app = express();
   app.use(express.json());
   app.use(
@@ -162,13 +193,15 @@ test("real JWT middleware and ownership stop unauthorized seeding before writes"
 });
 test("deterministic curves have 193 samples, prescribed bounds and one watering jump", () => {
   const end = new Date("2026-09-21T16:00:00Z");
-  const batch = generator("device", end);
-  assert.deepEqual(batch, generator("device", end));
+  const context = {plantId:plant.id,pairingId:randomUUID()};
+  const batch = generator("device", end, context);
+  assert.deepEqual(batch, generator("device", end, context));
   assert.equal(batch.length, 193);
   assert.equal(+batch[192].timestamp, +end);
   assert.equal(+end - batch[0].timestamp, 48 * 3600000);
   let jumps = 0;
   for (const [i, r] of batch.entries()) {
+    assert.equal(r.plantId,context.plantId); assert.equal(r.pairingId,context.pairingId); assert.equal(r.contextVersion,1);
     assert.ok(r.temperature >= 24 && r.temperature <= 31);
     assert.ok(r.humidity >= 55 && r.humidity <= 80);
     assert.ok(
@@ -208,6 +241,8 @@ test("seeding links one virtual device; repeats and concurrent requests retain o
     ids,
   );
   assert.equal(devices.size, 1);
+  assert.equal(histories.length,1);
+  assert.ok(rows.every(row => row.plantId === plant.id && row.pairingId === histories[0].id && row.contextVersion === 1));
   assert.equal(
     (await (await request(`/api/plants/${plant.id}`)).json()).simulated,
     true,
@@ -363,4 +398,35 @@ test("hardware ingestion accepts sensor boundaries and rejects invalid input bef
   } finally {
     failMongo = false;
   }
+});
+
+test("demo reseeding replaces only the current session and preserves earlier/legacy samples", async () => {
+  const previous = histories.find(row => row.plantId === plant.id && row.unpairedAt === null);
+  const previousRows = structuredClone(rows.filter(row => row.pairingId === previous.id));
+  await pairer(plant.id,"owner",null);
+  const legacy = {...previousRows[0],id:randomUUID()};
+  delete legacy.plantId; delete legacy.pairingId; delete legacy.contextVersion;
+  rows.push(legacy);
+  assert.equal((await seed()).status,200);
+  const current = histories.find(row => row.plantId === plant.id && row.unpairedAt === null);
+  assert.notEqual(current.id,previous.id);
+  const currentIds = rows.filter(row => row.pairingId === current.id).map(row => row.id);
+  assert.equal(currentIds.length,193);
+  assert.ok(currentIds.every(id => !previousRows.some(row => row.id === id)));
+  for (const response of await Promise.all([seed(),seed()])) assert.equal(response.status,200);
+  assert.deepEqual(rows.filter(row => row.pairingId === previous.id),previousRows);
+  assert.deepEqual(rows.filter(row => row.pairingId === current.id).map(row => row.id),currentIds);
+  assert.ok(rows.includes(legacy));
+  assert.equal(histories.length,2);
+});
+
+test("a failed first MongoDB batch leaves a committed demo session that reseeding repairs", async () => {
+  await pairer(plant.id,"owner",null);
+  failMongo = true;
+  try { assert.equal((await seed()).status,500); } finally { failMongo = false; }
+  const current = histories.find(row => row.plantId === plant.id && row.unpairedAt === null);
+  assert.ok(current); assert.equal(plant.deviceId,current.deviceId);
+  assert.equal(rows.filter(row => row.pairingId === current.id).length,0);
+  assert.equal((await seed()).status,200);
+  assert.equal(rows.filter(row => row.pairingId === current.id).length,193);
 });

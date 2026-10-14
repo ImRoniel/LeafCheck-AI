@@ -4,6 +4,8 @@ import { after, before, beforeEach, mock, test } from "node:test";
 import { HttpError } from "../src/lib/http.ts";
 
 const speciesName = "Ocimum basilicum";
+const newPlantId = "00000000-0000-4000-8000-000000000099";
+let createdPlant, pairingRows;
 const winner = {
   id: "cached-winner",
   speciesName,
@@ -62,11 +64,12 @@ before(async () => {
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
     namedExports: {
       prismaPg: {
-        $transaction: async function (operation) {
-          const snapshot = { plantCreates, analyses: [...analyses], taskWrites: [...taskWrites], identificationWrites: [...identificationWrites], healthWrites: [...healthWrites] };
+        $transaction: async function (operation,options) {
+          assert.equal(options.isolationLevel,"Serializable");
+          const snapshot = structuredClone({ plantCreates, createdPlant, pairingRows, analyses, taskWrites, identificationWrites, healthWrites });
           try { return await operation(this); }
           catch (error) {
-            ({ plantCreates, analyses, taskWrites, identificationWrites, healthWrites } = snapshot);
+            ({ plantCreates, createdPlant, pairingRows, analyses, taskWrites, identificationWrites, healthWrites } = snapshot);
             throw error;
           }
         },
@@ -74,15 +77,17 @@ before(async () => {
           create: async ({ data }) => {
             captureWrite("plant", data);
             plantCreates++;
-            return {
-              id: "new-plant",
+            createdPlant = {
+              id: newPlantId,
+              userId:"owner",
               name: data.name,
               species: data.species,
               deviceId: data.deviceId ?? null,
               healthStatus: data.healthStatus,
             };
+            return createdPlant;
           },
-          findFirst: async () => plantOwned ? ({
+          findFirst: async ({where}) => where.id === newPlantId ? createdPlant : plantOwned ? ({
             id: "00000000-0000-4000-8000-000000000001",
             userId: "owner",
             name: "Basil",
@@ -91,12 +96,20 @@ before(async () => {
             imageUrl: savedImageUrl,
             healthStatus: existingHealthStatus,
           }) : null,
+          updateMany: async () => ({count:0}),
           update: async ({ data }) => {
+            if (Object.hasOwn(data,"deviceId")) { Object.assign(createdPlant,data); return {...createdPlant}; }
             healthWrites.push(captureWrite("health", data));
             return data;
           },
         },
         device: { findFirst: async ({ where }) => deviceOwned ? { id: where.id, userId: "owner", macAddress: sensorMac } : null },
+        devicePairingHistory: {
+          findMany: async () => pairingRows.filter(row => row.unpairedAt === null),
+          findFirst: async () => null,
+          updateMany: async ({data}) => { for(const row of pairingRows) if(row.unpairedAt === null) Object.assign(row,data); return {count:0}; },
+          create: async ({data}) => { const row = {id:`pairing-${pairingRows.length}`,unpairedAt:null,...data}; pairingRows.push(row); return row; },
+        },
         plantIdentification: { create: async ({ data }) => {
           identificationWrites.push(captureWrite("identification", data));
           return { id: "identification" };
@@ -211,6 +224,7 @@ beforeEach(() => {
   fetches = 0;
   generationError = null;
   plantCreates = 0;
+  createdPlant = null; pairingRows = [];
   identifications = 0;
   linkedDevice = null;
   deviceOwned = true;
@@ -311,9 +325,9 @@ test("saved task fields match the public response and trusted scan ownership", a
   assert.equal(result.body.diagnostic.rawAnalysisText, diagnosticReport);
   assert.equal(analyses[0].rawAnalysisText, diagnosticReport);
   assert.deepEqual(result.body.notification, { notifyAt: "2027-01-02T09:00:00Z", reason: "Follow up" });
-  assert.deepEqual(taskWrites, result.body.careTasks.map((task) => ({ ...task, dueDate: new Date(task.dueDate), plantId: "new-plant", userId: "owner", analysisId: result.body.diagnostic.id, status: "PENDING" })));
+  assert.deepEqual(taskWrites, result.body.careTasks.map((task) => ({ ...task, dueDate: new Date(task.dueDate), plantId: newPlantId, userId: "owner", analysisId: result.body.diagnostic.id, status: "PENDING" })));
   assert.deepEqual(writeOrder, ["plant", "identification", "analysis", "tasks", "tasks", "health"]);
-  assert.equal(identificationWrites[0].plantId, "new-plant");
+  assert.equal(identificationWrites[0].plantId, newPlantId);
   assert.equal(healthWrites[0].healthStatus, "warning");
   assert.equal((await scan()).status, 201);
   assert.equal(plantCreates, 1);

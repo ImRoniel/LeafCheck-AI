@@ -14,6 +14,7 @@ import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import type { HardwareTelemetryPayload } from "../types/sensor.js";
 import { serializeTelemetry } from "../lib/telemetry-payload.js";
+import { serializableTransaction } from "../lib/serializable.js";
 
 export const telemetryRouter = Router();
 // Only reads require user authentication. Firmware POST uses the hardware MAC address.
@@ -107,8 +108,8 @@ function validateTelemetryPayload(body: unknown): string[] {
  * Ingest a new SensorReading from the ESP32 firmware.
  *
  * 1. Validate payload structure and numeric values.
- * 2. Cross-DB check: resolve the hardware MAC address to a PostgreSQL device UUID.
- * 3. Insert into MongoDB with server-authoritative timestamp.
+ * 2. Resolve the device and active pairing in one short PostgreSQL snapshot.
+ * 3. After commit, insert the frozen context and server timestamp into MongoDB.
  */
 telemetryRouter.post("/", async (req: Request, res: Response) => {
   // Step 1: Validate payload
@@ -130,12 +131,26 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
   } = req.body as HardwareTelemetryPayload;
 
   try {
-    // Step 2: Cross-DB device verification (PostgreSQL)
-    const device = await prismaPg.device.findUnique({
-      where: { macAddress: deviceId.toUpperCase() },
+    // Resolve once. A move after this transaction must not reattribute the sample.
+    const context = await serializableTransaction(prismaPg, async (tx) => {
+      const device = await tx.device.findUnique({
+        where: { macAddress: deviceId.toUpperCase() },
+      });
+      if (!device) return null;
+      const pairing = await tx.devicePairingHistory.findFirst({
+        where: { deviceId: device.id, unpairedAt: null },
+        select: { id: true, plantId: true },
+      });
+      return Object.freeze({
+        macAddress: device.macAddress,
+        plantId: pairing?.plantId ?? null,
+        pairingId: pairing?.id ?? null,
+        contextVersion: 1,
+        timestamp: new Date(),
+      });
     });
 
-    if (!device) {
+    if (!context) {
       console.warn("[Telemetry] Rejected telemetry for an unknown device.");
       res.status(404).json({
         error: "Device not found. Claim this Device ID in the app before sending telemetry.",
@@ -144,24 +159,27 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     }
 
     // Virtual devices only accept the authenticated, owner-scoped demo generator.
-    if (device.macAddress?.startsWith("DEMO:")) {
+    if (context.macAddress.startsWith("DEMO:")) {
       res
         .status(403)
         .json({ error: "Virtual devices do not accept hardware ingestion." });
       return;
     }
 
-    // Step 3: Insert into MongoDB with server-authoritative timestamp
+    // PostgreSQL has committed; MongoDB insertion does not re-resolve context.
     const reading = await prisma.sensorReading.create({
       data: {
-        deviceId: device.macAddress,
+        deviceId: context.macAddress,
+        plantId: context.plantId,
+        pairingId: context.pairingId,
+        contextVersion: context.contextVersion,
         temperature,
         humidity,
         // Keep calibrated percentage unavailable until calibration exists.
         soilMoisture: null,
         soilMoistureRaw: soilMoistureRaw ?? soilMoisture,
         lightLux: lightLux ?? lightLevel,
-        timestamp: new Date(), // Server-authoritative
+        timestamp: context.timestamp,
       },
     });
 

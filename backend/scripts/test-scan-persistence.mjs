@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { setTimeout } from "node:timers/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { deployIntegrationPostgres } from "./integration-postgres.mjs";
 
 const cwd = fileURLToPath(new URL("../", import.meta.url));
 const require = createRequire(import.meta.url);
@@ -56,7 +57,8 @@ try {
     DATABASE_URL: "mongodb://127.0.0.1:1/unused", LEAFCHECK_SCAN_TEST_CONTAINER: name };
   const prisma = join(dirname(require.resolve("prisma/package.json")), "build/index.js");
   run(process.execPath, [prisma, "generate", "--schema=prisma/schema.postgres.prisma"], env);
-  run(process.execPath, [prisma, "db", "push", "--schema=prisma/schema.postgres.prisma", "--skip-generate"], env);
+  const deployment = await deployIntegrationPostgres(args => run(process.execPath, [prisma, ...args], env));
+  process.stdout.write(deployment.replaceAll(password,"[redacted]"));
   console.log("Disposable PostgreSQL ready; running real commit/rollback checks.");
   const result = spawnSync(process.execPath, ["--import", "tsx/esm", "--test", "tests/integration/scan-persistence.test.mjs"], { cwd, env, encoding: "utf8", timeout: 600_000 });
   // Redact the test-only credential even if an upstream diagnostic contains it.

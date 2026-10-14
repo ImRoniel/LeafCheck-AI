@@ -2,6 +2,8 @@ import type { Prisma, PrismaClient } from "../generated/postgres-client/index.js
 import type { CareTaskOutput, GeminiStructuredOutput } from "../types/scan.js";
 import { HttpError } from "./http.js";
 import { validateScanOutput } from "./scan-output.js";
+import { pairPlantDeviceInTransaction } from "./plant-pairing.js";
+import { isPairingConflict, serializableTransaction } from "./serializable.js";
 
 export interface ScanPersistenceInput {
   userId: string;
@@ -27,15 +29,19 @@ export async function persistScan(client: Pick<PrismaClient, "$transaction">, in
   if (input.output && input.output.subjectKind !== "living_plant") {
     throw new HttpError(400, "INVALID_INPUT", "Only living plant scans can be saved.");
   }
-  return client.$transaction(async (tx) => {
+  return serializableTransaction(client, async (tx) => {
     const select = { id: true, name: true, species: true, deviceId: true, healthStatus: true } as const;
-    const plant = input.plantId
+    let plant = input.plantId
       ? await tx.plant.findFirst({ where: { id: input.plantId, userId: input.userId }, select })
       : await tx.plant.create({ data: {
         name: input.name, species: input.species, location: input.location, imageUrl: input.imageUrl,
-        userId: input.userId, healthStatus: "unknown", lastScannedAt: input.scanTime, deviceId: input.deviceId,
+        userId: input.userId, healthStatus: "unknown", lastScannedAt: input.scanTime,
       }, select });
     if (!plant) throw new HttpError(404, "NOT_FOUND", "Plant not found.");
+    if (!input.plantId && input.deviceId !== undefined) {
+      const paired = await pairPlantDeviceInTransaction(tx, plant.id, input.userId, input.deviceId);
+      plant = { ...plant, deviceId: paired.plant.deviceId };
+    }
     // An unsuccessful diagnosis cannot downgrade an existing health assessment.
     const healthStatus = input.output?.healthStatus ?? plant.healthStatus ?? "unknown";
 
@@ -69,5 +75,5 @@ export async function persistScan(client: Pick<PrismaClient, "$transaction">, in
       ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
     } });
     return { plant, analysis, careTasks, healthStatus };
-  });
+  }, isPairingConflict);
 }
