@@ -93,6 +93,9 @@ before(async () => {
   app.use(express.json({ limit: "16kb" }));
   app.use("/auth", authRouter);
   app.use("/users", usersRouter);
+  app.get("/admin-only", auth.requireAuth, auth.requireAdmin, (_req, res) => {
+    res.json({ ok: true });
+  });
   app.use(errorHandler);
   server = app.listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
@@ -122,6 +125,34 @@ const password = "  fifteen characters plus spaces  ";
 const register = (email) =>
   request("/auth/register", { email, password, name: " Test " });
 const bearer = (token) => ({ Authorization: `Bearer ${token}` });
+
+test("admin middleware requires authentication and uses the current database role instead of JWT claims", async () => {
+  const anonymous = await request("/admin-only", undefined, {}, "GET");
+  assert.equal(anonymous.status, 401);
+  assert.equal(anonymous.body.code, "INVALID_SESSION");
+
+  const account = await register("admin-roles@example.test");
+  assert.equal(account.status, 201);
+  const user = users.get(account.body.user.id);
+  const session = [...sessions.values()].find(row => row.userId === user.id);
+  const token = await new SignJWT({ sid: session.id, role: "ADMIN" })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(user.id)
+    .setIssuer("test-issuer")
+    .setAudience("test-audience")
+    .setIssuedAt()
+    .setExpirationTime("15m")
+    .sign(new TextEncoder().encode(process.env.AUTH_JWT_SECRET));
+
+  // Keep the same signed token while changing only the database record.
+  for (const [role, status] of [["USER", 403], ["ADMIN", 200], ["LEAD_DEV", 200], ["USER", 403]]) {
+    user.role = role;
+    const response = await request("/admin-only", undefined, bearer(token), "GET");
+    assert.equal(response.status, status);
+    if (status === 403) assert.equal(response.body.code, "ADMIN_REQUIRED");
+    else assert.deepEqual(response.body, { ok: true });
+  }
+});
 
 test("registration normalizes email, hashes exact password, rejects privileged fields and duplicates", async () => {
   assert.equal(

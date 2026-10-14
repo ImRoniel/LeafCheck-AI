@@ -78,7 +78,8 @@ model Device {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  plants Plant[]
+  plants         Plant[]
+  pairingHistory DevicePairingHistory[]
 }
 
 model Plant {
@@ -88,6 +89,8 @@ model Plant {
   location      String?
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // One current holder per device is enforced by the migration's partial index.
+  // Keep the list relation on Device for existing inventory consumers.
   deviceId      String?
   device        Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   healthStatus  String    @default("healthy")
@@ -101,6 +104,24 @@ model Plant {
   identifications PlantIdentification[]
   analyses        AIAnalysis[]
   careTasks       CareTask[]
+  pairingHistory  DevicePairingHistory[]
+}
+
+/// Pairing intervals use [pairedAt, unpairedAt); a null end means currently paired.
+/// Open-session uniqueness and interval ordering are native migration constraints.
+/// Pairing transitions and verified legacy imports must also prevent overlaps.
+model DevicePairingHistory {
+  id         String    @id @default(uuid())
+  deviceId   String
+  // The migration defers this FK until commit to support User -> Plant cascades.
+  device     Device    @relation(fields: [deviceId], references: [id], onDelete: NoAction)
+  plantId    String
+  plant      Plant     @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  pairedAt   DateTime  @default(now())
+  unpairedAt DateTime?
+
+  @@index([plantId, pairedAt])
+  @@index([deviceId, unpairedAt])
 }
 
 // ─── AI Scanner Pipeline Models ───────────────────────────────────────────────

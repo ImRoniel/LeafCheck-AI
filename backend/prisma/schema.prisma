@@ -17,6 +17,12 @@ datasource db {
 model SensorReading {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   deviceId        String
+  // PostgreSQL UUID strings; cross-database references are resolved by the server.
+  // Missing contextVersion identifies legacy documents. Do not add a default:
+  // ingestion must explicitly mark new paired and unpaired readings with version 1.
+  plantId         String?
+  pairingId       String?
+  contextVersion  Int?
   temperature     Float
   humidity        Float
   soilMoisture    Float?
@@ -26,5 +32,7 @@ model SensorReading {
   timestamp       DateTime @default(now()) @map("deviceTimestamp")
 
   @@index([deviceId, timestamp(sort: Desc)])
+  @@index([plantId, timestamp(sort: Desc)])
+  @@index([pairingId, timestamp(sort: Desc)])
   @@map("sensorReadings")
 }

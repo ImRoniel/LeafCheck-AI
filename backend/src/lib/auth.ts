@@ -130,3 +130,13 @@ export const requireAuth = asyncRoute(async (req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
+
+/** Must follow requireAuth; authorize the database user, never JWT role claims. */
+export const requireAdmin = asyncRoute((_req, res, next) => {
+  const user: User | undefined = res.locals.auth?.user;
+  if (!user) throw invalidSession();
+  if (user.role !== "ADMIN" && user.role !== "LEAD_DEV") {
+    throw new HttpError(403, "ADMIN_REQUIRED", "Administrator access required.");
+  }
+  next();
+});
