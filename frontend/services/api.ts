@@ -13,6 +13,21 @@ export interface HistoryQuery {
   limit?: number;
   offset?: number;
 }
+export interface PlantHistoryQuery extends HistoryQuery {
+  from?: string;
+  to?: string;
+}
+
+function plantHistoryDate(value: string | undefined, name: string): string | undefined {
+  if (value === undefined) return undefined;
+  const iso = /^\d{4}-\d{2}-\d{2}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d))?$/;
+  if (typeof value !== "string" || !iso.test(value)) throw new ApiError("validation", `${name} must be an ISO date`);
+  const date = new Date(value), calendar = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== value.slice(0, 10)) {
+    throw new ApiError("validation", `${name} must be a valid ISO date`);
+  }
+  return date.toISOString();
+}
 export interface CreatePlantInput {
   name: string;
   species: string;
@@ -315,6 +330,19 @@ export function createApiClient(
       v.uuid(plantId, "plantId");
       return request(`/api/plants/${id(plantId)}/telemetry`, v.parsePlantTelemetry, options);
     },
+    fetchPlantTelemetryHistory: (plantId: string, query: PlantHistoryQuery = {}, options?: RequestOptions) => {
+      v.uuid(plantId, "plantId");
+      const { limit = 50, offset = 0 } = query;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 200 || !Number.isInteger(offset) || offset < 0 || offset > 2_147_483_647) {
+        throw new ApiError("validation", "Invalid history pagination");
+      }
+      const from = plantHistoryDate(query.from, "from"), to = plantHistoryDate(query.to, "to");
+      if (from && to && from > to) throw new ApiError("validation", "from must not be after to");
+      const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      return request(`/api/plants/${id(plantId)}/telemetry/history?${params}`, v.parseHistory, options);
+    },
     fetchPlant: (plantId: string, options?: RequestOptions) =>
       request(`/api/plants/${id(plantId)}`, v.parsePlant, options),
     seedTelemetry: (plantId: string, options?: RequestOptions) =>
@@ -459,6 +487,7 @@ export const {
   claimDevice,
   pairDeviceToPlant,
   fetchPlantTelemetry,
+  fetchPlantTelemetryHistory,
   fetchUserPlants,
   fetchPlant,
   seedTelemetry,

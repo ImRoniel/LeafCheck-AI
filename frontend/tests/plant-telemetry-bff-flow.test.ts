@@ -67,10 +67,10 @@ for (const payload of [{ paired: false, device: null, telemetry: null }, { paire
       assert.match(output, /Bedroom sensor/);
       if (!payload.telemetry) assert.match(output, /Waiting for first sensor reading/);
       else assert.deepEqual(elements(node).filter((child) => child.type === "MetricCard").map((child) => child.props.value), [0, 0, 0, 0]);
-      press(node, "Reading history");
-      const history = elements(flow.renderTelemetry(flow.render())).find((child) => child.type === "TelemetryHistory");
-      assert.equal(history?.props.deviceId, device.id);
     }
+    press(node, "Reading history");
+    const history = elements(flow.renderTelemetry(flow.render())).find((child) => child.type === "TelemetryHistory");
+    assert.equal(history?.props.plantId, plantId);
     flow.metadata({ plants: [{ ...testPlant, name: "New name" }] }); flow.render(); assert.equal(reads, 1);
     flow.dispose();
   });
@@ -84,6 +84,20 @@ test("production profile reports malformed BFF distinctly and retry recovers", a
   assert.doesNotMatch(JSON.stringify(node), /No sensor paired|Waiting for first/);
   press(node, "Retry sensor readings"); malformed = false; flow.render(); await nextTurn();
   node = flow.renderTelemetry(flow.render()); assert.match(JSON.stringify(node), /Connect a sensor to monitor growing conditions/); flow.dispose();
+});
+
+test("an open plant chart stays available after its sensor is unpaired", async (t) => {
+  let paired = true;
+  const flow = profileHarness(async () => paired ? {paired:true,device,telemetry:zero} : {paired:false,device:null,telemetry:null});
+  t.after(flow.dispose);
+  flow.render(); await nextTurn();
+  press(flow.renderTelemetry(flow.render()), "Reading history");
+  paired = false; flow.refocus(); await nextTurn();
+  const node = flow.renderTelemetry(flow.render());
+  assert.match(JSON.stringify(node), /Connect a sensor/);
+  assert.equal(elements(node).find(child => child.type === "TelemetryHistory")?.props.plantId, plantId);
+  press(node, "Hide reading history");
+  assert.equal(elements(flow.renderTelemetry(flow.render())).find(child => child.type === "TelemetryHistory"), undefined);
 });
 
 test("production profile aborts obsolete plant/session responses and refocus observes reassignment", async () => {

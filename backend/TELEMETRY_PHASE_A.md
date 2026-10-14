@@ -1,8 +1,35 @@
 # Plant-scoped telemetry: Phase A
 
-Phase A prepares the two schemas and a PostgreSQL migration. Pairing, ingestion,
-plant reads, charts and AI scans still use their existing implementation. The
-telemetry isolation fix requires the separately approved Phases B, C and D.
+Phase A prepared the two schemas and a PostgreSQL migration. Phase B maintains
+pairing sessions and stamps new readings. Phase C scopes plant reads and charts
+to those sessions. AI scan provenance remains separate Phase D work.
+
+## Existing pairings and the reviewed backfill command
+
+Plants paired before Phase A may have a `Plant.deviceId` pointer without a
+`DevicePairingHistory` row. New readings are tagged as unpaired (`plantId: null`,
+`pairingId: null`, `contextVersion: 1`) until the sensor is re-paired or the
+backfill command runs. The plant's latest endpoint deliberately returns
+`{ paired: true, device, telemetry: null }` in this state.
+
+After review, run separately against the intended configured PostgreSQL database:
+
+```sh
+npm run backfill:pairing-sessions --workspace=backend
+```
+
+`scripts/backfill-open-pairing-sessions.mjs` uses Prisma Client and one
+Serializable transaction. It creates an open session starting at the current
+time for each paired plant without an open session, then logs the created count
+after commit. A second run creates zero rows and preserves existing session IDs
+and start times. Inconsistent pointers, ownership or existing device sessions
+abort the entire transaction for reconciliation; the command does not choose a
+winner, move a sensor, or alter MongoDB documents.
+
+This starts future attribution. It does not recover ownership of the 117 legacy
+readings or retroactively attribute version-1 unpaired readings. Older intervals
+require independently verified evidence before legacy window fallback is safe.
+The command is not run by application startup, builds or migration deployment.
 
 ## Reconciliation evidence
 
@@ -51,7 +78,7 @@ The native partial indexes and interval CHECK live in migration
 migrations, rather than `db push`: the Prisma 6 schema does not describe those
 native constraints. Closed-session overlap prevention, ownership checks and
 consistency between open sessions and `Plant.deviceId` belong to the Phase B
-writer and the verified importer. Those guarantees are not implemented yet.
+writer and the verified importer.
 
 MongoDB adds optional `plantId`, `pairingId` and `contextVersion` fields.
 The ID fields are PostgreSQL UUID strings, not MongoDB ObjectIds. None has a
@@ -133,8 +160,10 @@ route or pairing/ingestion helper was changed in Phase A.
 4. While those writers remain stopped, choose one UTC cutover time T0. A
    separately reviewed Prisma transaction creates an open session for every
    confirmed current pairing starting at T0. Do not start sessions at a plant's
-   createdAt/updatedAt or the earliest reading. The migration itself seeds no
-   sessions, and Phase A contains no runnable backfill or cutover writer.
+   createdAt/updatedAt or the earliest reading. The Phase A migration itself seeds
+   no sessions. The separately reviewed `backfill:pairing-sessions` command now
+   provides the transaction for current pointers; it does not establish older
+   ownership.
 5. Activate all context-aware writers and plant-scoped readers together, then
    resume ingestion. Keep the existing hardware payload; plant/pairing context
    comes exclusively from the server. Do not deploy the old scan-created
@@ -143,7 +172,7 @@ route or pairing/ingestion helper was changed in Phase A.
    Validate ownership, interval ordering and non-overlap for each device and
    plant before allowing any legacy window fallback. Existing AI snapshots may
    already contain another plant's readings and are not sufficient evidence.
-7. Any later backfill must operate in bounded, idempotent Prisma batches and
+7. Any later MongoDB document backfill must use bounded, idempotent Prisma batches and
    update only still-untagged documents inside verified intervals. Preserve
    MongoDB _ids, sensor keys, timestamps and measurements. Dry-run counts and
    interval evidence must be reviewed before applying a backfill. Documents

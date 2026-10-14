@@ -3,12 +3,13 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { before, beforeEach, after, mock, test } from "node:test";
 import express from "express";
+import { matchesWhere } from "./helpers/mongo-filter.mjs";
 
 const userId = randomUUID(), plantId = randomUUID(), deviceId = randomUUID();
 const device = { id: deviceId, userId, name: "Sensor", macAddress: "LC-A50528", status: "ONLINE", createdAt: new Date(), updatedAt: new Date() };
 const plant = { id: plantId, userId, name: "Snake plant", species: "Dracaena hyacinthoides", deviceId, imageUrl: "data:image/jpeg;base64,/9j/2Q==", healthStatus: "healthy", minMoisture: 30, maxMoisture: 80 };
 let server, base, rows, prompts, queries, activePairing, inTransaction, lookupCount, lookupFailures, insertGate;
-const matches = (query, row) => query.where.deviceId === row.deviceId;
+const matches = (query, row) => matchesWhere(row,query.where);
 before(async () => {
   mock.module(new URL("../src/lib/auth.js", import.meta.url).href, { namedExports: { requireAuth(req, res, next) {
     if (req.get("authorization") !== "owner") return res.sendStatus(401);
@@ -34,7 +35,7 @@ before(async () => {
     careTask: { create: async ({ data }) => data },
     devicePairingHistory: { findFirst: async ({where}) => {
       assert.equal(inTransaction,true);
-      assert.deepEqual(where,{deviceId,unpairedAt:null});
+      assert.deepEqual(where,where.plantId === undefined ? {deviceId,unpairedAt:null} : {plantId,deviceId,unpairedAt:null});
       lookupCount++;
       return activePairing ? {...activePairing} : null;
     } },
@@ -95,7 +96,8 @@ test("hardware ingestion round-trips through profile, latest, history, overview 
   assert.match(prompts[0][0], /Raw ADC: 2625/); assert.match(prompts[0][0], /Ambient Light: 0.83 lux/);
   assert.match(prompts[0][0], /Missing ideal species specs do not mean supplied sensor measurements are missing/);
   assert.equal(prompts[0][1].inlineData.data, "/9j/2Q==");
-  assert.ok(queries.every(query => query.where.deviceId === "LC-A50528"));
+  assert.deepEqual(queries.filter(query => query.where.plantId)[0].where,{plantId,pairingId:activePairing.id,contextVersion:1});
+  assert.ok(queries.filter(query => !query.where.plantId).every(query => query.where.deviceId === "LC-A50528"));
 });
 
 test("legacy firmware lightLevel and percentage are accepted only with explicit raw ADC and normalized", async () => {

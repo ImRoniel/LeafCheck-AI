@@ -3,12 +3,13 @@ import { requireAuth } from "../lib/auth.js";
 import { demoDeviceId, seedDemoTelemetry } from "../lib/demo-telemetry.js";
 import { serializeDevice } from "../lib/device.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
-import { ownedDevice, ownedPlant, resourceId } from "../lib/ownership.js";
+import { ownedPlant, resourceId } from "../lib/ownership.js";
 import { pairPlantDevice } from "../lib/plant-pairing.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import { Plant } from "../types/plant.js";
 import { serializeTelemetry } from "../lib/telemetry-payload.js";
+import { additionalHistorySources, historyOrder, latestPlantContext, parsePlantHistoryQuery, plantHistoryContext, plantHistoryWhere, serializePlantHistoryReading } from "../lib/plant-telemetry.js";
 
 export const plantsRouter = Router();
 plantsRouter.use(requireAuth);
@@ -165,23 +166,43 @@ plantsRouter.patch(
 
 plantsRouter.get(
   "/:id/telemetry",
-  asyncRoute(async (_req, res) => {
-    const plant: Awaited<ReturnType<typeof ownedPlant>> = res.locals.plant;
-    if (plant.deviceId === null) {
+  asyncRoute(async (req, res) => {
+    const { plant, device, session } = await latestPlantContext(req.params.id, res.locals.auth.user.id);
+    if (!device) {
       res.json({ paired: false, device: null, telemetry: null });
       return;
     }
-    const device = await ownedDevice(plant.deviceId, res.locals.auth.user.id);
-    // Vercel stores physical sensor readings under the printed MAC address.
-    // Virtual demo sensors retain their UUID and calibrated percentage contract.
+    // A legacy pointer without a session is paired-but-empty, not an error.
+    // Re-pairing or the reviewed backfill starts attribution from that moment.
+    if (!session) {
+      res.json({ paired: true, device: serializeDevice(device), telemetry: null });
+      return;
+    }
     const isDemo = device.macAddress.startsWith("DEMO:");
-    const queryDeviceId = isDemo ? device.id : device.macAddress;
     const reading = await prisma.sensorReading.findFirst({
-      where: { deviceId: queryDeviceId },
-      orderBy: { timestamp: "desc" },
+      where: { plantId: plant.id, pairingId: session.id, contextVersion: 1 },
+      orderBy: [...historyOrder],
     });
     const telemetry = reading ? serializeTelemetry(reading, device.id, isDemo, plant.minMoisture, plant.maxMoisture) : null;
     res.json({ paired: true, device: serializeDevice(device), telemetry });
+  }),
+);
+
+plantsRouter.get(
+  "/:id/telemetry/history",
+  asyncRoute(async (req, res) => {
+    const query = parsePlantHistoryQuery(req.query);
+    const { plant, sessions, now } = await plantHistoryContext(req.params.id, res.locals.auth.user.id);
+    const where = plantHistoryWhere(plant.id, sessions, now, query);
+    const [readings, total] = await prisma.$transaction([
+      prisma.sensorReading.findMany({ where, orderBy: [...historyOrder], take: query.limit, skip: query.offset }),
+      prisma.sensorReading.count({ where }),
+    ]);
+    const sources = await additionalHistorySources(readings, sessions);
+    res.json({
+      data: readings.map(reading => serializePlantHistoryReading(reading, sessions, sources)),
+      pagination: { total, limit: query.limit, offset: query.offset, hasMore: query.offset + query.limit < total },
+    });
   }),
 );
 

@@ -9,7 +9,7 @@ export function PlantTelemetry({ plant, payload, loading, error, onRefresh, onPa
   plant: Plant; payload: SensorState | null; loading: boolean; error: string | null;
   onRefresh: () => void; onPair: () => void; authenticated?: boolean;
 }) {
-  const [historyDeviceId, setHistoryDeviceId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [showCalibration, setShowCalibration] = useState(false);
   const telemetry = payload?.paired ? payload.telemetry : null;
   const paired = payload?.paired ?? Boolean(plant.deviceId);
@@ -41,9 +41,9 @@ export function PlantTelemetry({ plant, payload, loading, error, onRefresh, onPa
     </>}
     {authenticated && !paired && !loading && !error && <Action label="Pair a Sensor" variant="secondary" onPress={onPair} />}
     {authenticated && (paired || error) && <Action label={error ? "Retry sensor readings" : "Refresh readings"} variant="secondary" disabled={loading} onPress={onRefresh} />}
-    {payload?.paired && <>
-      <Action label={historyDeviceId === payload.device.id ? "Hide reading history" : "Reading history"} variant="secondary" onPress={() => setHistoryDeviceId(value => value === payload.device.id ? null : payload.device.id)} />
-      {historyDeviceId === payload.device.id && <TelemetryHistory key={historyDeviceId} deviceId={historyDeviceId} />}
+    {authenticated && <>
+      <Action label={showHistory ? "Hide reading history" : "Reading history"} variant="secondary" onPress={() => setShowHistory(value => !value)} />
+      {showHistory && <TelemetryHistory key={plant.id} plantId={plant.id} />}
     </>}
   </View>;
 }

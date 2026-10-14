@@ -86,8 +86,11 @@ try {
   run(process.execPath, [prisma, "generate", "--schema=prisma/schema.postgres.prisma"], env);
   const deployment = await deployIntegrationPostgres(args => run(process.execPath, [prisma, ...args], env));
   process.stdout.write(deployment.replaceAll(password,"[redacted]"));
-  console.log("Disposable PostgreSQL/MongoDB ready; running real pairing, ingestion and demo checks.");
-  const result = spawnSync(process.execPath, ["--import", "tsx/esm", "--experimental-test-module-mocks", "--test", "tests/integration/plant-pairing.test.mjs", "tests/integration/ingestion-context.test.mjs"], { cwd, env, encoding: "utf8", timeout: 600_000 });
+  const files = process.argv.includes("--plant-telemetry")
+    ? ["tests/integration/plant-telemetry.test.mjs"]
+    : ["tests/integration/plant-pairing.test.mjs", "tests/integration/ingestion-context.test.mjs"];
+  console.log("Disposable PostgreSQL/MongoDB ready; running telemetry integration checks.");
+  const result = spawnSync(process.execPath, ["--import", "tsx/esm", "--experimental-test-module-mocks", "--test", ...files], { cwd, env, encoding: "utf8", timeout: 600_000 });
   // Redact the test-only credential even if an upstream diagnostic contains it.
   const redact = (text) => (text ?? "").replaceAll(url, "[test database]").replaceAll(password, "[redacted]");
   process.stdout.write(redact(result.stdout));

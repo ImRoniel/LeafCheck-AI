@@ -16,11 +16,11 @@ const metrics = [
   { key: "lightLevel", title: "Light", unit: "lux", max: 15000 },
 ] as const;
 
-export function TelemetryHistory({ deviceId }: { deviceId: string }) {
+export function TelemetryHistory({ plantId }: { plantId: string }) {
   const [offset, setOffset] = useState(0);
   const limit = 200;
   const { readings, pagination, loading, error, refreshData } =
-    useTelemetryHistory(deviceId, { limit, offset });
+    useTelemetryHistory(plantId, { limit, offset });
   const ordered = chronologicalReadings(readings);
   return (
     <View style={{ gap: 12 }}>
