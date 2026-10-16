@@ -5,14 +5,15 @@ import { ApiError, createApiClient } from "../services/api";
 import { createSessionCoordinator, type PendingVerification } from "../services/session";
 import * as emailOtp from "../services/email-otp";
 import * as errors from "../services/errors";
+import type { useAuthCapabilities } from "../hooks/use-auth-capabilities";
 import { loadComponent, nodes } from "./startup-test-helpers";
 
 const flush = () => new Promise<void>(resolve => setImmediate(resolve));
 type Props = { children?: React.ReactNode; label?: string; title?: string; description?: string;
-  accessibilityRole?: string; maxLength?: number; disabled?: boolean;
+  accessibilityRole?: string; maxLength?: number; disabled?: boolean; loading?: boolean; editable?: boolean; backLabel?: string;
   href?: string | { pathname: string; params: Record<string, string> };
-  onChangeText?: (text: string) => void; onPress?: () => void; value?: string };
-function screen(path: string, overrides: Record<string, unknown>) {
+  onChangeText?: (text: string) => void; onPress?: () => void; onBack?: () => void; onSubmitEditing?: () => void; value?: string };
+function renderModule<T>(path: string, overrides: Record<string, unknown>, exportName = "default") {
   let cursor = 0;
   const slots: unknown[] = [];
   const dependencies: (readonly unknown[])[] = [];
@@ -22,12 +23,21 @@ function screen(path: string, overrides: Record<string, unknown>) {
     ...React,
     useState(initial: unknown) {
       const index = cursor++;
-      if (!(index in slots)) slots[index] = initial;
+      if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
       return [slots[index], (value: unknown) => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }];
     },
     useRef(initial: unknown) {
       const index = cursor++;
       if (!(index in slots)) slots[index] = { current: initial };
+      return slots[index];
+    },
+    useCallback(callback: unknown, deps: readonly unknown[]) {
+      const index = cursor++;
+      const previous = dependencies[index];
+      if (!previous || deps.some((value, position) => !Object.is(value, previous[position]))) {
+        dependencies[index] = deps;
+        slots[index] = callback;
+      }
       return slots[index];
     },
     useEffect(effect: () => void | (() => void), deps: readonly unknown[]) {
@@ -39,52 +49,72 @@ function screen(path: string, overrides: Record<string, unknown>) {
       }
     },
   };
-  const Component = loadComponent(path, {
+  const Component = loadComponent<() => T>(path, {
     react,
     "@/components/auth-button": { AuthButton: "AuthButton" },
     "@/components/auth-layout": { AuthLayout: "AuthLayout", authStyles: {} },
     "@/components/custom-text-input": { CustomTextInput: "CustomTextInput" },
     "@/components/screen": { Notice: "Notice" },
     "@/services/errors": errors,
-    "react-native": { Text: "Text", Pressable: "Pressable", View: "View" },
+    "react-native": { Text: "Text", Pressable: "Pressable", View: "View", BackHandler: { addEventListener: () => ({ remove() {} }) } },
     ...overrides,
-  }, [], { Error, Date });
+    "expo-router": { useLocalSearchParams: () => ({}), ...(overrides["expo-router"] as Record<string, unknown> | undefined) },
+  }, [], { Error, Date, AbortController }, exportName);
   const render = () => { cursor = 0; const element = Component(); effects.splice(0).forEach(effect => effect()); return element; };
+  return { render, unmount: () => cleanups.forEach(cleanup => cleanup()) };
+}
+function screen(path: string, overrides: Record<string, unknown>) {
+  const { render, unmount } = renderModule<React.ReactElement<Props>>(path, overrides);
   const elements = () => nodes(render()) as React.ReactElement<Props>[];
   return {
     render,
     fill(label: string, value: string) {
       const input = elements().find(node => node.props.label === label);
       assert.ok(input?.props.onChangeText, label);
+      assert.notEqual(input.props.editable, false, `${label} is not editable`);
       input.props.onChangeText(value);
     },
     press(title: string) {
       const button = elements().find(node => node.type === "AuthButton" && node.props.title === title);
       assert.ok(button?.props.onPress, title);
-      assert.ok(!button.props.disabled, `${title} is disabled`);
+      assert.ok(!button.props.disabled && !button.props.loading, `${title} is disabled`);
       button.props.onPress();
     },
+    pressLink(text: string) {
+      const link = elements().find(node => node.type === "Pressable" &&
+        nodes(node.props.children).some(child => child.props.children === text));
+      assert.ok(link?.props.onPress, text);
+      assert.ok(!link.props.disabled, `${text} is disabled`);
+      link.props.onPress();
+    },
     elements,
-    unmount: () => cleanups.forEach(cleanup => cleanup()),
+    unmount,
   };
 }
 
-test("forgot-password screen requests a recovery code and navigates with email only", async () => {
+test("forgot-password shows sending progress and passes email, recovery type and backend cooldown", async (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] });
   const calls: unknown[] = [], routes: unknown[] = [];
   let release!: () => void;
   const app = screen("app/forgot-password.tsx", {
-    "@/services/api": { api: { async forgotPassword(body: unknown) { calls.push(body); await new Promise<void>(resolve => { release = resolve; }); } } },
+    "@/services/api": { api: { async forgotPassword(body: unknown) { calls.push(body); await new Promise<void>(resolve => { release = resolve; }); return { resendAfter: 90 }; } } },
     "expo-router": { useRouter: () => ({ push: (route: unknown) => routes.push(route), replace() {} }) },
   });
   assert.match(app.elements()[0].props.description ?? "", /eight-digit recovery code/);
   app.fill("Email", "invalid"); app.press("Send recovery code");
   assert.equal(calls.length, 0);
   app.fill("Email", "  Person@Example.test  ");
-  app.press("Send recovery code"); app.press("Send recovery code");
+  app.press("Send recovery code");
+  const sending = app.elements().find(node => node.props.title === "Sending code...");
+  assert.equal(sending?.props.loading, true);
+  sending?.props.onPress?.();
+  assert.equal(app.elements().find(node => node.props.label === "Email")?.props.editable, false);
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test" }]);
   assert.equal(routes.length, 0);
   release(); await flush();
-  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/reset-password", params: { email: "person@example.test", type: "recovery" } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/reset-password", params: {
+    email: "person@example.test", type: "recovery", resendAt: String(Date.now() + 90_000) } }]);
+  app.unmount();
 });
 
 test("registration explains eight-digit verification and opens the shared OTP screen", async () => {
@@ -96,7 +126,7 @@ test("registration explains eight-digit verification and opens the shared OTP sc
       pending = { status: "verification_required", email: "person@example.test", purpose: "registration", resendAfter: 60 };
     } }) },
     "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
-    "expo-router": { Redirect: "Redirect", useRouter: () => ({ push: (route: unknown) => routes.push(route), replace() {} }) },
+    "expo-router": { useRouter: () => ({ push() {}, replace: (route: unknown) => routes.push(route) }) },
   });
   assert.match(app.elements()[0].props.description ?? "", /eight-digit code/);
   app.fill("Email", "Person@Example.test"); app.fill("First name", "Plant"); app.fill("Last name", "Owner");
@@ -105,9 +135,12 @@ test("registration explains eight-digit verification and opens the shared OTP sc
   assert.ok(terms?.props.onPress); terms.props.onPress();
   app.press("Create account"); await flush();
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test", password: "password", name: "Plant Owner" }]);
-  assert.deepEqual(routes, []);
-  assert.equal(app.render().type, "Redirect");
-  assert.deepEqual(JSON.parse(JSON.stringify(app.elements()[0].props.href)), emailOtp.otpRoute(pending!));
+  assert.equal(app.render().props.title, "Check your email");
+  assert.equal(app.render().props.description, emailOtp.codeSentMessage("person@example.test"));
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [emailOtp.otpRoute(pending!)]);
+  app.press("Continue to verification");
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [emailOtp.otpRoute(pending!), emailOtp.otpRoute(pending!)]);
+  app.unmount();
 });
 
 test("login offers a passwordless request using only the email when enabled", async () => {
@@ -119,14 +152,14 @@ test("login offers a passwordless request using only the email when enabled", as
       async login() { throw new Error("Password login must not be used"); },
     }) },
     "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
-    "expo-router": { Redirect: "Redirect", useRouter: () => ({ push: (route: unknown) => routes.push(route) }) },
+    "expo-router": { useRouter: () => ({ push() {}, replace: (route: unknown) => routes.push(route) }) },
   });
   assert.ok(app.elements().some(node => node.props.children === "Forgot password?"));
   app.fill("Email", "  Person@Example.test  "); app.press("Login with email code"); await flush();
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test" }]);
-  assert.deepEqual(routes, []);
-  assert.equal(app.render().type, "Redirect");
-  assert.deepEqual(JSON.parse(JSON.stringify(app.elements()[0].props.href)), emailOtp.otpRoute(pending!));
+  assert.equal(app.render().props.title, "Check your email");
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [emailOtp.otpRoute(pending!)]);
+  app.unmount();
 });
 
 test("reset-password screen validates the code and confirmation, retries and clears secrets after success", async () => {
@@ -139,7 +172,9 @@ test("reset-password screen validates the code and confirmation, retries and cle
   assert.equal(app.elements().find(node => node.props.label === "Recovery code")?.props.maxLength, 8);
   app.fill("New password", "  new password  "); app.fill("Confirm new password", "  new password  ");
   for (const invalid of ["123456", "1234567", "123456789", "1234abcd"]) {
-    app.fill("Recovery code", invalid); app.press("Reset password");
+    app.fill("Recovery code", invalid);
+    assert.equal(app.elements().find(node => node.type === "AuthButton" && node.props.title === "Reset password")?.props.disabled, true);
+    app.elements().find(node => node.props.label === "Confirm new password")?.props.onSubmitEditing?.();
     assert.equal(calls.length, 0);
     assert.ok(app.elements().some(node => node.props.children === "Enter the eight-digit recovery code from your email."));
   }
@@ -151,6 +186,7 @@ test("reset-password screen validates the code and confirmation, retries and cle
   assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), { email: "person@example.test", code: "00654321", newPassword: "  new password  " });
   assert.ok(app.elements().some(node => node.props.title === "Return to login"));
   assert.ok(!app.elements().some(node => node.props.label === "New password"));
+  app.unmount();
 });
 
 for (const purpose of ["registration", "login"] as const) {
@@ -180,10 +216,11 @@ for (const purpose of ["registration", "login"] as const) {
       verifyOtp: session.verifyOtp, resendOtp: session.resendOtp, cancelVerification: session.cancelVerification,
       resumeVerification: session.resumeVerification,
     });
+    const routes: { pathname: string; params: Record<string, string> }[] = [];
     const entry = screen(purpose === "registration" ? "app/register.tsx" : "app/(auth)/login.tsx", {
       "@/context/auth": { useAuth },
       "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
-      "expo-router": { Redirect: "Redirect", useRouter: () => ({ push() {}, replace() {} }) },
+      "expo-router": { useRouter: () => ({ push() {}, replace: (route: { pathname: string; params: Record<string, string> }) => routes.push(route) }) },
     });
     entry.fill("Email", pending.email);
     if (purpose === "registration") {
@@ -192,13 +229,12 @@ for (const purpose of ["registration", "login"] as const) {
       assert.ok(terms?.props.onPress); terms.props.onPress(); entry.press("Create account");
     } else entry.press("Login with email code");
     await flush();
-    const redirect = entry.elements()[0];
-    assert.equal(redirect.type, "Redirect");
-    assert.deepEqual(JSON.parse(JSON.stringify(redirect.props.href)), {
+    assert.equal(entry.render().props.title, "Check your email");
+    assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{
       pathname: "/otp-verification", params: { email: pending.email,
         type: purpose === "registration" ? "signup" : "magiclink", message: `We sent an 8-digit code to ${pending.email}` },
-    });
-    const params = (redirect.props.href as { params: Record<string, string> }).params;
+    }]);
+    const params = routes[0].params;
     assert.equal(session.snapshot().token, null); assert.equal(stored, null);
     const app = screen("app/otp-verification.tsx", {
       "@/context/auth": { useAuth },
@@ -206,12 +242,15 @@ for (const purpose of ["registration", "login"] as const) {
     });
     assert.equal(app.elements()[0].props.description, `Enter the 8-digit code sent to ${pending.email}`);
     assert.equal(app.elements().find(node => node.props.label === "Email code")?.props.maxLength, 8);
+    assert.equal(app.elements().find(node => node.props.title === "Verify code")?.props.disabled, true);
     await assert.rejects(session.verifyOtp("00123456", { email: pending.email,
       type: purpose === "registration" ? "magiclink" : "signup" }),
       (e: unknown) => e instanceof ApiError && e.status === 400 && e.message === emailOtp.INVALID_OTP_MESSAGE);
     assert.equal(requests.filter(request => request.path === "auth/otp/verify").length, 0);
     for (const invalid of ["123456", "1234567", "123456789", "1234abcd"]) {
-      app.fill("Email code", invalid); app.press("Verify code"); await flush();
+      app.fill("Email code", invalid);
+      assert.equal(app.elements().find(node => node.props.title === "Verify code")?.props.disabled, true);
+      app.elements().find(node => node.props.label === "Email code")?.props.onSubmitEditing?.(); await flush();
       assert.equal(requests.filter(request => request.path === "auth/otp/verify").length, 0);
       assert.ok(app.elements().some(node => node.props.children === "Enter the eight-digit code from your email."));
     }
@@ -249,6 +288,7 @@ for (const purpose of ["registration", "login"] as const) {
       { email: pending.email, code: "00123456", type: purpose === "registration" ? "signup" : "magiclink" });
     assert.equal(app.elements()[0].props.href, "/(tabs)");
     app.unmount();
+    entry.unmount();
   });
 }
 
@@ -327,3 +367,239 @@ test("a profile outage after OTP can retry without consuming another code or los
   await session.restore();
   assert.equal(session.snapshot().status, "authenticated"); assert.equal(verifications, 1);
 });
+
+test("registration keeps fields on failure and offers a visible retry if OTP navigation throws", async () => {
+  let pending: PendingVerification | null = null;
+  let finish!: () => void;
+  let fail = true, navigationFails = true;
+  const routes: unknown[] = [];
+  const app = screen("app/register.tsx", {
+    "@/context/auth": { useAuth: () => ({ pendingVerification: pending, async register() {
+      await new Promise<void>(resolve => { finish = resolve; });
+      if (fail) throw new Error("Email delivery is temporarily unavailable");
+      pending = { status: "verification_required", email: "person@example.test", purpose: "registration", resendAfter: 60 };
+    } }) },
+    "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ status: "ready", emailOtp: true }) },
+    "expo-router": { useRouter: () => ({ replace(route: unknown) {
+      if (navigationFails) throw new Error("Navigator unavailable");
+      routes.push(route);
+    } }) },
+  });
+  app.fill("Email", "person@example.test"); app.fill("First name", "Plant");
+  app.fill("Password", "password"); app.fill("Confirm password", "password");
+  app.elements().find(node => node.props.accessibilityRole === "checkbox")?.props.onPress?.();
+  app.press("Create account");
+  assert.equal(app.elements().find(node => node.props.title === "Creating account...")?.props.loading, true);
+  assert.ok(app.elements().filter(node => node.type === "CustomTextInput").every(node => node.props.editable === false));
+  assert.ok(app.elements().filter(node => node.type === "Pressable").every(node => node.props.disabled === true));
+  finish(); await flush();
+  assert.equal(app.elements().find(node => node.props.label === "Email")?.props.value, "person@example.test");
+  assert.equal(app.elements().find(node => node.props.label === "First name")?.props.value, "Plant");
+  assert.ok(app.elements().some(node => node.props.children === "Email delivery is temporarily unavailable"));
+  fail = false; app.press("Create account"); finish(); await flush();
+  assert.equal(app.render().props.description, emailOtp.codeSentMessage("person@example.test"));
+  assert.ok(app.elements().some(node => node.props.children === "Your code was sent. Tap Continue to verification to enter it."));
+  assert.equal(routes.length, 0);
+  navigationFails = false; app.press("Continue to verification");
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [emailOtp.otpRoute(pending!)]);
+  app.unmount();
+});
+
+test("login uses separate loading states for email-code requests and password sign-in", async () => {
+  let finish!: () => void;
+  const calls: string[] = [];
+  const app = screen("app/(auth)/login.tsx", {
+    "@/context/auth": { useAuth: () => ({
+      async requestLoginOtp() { calls.push("code"); await new Promise<void>(resolve => { finish = resolve; }); },
+      async login() { calls.push("password"); await new Promise<void>(resolve => { finish = resolve; }); },
+    }) },
+    "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ status: "ready", emailOtp: true, passwordRecovery: true }) },
+    "expo-router": { useRouter: () => ({ replace() {} }) },
+  });
+  app.fill("Email", "person@example.test"); app.fill("Password", "password");
+  app.press("Login with email code");
+  assert.equal(app.elements().find(node => node.props.title === "Sending code...")?.props.loading, true);
+  assert.equal(app.elements().find(node => node.props.title === "Sign in")?.props.loading, false);
+  assert.equal(app.elements().find(node => node.props.title === "Sign in")?.props.disabled, true);
+  finish(); await flush(); app.press("Sign in");
+  assert.equal(app.elements().find(node => node.props.title === "Signing in...")?.props.loading, true);
+  assert.equal(app.elements().find(node => node.props.title === "Login with email code")?.props.loading, false);
+  assert.equal(app.elements().find(node => node.props.title === "Login with email code")?.props.disabled, true);
+  finish(); await flush(); assert.deepEqual(calls, ["code", "password"]);
+  app.unmount();
+});
+
+for (const type of ["signup", "magiclink"] as const) {
+  for (const action of ["link", "back", "hardware"] as const) {
+    test(`${type} ${action} returns to its source with editable email and cancels verification`, () => {
+      const routes: unknown[] = [];
+      let cancellations = 0;
+      let nativeBack: (() => boolean) | undefined;
+      let listeners = 0;
+      const app = screen("app/otp-verification.tsx", {
+        "@/context/auth": { useAuth: () => ({ status: "verificationRequired",
+          pendingVerification: { email: "person@example.test", purpose: type === "signup" ? "registration" : "login" },
+          cancelVerification() { cancellations++; },
+        }) },
+        "expo-router": { useLocalSearchParams: () => ({ email: "person@example.test", type }),
+          useRouter: () => ({ replace: (route: unknown) => routes.push(route) }) },
+        "react-native": { Text: "Text", Pressable: "Pressable", BackHandler: { addEventListener(_event: string, callback: () => boolean) {
+          nativeBack = callback; listeners++;
+          return { remove() { listeners--; } };
+        } } },
+      });
+      app.render();
+      assert.equal(app.render().props.backLabel, type === "signup" ? "Back to registration" : "Back to log in");
+      if (action === "link") app.pressLink("Use a different email");
+      else if (action === "back") app.render().props.onBack?.();
+      else assert.equal(nativeBack?.(), true);
+      assert.equal(cancellations, 1);
+      assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: type === "signup" ? "/register" : "/login", params: { email: "person@example.test" } }]);
+      app.unmount(); assert.equal(listeners, 0);
+      const source = screen(type === "signup" ? "app/register.tsx" : "app/(auth)/login.tsx", {
+        "@/context/auth": { useAuth: () => ({}) },
+        "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ status: "ready", emailOtp: true }) },
+        "expo-router": { useLocalSearchParams: () => ({ email: "person@example.test" }), useRouter: () => ({ replace() {} }) },
+      });
+      assert.equal(source.elements().find(node => node.props.label === "Email")?.props.value, "person@example.test");
+      source.fill("Email", "another@example.test");
+      assert.equal(source.elements().find(node => node.props.label === "Email")?.props.value, "another@example.test");
+      source.unmount();
+    });
+  }
+}
+
+test("OTP verification and resend display progress on the operation being performed", async (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] });
+  let finish!: () => void;
+  const app = screen("app/otp-verification.tsx", {
+    "@/context/auth": { useAuth: () => ({ status: "verificationRequired", otpResendAt: Date.now(),
+      pendingVerification: { email: "person@example.test", purpose: "registration" },
+      async verifyOtp() { await new Promise<void>(resolve => { finish = resolve; }); },
+      async resendOtp() { await new Promise<void>(resolve => { finish = resolve; }); },
+    }) },
+    "expo-router": { useRouter: () => ({ replace() {} }) },
+  });
+  app.fill("Email code", "00123456"); app.press("Verify code");
+  assert.equal(app.elements().find(node => node.props.title === "Verifying...")?.props.loading, true);
+  assert.equal(app.elements().find(node => node.props.title === "Resend code")?.props.loading, false);
+  finish(); await flush(); app.press("Resend code");
+  assert.equal(app.elements().find(node => node.props.title === "Resending code...")?.props.loading, true);
+  assert.equal(app.elements().find(node => node.props.title === "Verify code")?.props.loading, false);
+  finish(); await flush();
+  assert.ok(app.elements().some(node => node.props.children === "A new code has been sent. Check your email."));
+  app.unmount();
+});
+
+test("recovery resend uses backend timing, survives remounts, handles rate limits and preserves email", async (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] });
+  const params = { email: "person@example.test", type: "recovery", resendAt: String(Date.now() + 90_000) };
+  const calls: unknown[] = [], routes: unknown[] = [];
+  let rateLimited = false;
+  let finish!: () => void;
+  const overrides = {
+    "@/services/api": { api: { async forgotPassword(body: unknown) {
+      calls.push(body); await new Promise<void>(resolve => { finish = resolve; });
+      if (rateLimited) throw new ApiError("http", "Please wait before requesting another code.", 429);
+      return { resendAfter: 120 };
+    } } },
+    "expo-router": { useLocalSearchParams: () => params, useRouter: () => ({
+      replace: (route: unknown) => routes.push(route), setParams: (next: Partial<typeof params>) => Object.assign(params, next),
+    }) },
+  };
+  const app = screen("app/reset-password.tsx", overrides);
+  const waiting = app.elements().find(node => node.props.title === "Resend code in 90s");
+  assert.equal(waiting?.props.disabled, true); waiting?.props.onPress?.(); assert.equal(calls.length, 0);
+  t.mock.timers.tick(89_999);
+  assert.equal(app.elements().find(node => node.props.title === "Resend code in 1s")?.props.disabled, true);
+  t.mock.timers.tick(1); app.press("Resend code");
+  assert.equal(app.elements().find(node => node.props.title === "Resending code...")?.props.loading, true);
+  finish(); await flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: params.email }]);
+  assert.equal(app.elements().find(node => node.props.title === "Resend code in 120s")?.props.disabled, true);
+  assert.ok(app.elements().some(node => node.props.children === "If an eligible account exists, a new recovery code has been sent."));
+  app.unmount(); t.mock.timers.tick(20_000);
+  const remounted = screen("app/reset-password.tsx", overrides);
+  assert.equal(remounted.elements().find(node => node.props.title === "Resend code in 100s")?.props.disabled, true);
+  t.mock.timers.tick(100_000); rateLimited = true; remounted.press("Resend code"); finish(); await flush();
+  assert.equal(remounted.elements().find(node => node.props.title === "Resend code in 60s")?.props.disabled, true);
+  assert.ok(remounted.elements().some(node => node.props.children === "Please wait before requesting another code."));
+  remounted.pressLink("Use a different email");
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/forgot-password", params: { email: params.email } }]);
+  remounted.unmount();
+  const forgot = screen("app/forgot-password.tsx", { ...overrides });
+  assert.equal(forgot.elements().find(node => node.props.label === "Email")?.props.value, params.email);
+  forgot.unmount();
+});
+
+test("reset progress clears secrets after success and invalid recovery routes offer a restart", async () => {
+  let finish!: () => void;
+  const app = screen("app/reset-password.tsx", {
+    "@/services/api": { api: { async resetPassword() { await new Promise<void>(resolve => { finish = resolve; }); } } },
+    "expo-router": { useLocalSearchParams: () => ({ email: "person@example.test", type: "recovery" }), useRouter: () => ({ replace() {} }) },
+  });
+  app.fill("Recovery code", "00123456"); app.fill("New password", "new password"); app.fill("Confirm new password", "new password");
+  app.press("Reset password");
+  assert.equal(app.elements().find(node => node.props.title === "Resetting password...")?.props.loading, true);
+  assert.equal(app.elements().find(node => node.props.label === "New password")?.props.editable, false);
+  finish(); await flush(); assert.equal(app.render().props.title, "Password reset"); app.unmount();
+  for (const params of [{}, { email: "invalid" }, { email: "person@example.test", type: "signup" }]) {
+    const routes: unknown[] = [];
+    const invalid = screen("app/reset-password.tsx", {
+      "@/services/api": { api: {} },
+      "expo-router": { useLocalSearchParams: () => params, useRouter: () => ({ replace: (route: unknown) => routes.push(route) }) },
+    });
+    assert.ok(!invalid.elements().some(node => node.props.label === "New password"));
+    invalid.press("Request a recovery code");
+    assert.equal(routes.length, 1); invalid.unmount();
+  }
+});
+
+test("recovery API retains backend resendAfter and rejects malformed timing", async () => {
+  const response: { resendAfter?: unknown } = { resendAfter: 150 };
+  const api = createApiClient({ platform: "android", fetch: async () => new Response(JSON.stringify(response), { status: 202 }) });
+  assert.deepEqual(await api.forgotPassword({ email: "person@example.test" }), { resendAfter: 150 });
+  for (const value of [undefined, -1, "60", null]) {
+    response.resendAfter = value;
+    await assert.rejects(api.forgotPassword({ email: "person@example.test" }), /Invalid recovery response/);
+  }
+});
+
+test("capabilities hook exposes loading, failure, retry and unavailable states and aborts on cleanup", async () => {
+  const signals: AbortSignal[] = [];
+  let fail = true;
+  const hook = renderModule<ReturnType<typeof useAuthCapabilities>>("hooks/use-auth-capabilities.ts", {
+    "@/services/api": { api: { async authCapabilities({ signal }: { signal: AbortSignal }) {
+      signals.push(signal); if (fail) throw new Error("Offline");
+      return { emailOtp: false, passwordRecovery: false };
+    } } },
+  }, "useAuthCapabilities");
+  assert.equal(hook.render().status, "loading"); await flush();
+  assert.equal(hook.render().status, "error");
+  assert.equal(hook.render().error, "Unable to load email sign-in options. Please try again.");
+  fail = false; hook.render().retry(); assert.equal(hook.render().status, "loading"); await flush();
+  assert.equal(signals[0].aborted, true);
+  assert.equal(hook.render().status, "ready"); assert.equal(hook.render().emailOtp, false);
+  hook.unmount(); assert.equal(signals[1].aborted, true);
+});
+
+for (const path of ["app/register.tsx", "app/(auth)/login.tsx"]) {
+  test(`${path} shows capability loading, failure with retry, and explicit unavailability`, () => {
+    let status = "loading", retries = 0;
+    const app = screen(path, {
+      "@/context/auth": { useAuth: () => ({}) },
+      "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ status, emailOtp: false, passwordRecovery: false,
+        error: "Unable to load email sign-in options. Please try again.", retry() { retries++; },
+      }) },
+      "expo-router": { useRouter: () => ({ replace() {} }) },
+    });
+    assert.ok(app.elements().some(node => typeof node.props.children === "string" && /(?:Loading|Checking) email/.test(node.props.children)));
+    status = "error";
+    assert.ok(app.elements().some(node => node.props.children === "Unable to load email sign-in options. Please try again."));
+    app.press("Retry email options"); assert.equal(retries, 1);
+    status = "ready";
+    assert.ok(app.elements().some(node => typeof node.props.children === "string" && /(?:codes are|sign-in is) unavailable/.test(node.props.children)));
+    assert.ok(app.elements().some(node => node.props.title === (path.includes("register") ? "Create account" : "Sign in")));
+    app.unmount();
+  });
+}

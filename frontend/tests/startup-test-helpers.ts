@@ -11,8 +11,8 @@ type Element = React.ReactElement<NodeProps>;
 export function nodes(node: React.ReactNode): Element[] {
   return React.Children.toArray(node).flatMap(child => React.isValidElement<NodeProps>(child) ? [child, ...nodes(child.props.children)] : []);
 }
-export function loadComponent(path: string, overrides: Record<string, unknown>, effects: (() => void)[] = [], globals: Record<string, unknown> = {}) {
-  const exports: { default?: () => Element } = {};
+export function loadComponent<T = () => Element>(path: string, overrides: Record<string, unknown>, effects: (() => void)[] = [], globals: Record<string, unknown> = {}, exportName = "default") {
+  const exports: Record<string, T> = {};
   runInNewContext(ts.transpileModule(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     exports, setTimeout, clearTimeout, ...globals, require: (name: string): unknown => {
       if (name in overrides) return overrides[name];
@@ -25,8 +25,8 @@ export function loadComponent(path: string, overrides: Record<string, unknown>, 
       throw new Error(`Unexpected import: ${name}`);
     },
   });
-  assert.ok(exports.default);
-  return exports.default;
+  assert.ok(exports[exportName]);
+  return exports[exportName];
 }
 export function rootRoute(auth: { status: string; isGuest?: boolean; isLoading?: boolean }, local = { ready: true, error: null as string | null, data: { onboarding: { status: 'completed' } } }, reduced = false) {
   const effects: (() => void)[] = [];

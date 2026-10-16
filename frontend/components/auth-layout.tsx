@@ -4,10 +4,11 @@ import { PropsWithChildren } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export function AuthLayout({ children, title, description, onBack, recovery = false, compact = false }: PropsWithChildren<{
+export function AuthLayout({ children, title, description, onBack, backLabel = "Back to log in", recovery = false, compact = false }: PropsWithChildren<{
   title: string;
   description: string;
   onBack?: () => void;
+  backLabel?: string;
   recovery?: boolean;
   compact?: boolean;
 }>) {
@@ -19,7 +20,7 @@ export function AuthLayout({ children, title, description, onBack, recovery = fa
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.backSlot}>{onBack && (
-            <Pressable onPress={onBack} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to log in">
+            <Pressable onPress={onBack} style={styles.back} accessibilityRole="button" accessibilityLabel={backLabel}>
               <Ionicons name="arrow-back" size={21} color="#245C36" />
             </Pressable>
           )}</View>
@@ -30,7 +31,7 @@ export function AuthLayout({ children, title, description, onBack, recovery = fa
           <View style={[styles.artwork, compact && styles.compactArtwork]}>
             {recovery ? <Ionicons name="lock-closed-outline" size={48} color="#278448" /> : <LeafCheckLogo size={compact ? 80 : 110} />}
           </View>
-          <Text style={styles.eyebrow}>{recovery ? "LETâ€™S GET YOU BACK" : "GROW WITH CONFIDENCE"}</Text>
+          <Text style={styles.eyebrow}>{recovery ? "LET’S GET YOU BACK" : "GROW WITH CONFIDENCE"}</Text>
           <Text accessibilityRole="header" style={styles.title}>{title}</Text>
           <Text style={styles.description}>{description}</Text>
           <View style={styles.form}>{children}</View>
@@ -47,6 +48,7 @@ export const authStyles = StyleSheet.create({
   footerText: { color: "#66746A", fontSize: 14, lineHeight: 22 },
   recoveryLink: { alignSelf: "flex-end", minHeight: 44, justifyContent: "center", marginTop: -8, marginBottom: 14, paddingHorizontal: 4 },
   note: { color: "#66746A", fontSize: 13, lineHeight: 20, textAlign: "center", marginBottom: 20 },
+  destinationEmail: { color: "#193E27", fontSize: 16, fontWeight: "700", lineHeight: 24, textAlign: "center", marginBottom: 20 },
 });
 
 const styles = StyleSheet.create({

@@ -182,14 +182,14 @@ test("login requires authentication and offers no token-free Dashboard bypass", 
   let localEntries = 0;
   const routes: string[] = [];
   const module = load("app/(auth)/login.tsx", {
-    "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: false, passwordRecovery: false }) },
+    "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: false, passwordRecovery: false, status: "ready" }) },
     react: state.react,
     "@/components/auth-button": { AuthButton: "AuthButton" },
     "@/components/auth-layout": { AuthLayout: "AuthLayout", authStyles: {} },
     "@/components/custom-text-input": { CustomTextInput: "CustomTextInput" },
     "@/components/screen": { Notice: "Notice" },
     "@/context/auth": { useAuth: () => ({ enterLocal: () => localEntries++, login: () => { throw new Error("Should not authenticate"); } }) },
-    "expo-router": { useRouter: () => ({ replace: (route: string) => routes.push(route) }) },
+    "expo-router": { useLocalSearchParams: () => ({}), useRouter: () => ({ replace: (route: string) => routes.push(route) }) },
   });
   const nodes = elements(module.default());
   const entry = nodes.find(node => (node.props as { title?: string }).title === "Continue without an account");

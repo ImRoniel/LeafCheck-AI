@@ -3,12 +3,14 @@ import { AuthLayout } from "@/components/auth-layout";
 import { CustomTextInput } from "@/components/custom-text-input";
 import { Notice } from "@/components/screen";
 import { api } from "@/services/api";
-import { useRouter } from "expo-router";
+import { emailAddress, resendDeadline } from "@/services/email-otp";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 
 export default function ForgotPassword() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(emailAddress(params.email) ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
@@ -20,16 +22,17 @@ export default function ForgotPassword() {
     setBusy(true);
     setError(null);
     try {
-      await api.forgotPassword({ email: address });
-      router.push({ pathname: "/reset-password", params: { email: address, type: "recovery" } });
+      const response = await api.forgotPassword({ email: address });
+      router.push({ pathname: "/reset-password", params: { email: address, type: "recovery",
+        resendAt: String(resendDeadline(response.resendAfter)) } });
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to send a recovery code"); }
     finally { submitting.current = false; setBusy(false); }
   };
-  return <AuthLayout title="Forgot password" description="Enter your email to request an eight-digit recovery code."
-    onBack={() => router.replace("/login")}>
+  return <AuthLayout recovery title="Forgot password" description="Enter your email to request an eight-digit recovery code."
+    onBack={busy ? undefined : () => router.replace({ pathname: "/login", params: { email: email.trim().toLowerCase() } })}>
     <CustomTextInput label="Email" value={email} onChangeText={setEmail} keyboardType="email-address"
       autoComplete="email" autoCorrect={false} editable={!busy} onSubmitEditing={() => void submit()} />
     {error && <Notice>{error}</Notice>}
-    <AuthButton title="Send recovery code" loading={busy} onPress={() => void submit()} />
+    <AuthButton title={busy ? "Sending code..." : "Send recovery code"} loading={busy} onPress={() => void submit()} />
   </AuthLayout>;
 }

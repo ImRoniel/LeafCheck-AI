@@ -285,7 +285,12 @@ export function createApiClient(
       request("/api/auth/otp/resend", parseChallenge, {}, "POST", body),
     verifyOtp: (body: { email: string; code: string; type: EmailOtpType }) =>
       request("/api/auth/otp/verify", parseTokens, {}, "POST", body),
-    forgotPassword: (body: { email: string }) => request("/api/auth/forgot-password", () => undefined, {}, "POST", body),
+    forgotPassword: (body: { email: string }) => request("/api/auth/forgot-password", (value) => {
+      if (!value || typeof value !== "object" || !("resendAfter" in value) || typeof value.resendAfter !== "number" ||
+          !Number.isFinite(value.resendAfter) || value.resendAfter < 0)
+        throw new ApiError("validation", "Invalid recovery response");
+      return { resendAfter: value.resendAfter };
+    }, {}, "POST", body),
     resetPassword: (body: { email: string; code: string; newPassword: string }) =>
       request("/api/auth/reset-password", () => undefined, {}, "POST", body),
     refresh: (body: { refreshToken?: string }) =>
