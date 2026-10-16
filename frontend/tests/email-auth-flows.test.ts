@@ -58,7 +58,7 @@ function renderModule<T>(path: string, overrides: Record<string, unknown>, expor
     "@/services/errors": errors,
     "react-native": { Text: "Text", Pressable: "Pressable", View: "View", BackHandler: { addEventListener: () => ({ remove() {} }) } },
     ...overrides,
-    "expo-router": { useLocalSearchParams: () => ({}), ...(overrides["expo-router"] as Record<string, unknown> | undefined) },
+    "expo-router": { useIsFocused: () => true, useLocalSearchParams: () => ({}), ...(overrides["expo-router"] as Record<string, unknown> | undefined) },
   }, [], { Error, Date, AbortController }, exportName);
   const render = () => { cursor = 0; const element = Component(); effects.splice(0).forEach(effect => effect()); return element; };
   return { render, unmount: () => cleanups.forEach(cleanup => cleanup()) };
@@ -143,23 +143,37 @@ test("registration explains eight-digit verification and opens the shared OTP sc
   app.unmount();
 });
 
-test("login offers a passwordless request using only the email when enabled", async () => {
+test("login opens a dedicated email-code screen through a text link without sharing its email", async () => {
   const calls: unknown[] = [], routes: unknown[] = [];
   let pending: PendingVerification | null = null;
-  const app = screen("app/(auth)/login.tsx", {
-    "@/context/auth": { useAuth: () => ({ pendingVerification: pending,
+  const useAuth = () => ({ pendingVerification: pending,
       async requestLoginOtp(body: unknown) { calls.push(body); pending = { status: "verification_required", email: "person@example.test", purpose: "login", resendAfter: 60 }; },
       async login() { throw new Error("Password login must not be used"); },
-    }) },
+    });
+  const app = screen("app/(auth)/login.tsx", {
+    "@/context/auth": { useAuth },
     "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
-    "expo-router": { useRouter: () => ({ push() {}, replace: (route: unknown) => routes.push(route) }) },
+    "expo-router": { useRouter: () => ({ push: (route: unknown) => routes.push(route), replace() {} }) },
   });
   assert.ok(app.elements().some(node => node.props.children === "Forgot password?"));
-  app.fill("Email", "  Person@Example.test  "); app.press("Login with email code"); await flush();
+  assert.ok(!app.elements().some(node => node.type === "AuthButton" && node.props.title === "Login with email code"));
+  app.pressLink("Login with email code");
+  app.fill("Email", "password-only@example.test"); app.pressLink("Login with email code");
+  assert.deepEqual(routes, ["/login-with-code", "/login-with-code"]);
+  assert.deepEqual(calls, []);
+  const codeRoutes: unknown[] = [];
+  const code = screen("app/login-with-code.tsx", {
+    "@/context/auth": { useAuth },
+    "expo-router": { useRouter: () => ({ replace: (route: unknown) => codeRoutes.push(route) }) },
+  });
+  assert.equal(code.elements().find(node => node.props.label === "Email")?.props.value, "");
+  assert.ok(!code.elements().some(node => node.props.label === "Password"));
+  code.fill("Email", "  Person@Example.test  "); code.press("Send code"); await flush();
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test" }]);
-  assert.equal(app.render().props.title, "Check your email");
-  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [emailOtp.otpRoute(pending!)]);
-  app.unmount();
+  assert.equal(code.render().props.title, "Check your email");
+  assert.deepEqual(JSON.parse(JSON.stringify(codeRoutes)), [emailOtp.otpRoute(pending!)]);
+  assert.equal((JSON.parse(JSON.stringify(codeRoutes)) as { params: { type: string } }[])[0].params.type, "magiclink");
+  code.unmount(); app.unmount();
 });
 
 test("reset-password screen validates the code and confirmation, retries and clears secrets after success", async () => {
@@ -217,7 +231,7 @@ for (const purpose of ["registration", "login"] as const) {
       resumeVerification: session.resumeVerification,
     });
     const routes: { pathname: string; params: Record<string, string> }[] = [];
-    const entry = screen(purpose === "registration" ? "app/register.tsx" : "app/(auth)/login.tsx", {
+    const entry = screen(purpose === "registration" ? "app/register.tsx" : "app/login-with-code.tsx", {
       "@/context/auth": { useAuth },
       "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
       "expo-router": { useRouter: () => ({ push() {}, replace: (route: { pathname: string; params: Record<string, string> }) => routes.push(route) }) },
@@ -227,7 +241,7 @@ for (const purpose of ["registration", "login"] as const) {
       entry.fill("Password", "password"); entry.fill("Confirm password", "password");
       const terms = entry.elements().find(node => node.props.accessibilityRole === "checkbox");
       assert.ok(terms?.props.onPress); terms.props.onPress(); entry.press("Create account");
-    } else entry.press("Login with email code");
+    } else entry.press("Send code");
     await flush();
     assert.equal(entry.render().props.title, "Check your email");
     assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{
@@ -405,7 +419,7 @@ test("registration keeps fields on failure and offers a visible retry if OTP nav
   app.unmount();
 });
 
-test("login uses separate loading states for email-code requests and password sign-in", async () => {
+test("password login shows its own loading state and disables navigation while signing in", async () => {
   let finish!: () => void;
   const calls: string[] = [];
   const app = screen("app/(auth)/login.tsx", {
@@ -417,15 +431,98 @@ test("login uses separate loading states for email-code requests and password si
     "expo-router": { useRouter: () => ({ replace() {} }) },
   });
   app.fill("Email", "person@example.test"); app.fill("Password", "password");
-  app.press("Login with email code");
-  assert.equal(app.elements().find(node => node.props.title === "Sending code...")?.props.loading, true);
-  assert.equal(app.elements().find(node => node.props.title === "Sign in")?.props.loading, false);
-  assert.equal(app.elements().find(node => node.props.title === "Sign in")?.props.disabled, true);
-  finish(); await flush(); app.press("Sign in");
+  app.press("Sign in");
   assert.equal(app.elements().find(node => node.props.title === "Signing in...")?.props.loading, true);
-  assert.equal(app.elements().find(node => node.props.title === "Login with email code")?.props.loading, false);
-  assert.equal(app.elements().find(node => node.props.title === "Login with email code")?.props.disabled, true);
-  finish(); await flush(); assert.deepEqual(calls, ["code", "password"]);
+  const codeLink = app.elements().find(node => node.type === "Pressable" && nodes(node.props.children).some(child => child.props.children === "Login with email code"));
+  assert.equal(codeLink?.props.disabled, true);
+  finish(); await flush(); assert.deepEqual(calls, ["password"]);
+  app.unmount();
+});
+
+test("dedicated email-code login validates email, shows progress, prevents duplicate sends and retries errors", async () => {
+  const calls: unknown[] = [], routes: unknown[] = [];
+  let finish!: () => void;
+  let fail = true;
+  let pending: PendingVerification | null = null;
+  const app = screen("app/login-with-code.tsx", {
+    "@/context/auth": { useAuth: () => ({ pendingVerification: pending, async requestLoginOtp(body: unknown) {
+      calls.push(body); await new Promise<void>(resolve => { finish = resolve; });
+      if (fail) throw new Error("Email service is temporarily unavailable");
+      pending = { status: "verification_required", email: "person@example.test", purpose: "login", resendAfter: 60 };
+    } }) },
+    "expo-router": { useRouter: () => ({ replace: (route: unknown) => routes.push(route) }) },
+  });
+  for (const email of ["", "invalid"]) {
+    app.fill("Email", email); app.press("Send code");
+    assert.ok(app.elements().some(node => node.props.children === "Enter a valid email address."));
+  }
+  assert.equal(calls.length, 0);
+  app.fill("Email", "  Person@Example.test  "); app.press("Send code");
+  const sending = app.elements().find(node => node.props.title === "Sending code...");
+  assert.equal(sending?.props.loading, true);
+  assert.equal(app.elements().find(node => node.props.label === "Email")?.props.editable, false);
+  sending?.props.onPress?.();
+  assert.equal(calls.length, 1); assert.equal(routes.length, 0);
+  finish(); await flush();
+  assert.ok(app.elements().some(node => node.props.children === "Email service is temporarily unavailable"));
+  assert.equal(app.elements().find(node => node.props.label === "Email")?.props.value, "  Person@Example.test  ");
+  fail = false; app.press("Send code"); finish(); await flush();
+  app.render(); app.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test" }, { email: "person@example.test" }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/otp-verification", params: {
+    email: "person@example.test", type: "magiclink", message: "We sent an 8-digit code to person@example.test" } }]);
+  app.unmount();
+});
+
+test("dedicated email-code login back button returns to password login", () => {
+  const routes: unknown[] = [];
+  let canceled = 0;
+  const app = screen("app/login-with-code.tsx", {
+    "@/context/auth": { useAuth: () => ({ cancelVerification() { canceled++; } }) },
+    "expo-router": { useRouter: () => ({ replace: (route: unknown) => routes.push(route) }) },
+  });
+  app.render().props.onBack?.();
+  assert.deepEqual(routes, ["/login"]); assert.equal(canceled, 1);
+  app.unmount();
+});
+
+test("password login behind email-code entry does not duplicate the OTP navigation", async () => {
+  const routes: unknown[] = [];
+  let pending: PendingVerification | null = null;
+  const useAuth = () => ({ pendingVerification: pending, async requestLoginOtp() {
+    pending = { status: "verification_required", email: "person@example.test", purpose: "login", resendAfter: 60 };
+  } });
+  const login = screen("app/(auth)/login.tsx", {
+    "@/context/auth": { useAuth },
+    "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true }) },
+    "expo-router": { useIsFocused: () => false, useRouter: () => ({ replace: (route: unknown) => routes.push(route) }) },
+  });
+  const code = screen("app/login-with-code.tsx", {
+    "@/context/auth": { useAuth },
+    "expo-router": { useRouter: () => ({ replace: (route: unknown) => routes.push(route) }) },
+  });
+  login.render(); code.fill("Email", "person@example.test"); code.press("Send code"); await flush();
+  login.render(); code.render(); login.render(); code.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [emailOtp.otpRoute(pending!)]);
+  login.unmount(); code.unmount();
+});
+
+test("dedicated email-code entry retains sent feedback and a retry when navigation fails", () => {
+  const pending: PendingVerification = { status: "verification_required", email: "person@example.test", purpose: "login", resendAfter: 60 };
+  const routes: unknown[] = [];
+  let fail = true;
+  const app = screen("app/login-with-code.tsx", {
+    "@/context/auth": { useAuth: () => ({ pendingVerification: pending }) },
+    "expo-router": { useRouter: () => ({ replace(route: unknown) {
+      if (fail) throw new Error("Navigator unavailable");
+      routes.push(route);
+    } }) },
+  });
+  app.render();
+  assert.equal(app.render().props.description, emailOtp.codeSentMessage(pending.email));
+  assert.ok(app.elements().some(node => node.props.children === "Your code was sent. Tap Continue to verification to enter it."));
+  fail = false; app.press("Continue to verification");
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [emailOtp.otpRoute(pending)]);
   app.unmount();
 });
 
@@ -454,9 +551,9 @@ for (const type of ["signup", "magiclink"] as const) {
       else if (action === "back") app.render().props.onBack?.();
       else assert.equal(nativeBack?.(), true);
       assert.equal(cancellations, 1);
-      assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: type === "signup" ? "/register" : "/login", params: { email: "person@example.test" } }]);
+      assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: type === "signup" ? "/register" : "/login-with-code", params: { email: "person@example.test" } }]);
       app.unmount(); assert.equal(listeners, 0);
-      const source = screen(type === "signup" ? "app/register.tsx" : "app/(auth)/login.tsx", {
+      const source = screen(type === "signup" ? "app/register.tsx" : "app/login-with-code.tsx", {
         "@/context/auth": { useAuth: () => ({}) },
         "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ status: "ready", emailOtp: true }) },
         "expo-router": { useLocalSearchParams: () => ({ email: "person@example.test" }), useRouter: () => ({ replace() {} }) },

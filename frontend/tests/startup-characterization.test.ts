@@ -4,6 +4,12 @@ import { rootRoute, loadComponent, available } from './startup-test-helpers';
 test('completed installations exclude introductory routes for authenticated sessions', () => {
   assert.deepEqual(available(rootRoute({ status: 'authenticated' }).route).sort(), ['setup', '(tabs)', 'profile', 'device-connection', 'plant-profile', 'settings', 'archives', 'modal'].sort());
 });
+test('dedicated email-code login is available only to signed-out users after onboarding', () => {
+  for (const status of ['signedOut', 'verificationRequired']) {
+    assert.ok(available(rootRoute({ status }).route).includes('login-with-code'));
+  }
+  assert.ok(!available(rootRoute({ status: 'authenticated' }).route).includes('login-with-code'));
+});
 test('anonymous, pending setup, completed and skipped setup retain route guards', () => {
   assert.ok(available(rootRoute({ status: 'anonymous' }).route).includes('(auth)'));
   for (const status of ['pending', 'completed', 'skipped']) {

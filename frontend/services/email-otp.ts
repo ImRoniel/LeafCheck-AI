@@ -10,7 +10,8 @@ export function emailAddress(value: unknown): string | null {
 export const codeSentMessage = (email: string) => `We sent an 8-digit code to ${email}`;
 export const resendDeadline = (resendAfter: number) => Date.now() + Math.max(OTP_RESEND_MS, resendAfter * 1000);
 export function otpSource(flow: EmailOtpFlow | null) {
-  return { pathname: flow?.type === "signup" ? "/register" as const : "/login" as const,
+  return { pathname: flow?.type === "signup" ? "/register" as const
+      : flow?.type === "magiclink" ? "/login-with-code" as const : "/login" as const,
     params: { email: flow?.email ?? "" } };
 }
 

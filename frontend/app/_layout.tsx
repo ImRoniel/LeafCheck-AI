@@ -74,6 +74,7 @@ function Routes({ hasToken }: { hasToken: boolean }) {
       <Stack.Protected guard={!authenticated}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="register" />
+        <Stack.Screen name="login-with-code" />
         <Stack.Screen name="forgot-password" />
         <Stack.Screen name="reset-password" />
         <Stack.Screen name="otp-verification" />
@@ -176,6 +177,7 @@ function StartupTree() {
         <Stack.Screen name="device-connection" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="register" />
+        <Stack.Screen name="login-with-code" />
         <Stack.Screen name="forgot-password" />
         <Stack.Screen name="reset-password" />
         <Stack.Screen name="otp-verification" />

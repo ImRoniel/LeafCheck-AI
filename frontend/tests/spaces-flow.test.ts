@@ -189,7 +189,7 @@ test("login requires authentication and offers no token-free Dashboard bypass", 
     "@/components/custom-text-input": { CustomTextInput: "CustomTextInput" },
     "@/components/screen": { Notice: "Notice" },
     "@/context/auth": { useAuth: () => ({ enterLocal: () => localEntries++, login: () => { throw new Error("Should not authenticate"); } }) },
-    "expo-router": { useLocalSearchParams: () => ({}), useRouter: () => ({ replace: (route: string) => routes.push(route) }) },
+    "expo-router": { useIsFocused: () => true, useLocalSearchParams: () => ({}), useRouter: () => ({ replace: (route: string) => routes.push(route) }) },
   });
   const nodes = elements(module.default());
   const entry = nodes.find(node => (node.props as { title?: string }).title === "Continue without an account");
