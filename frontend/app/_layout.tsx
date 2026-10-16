@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
 import { Action, Notice, Screen } from "@/components/screen";
 import { AppDataProvider } from "@/context/app-data";
 import { AuthProvider, useAuth } from "@/context/auth";
@@ -9,7 +8,7 @@ import Splash from "./splash";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Platform } from "react-native";
+import { ActivityIndicator } from "react-native";
 function Routes({ hasToken }: { hasToken: boolean }) {
   const auth = useAuth();
   const local = useLocalState();
@@ -76,6 +75,7 @@ function Routes({ hasToken }: { hasToken: boolean }) {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="reset-password" />
         <Stack.Screen name="otp-verification" />
       </Stack.Protected>
       <Stack.Protected guard={false}>
@@ -121,24 +121,17 @@ function StartupTree() {
   const auth = useAuth();
   const reducedMotion = useReducedMotion();
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
-  const [hasToken, setHasToken] = useState<boolean | null>(null);
   const gateError = useRef<string | null>(null);
-  const latest = useRef({ phase: intro.phase, status: auth.status });
-  latest.current = { phase: intro.phase, status: auth.status };
+  const latest = useRef({ phase: intro.phase });
+  latest.current = { phase: intro.phase };
   useEffect(() => {
     let mounted = true;
-    void Promise.all([
-      AsyncStorage.getItem("@leafcheck_onboarding_complete"),
-      Platform.OS === "web" ? Promise.resolve(null) : SecureStore.getItemAsync("access_token"),
-    ]).then(([flag, token]) => {
+    void AsyncStorage.getItem("@leafcheck_onboarding_complete").then((flag) => {
       if (!mounted) return;
       setHasOnboarded(latest.current.phase === "completed" || flag === "true");
-      setHasToken(latest.current.status === "authenticated" ||
-        (latest.current.status !== "signedOut" && latest.current.status !== "guest" && Boolean(token)));
     }).catch(() => {
       if (mounted) {
         gateError.current = "Startup storage could not be read. Please restart the app.";
-        setHasToken(false);
       }
     });
     return () => { mounted = false; };
@@ -147,11 +140,6 @@ function StartupTree() {
   useEffect(() => {
     if (intro.phase === "completed") setHasOnboarded(true);
   }, [intro.phase]);
-  // Login/logout and expired credentials update the gate during this app session.
-  useEffect(() => {
-    if (auth.status === "authenticated") setHasToken(true);
-    else if (auth.status === "signedOut") setHasToken(false);
-  }, [auth.status]);
   const [splashReady, setSplashReady] = useState(false);
   // This timer belongs to the startup tree, not the flag read or an account tree.
   // It runs once while both storage and session restoration proceed in parallel.
@@ -163,7 +151,7 @@ function StartupTree() {
     if (splashReady && intro.phase === "splash") intro.finishSplash();
   }, [splashReady, intro.phase, intro.finishSplash]);
   if (gateError.current) return <Screen title="Startup unavailable"><Notice>{gateError.current}</Notice></Screen>;
-  if (hasOnboarded === null || hasToken === null || !splashReady || intro.phase === "loading" || (intro.phase === "completed" && auth.isLoading)) return <Splash />;
+  if (hasOnboarded === null || !splashReady || intro.phase === "loading" || (intro.phase === "completed" && auth.isLoading)) return <Splash />;
   if (intro.phase === "error") return (
     <Screen title="Introductory setup unavailable">
       <Notice>{intro.error}</Notice>
@@ -189,6 +177,7 @@ function StartupTree() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="reset-password" />
         <Stack.Screen name="otp-verification" />
         <Stack.Screen name="terms" />
         <Stack.Screen name="plant-profile" />
@@ -198,10 +187,8 @@ function StartupTree() {
       </Stack.Protected>
     </Stack>
   );
-  // State 2: completed with no token => Login. State 3: token => Dashboard.
-  const tokenAvailable = auth.status === "authenticated" ||
-    (auth.status !== "signedOut" && auth.status !== "guest" && hasToken);
-  return <AccountTree hasToken={tokenAvailable} />;
+  // Only the coordinator's verified session can unlock private routes.
+  return <AccountTree hasToken={auth.status === "authenticated"} />;
 }
 export default function Layout() {
   return (

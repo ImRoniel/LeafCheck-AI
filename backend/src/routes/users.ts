@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, safeUser } from "../lib/auth.js";
+import { legacyUserSelect, requireAuth, safeUser } from "../lib/auth.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { validateName } from "./auth.js";
@@ -18,6 +18,7 @@ usersRouter.patch(
     const user = await prismaPg.user.update({
       where: { id: res.locals.auth.user.id },
       data: { name: validateName(data.name) },
+      select: legacyUserSelect,
     });
     res.json(safeUser(user));
   }),

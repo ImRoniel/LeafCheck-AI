@@ -3,6 +3,7 @@ import { authConfig } from "../lib/auth-config.js";
 import {
   createSession,
   hashPassword,
+  legacyUserSelect,
   requireAuth,
   rotateSession,
   safeUser,
@@ -11,6 +12,9 @@ import {
 } from "../lib/auth.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { prismaPg } from "../lib/prisma-pg.js";
+import { authProvider, requireSupabase } from "../lib/auth-provider.js";
+import { forgotPassword, loginProvider, refreshProvider, registerProvider, requestLoginOtp, resendOtp, resetPassword, verifyOtp, type OtpPurpose } from "../lib/supabase-auth.js";
+import { revokeProviderSession } from "../lib/supabase-session.js";
 
 export const authRouter = Router();
 const cookieName = "__Host-leafcheck-refresh";
@@ -46,6 +50,8 @@ authRouter.use(
   asyncRoute((req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.locals.client = clientMode(req);
+    if (authProvider() === "supabase" && res.locals.client !== "native")
+      throw new HttpError(400, "NATIVE_REQUIRED", "Email authentication requires the mobile app.");
     next();
   }),
 );
@@ -107,11 +113,16 @@ authRouter.post(
   "/register",
   asyncRoute(async (req, res) => {
     const data = credentials(req.body, true);
+    if (authProvider() === "supabase") {
+      res.status(202).json(await registerProvider(data));
+      return;
+    }
     const password = await hashPassword(data.password);
     let user;
     try {
       user = await prismaPg.user.create({
         data: { ...data, password, role: "USER" },
+        select: legacyUserSelect,
       });
     } catch (error) {
       if (
@@ -140,8 +151,14 @@ authRouter.post(
   "/login",
   asyncRoute(async (req, res) => {
     const data = credentials(req.body, false);
+    if (authProvider() === "supabase") {
+      const result = await loginProvider(data.email, data.password);
+      sendTokens(res, result.tokens, 200, safeUser(result.user));
+      return;
+    }
     const user = await prismaPg.user.findUnique({
       where: { email: data.email },
+      select: legacyUserSelect,
     });
     const valid = await verifyPassword(data.password, user?.password);
     if (!valid || !user?.isActive)
@@ -177,7 +194,8 @@ authRouter.post(
         "INVALID_SESSION",
         "Invalid or expired session.",
       );
-    sendTokens(res, await rotateSession(token, res.locals.client));
+    sendTokens(res, authProvider() === "supabase"
+      ? await refreshProvider(token) : await rotateSession(token, res.locals.client));
   }),
 );
 for (const path of ["/logout", "/logout-all"]) {
@@ -186,6 +204,11 @@ for (const path of ["/logout", "/logout-all"]) {
     requireAuth,
     asyncRoute(async (req, res) => {
       bodyObject(req.body ?? {}, []);
+      if (authProvider() === "supabase") {
+        await revokeProviderSession(req.get("authorization")!.slice(7), path === "/logout" ? "local" : "global");
+        res.status(204).end();
+        return;
+      }
       await prismaPg.authSession.updateMany({
         where:
           path === "/logout"
@@ -197,4 +220,49 @@ for (const path of ["/logout", "/logout-all"]) {
       res.status(204).end();
     }),
   );
+}
+
+authRouter.get("/capabilities", asyncRoute((_req, res) => {
+  const enabled = authProvider() === "supabase";
+  res.json({ provider: authProvider(), emailOtp: enabled, passwordRecovery: enabled });
+}));
+
+function email(value: unknown): string {
+  if (typeof value !== "string" || value.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()))
+    throw new HttpError(400, "INVALID_INPUT", "Enter a valid email address.");
+  return value.trim().toLowerCase();
+}
+function code(value: unknown): string {
+  if (typeof value !== "string" || !/^\d{8}$/.test(value))
+    throw new HttpError(400, "INVALID_INPUT", "Enter the eight-digit email code.");
+  return value;
+}
+function purpose(value: unknown): OtpPurpose {
+  if (value !== "registration" && value !== "login")
+    throw new HttpError(400, "INVALID_INPUT", "Invalid verification purpose.");
+  return value;
+}
+for (const path of ["/forgot-password", "/reset-password", "/otp/request", "/otp/verify", "/otp/resend"]) {
+  authRouter.post(path, asyncRoute(async (req, res) => {
+    requireSupabase();
+    if (res.locals.client !== "native") throw new HttpError(400, "NATIVE_REQUIRED", "Use the mobile app.");
+    const allowed = path === "/reset-password" ? ["email", "code", "newPassword"]
+      : path === "/otp/verify" ? ["email", "code", "purpose"]
+      : path === "/otp/resend" ? ["email", "purpose"] : ["email"];
+    const data = bodyObject(req.body, allowed);
+    const address = email(data.email);
+    if (path === "/forgot-password") { res.status(202).json(await forgotPassword(address)); return; }
+    if (path === "/otp/request") { res.status(202).json(await requestLoginOtp(address)); return; }
+    if (path === "/otp/resend") { res.status(202).json(await resendOtp(address, purpose(data.purpose))); return; }
+    const digits = code(data.code);
+    if (path === "/otp/verify") {
+      const result = await verifyOtp(address, digits, purpose(data.purpose));
+      sendTokens(res, result.tokens, 200, safeUser(result.user));
+      return;
+    }
+    if (typeof data.newPassword !== "string" || [...data.newPassword].length < 8 || [...data.newPassword].length > 128)
+      throw new HttpError(400, "INVALID_INPUT", "Password must contain 8–128 characters.");
+    await resetPassword(address, digits, data.newPassword);
+    res.status(204).end();
+  }));
 }

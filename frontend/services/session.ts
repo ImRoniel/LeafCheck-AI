@@ -8,6 +8,7 @@ export interface User {
 export type Status =
   | "restoring"
   | "authenticating"
+  | "verificationRequired"
   | "signedOut"
   | "guest"
   | "authenticated"
@@ -18,6 +19,7 @@ export interface SessionState {
   token: string | null;
   generation: number;
   error: string | null;
+  pendingVerification?: PendingVerification | null;
 }
 export interface TokenStorage {
   get(): Promise<string | null>;
@@ -28,13 +30,22 @@ export interface Tokens {
   accessToken: string;
   refreshToken?: string;
 }
+export interface PendingVerification {
+  status: "verification_required";
+  email: string;
+  purpose: "registration" | "login";
+  resendAfter: number;
+}
 export interface SessionTransport {
   login(body: { email: string; password: string }): Promise<Tokens>;
   register(body: {
     email: string;
     password: string;
     name?: string;
-  }): Promise<Tokens>;
+  }): Promise<Tokens | PendingVerification>;
+  requestLoginOtp?(body: { email: string }): Promise<PendingVerification>;
+  verifyOtp?(body: { email: string; code: string; purpose: PendingVerification["purpose"] }): Promise<Tokens>;
+  resendOtp?(body: { email: string; purpose: PendingVerification["purpose"] }): Promise<PendingVerification>;
   refresh(body: { refreshToken?: string }): Promise<Tokens>;
   me(): Promise<User>;
   updateProfile?(name: string): Promise<User>;
@@ -84,6 +95,18 @@ export function parseTokens(value: unknown): Tokens {
       : {}),
   };
 }
+export function parseChallenge(value: unknown): PendingVerification {
+  if (!value || typeof value !== "object" || !("status" in value) || value.status !== "verification_required" ||
+      !("email" in value) || typeof value.email !== "string" ||
+      !("purpose" in value) || (value.purpose !== "registration" && value.purpose !== "login") ||
+      !("resendAfter" in value) || typeof value.resendAfter !== "number" || !Number.isFinite(value.resendAfter) || value.resendAfter < 0)
+    throw new ApiError("validation", "Invalid email verification response");
+  return { status: value.status, email: value.email, purpose: value.purpose, resendAfter: value.resendAfter };
+}
+export function parseRegistration(value: unknown): Tokens | PendingVerification {
+  return value && typeof value === "object" && "status" in value && value.status === "verification_required"
+    ? parseChallenge(value) : parseTokens(value);
+}
 const cancelled = () => new ApiError("cancelled", "Session changed");
 const sessionErrorMessage = (error: unknown) => {
   const e = asApiError(error);
@@ -94,7 +117,7 @@ export function createSessionCoordinator(
   storage: TokenStorage,
   native: boolean,
   coordination: SessionCoordination,
-  accessStorage?: TokenStorage,
+  legacyAccessStorage?: Pick<TokenStorage, "remove">,
 ) {
   let state: SessionState = {
     status: "restoring",
@@ -102,6 +125,7 @@ export function createSessionCoordinator(
     token: null,
     generation: 0,
     error: null,
+    pendingVerification: null,
   };
   let controller = new AbortController();
   let transport: SessionTransport;
@@ -130,12 +154,13 @@ export function createSessionCoordinator(
       user: null,
       token: null,
       error: null,
+      pendingVerification: null,
       generation: state.generation + 1,
     });
   };
   const erase = async () => {
     if (native) await store(async () => {
-      await accessStorage?.remove();
+      await legacyAccessStorage?.remove();
       await storage.remove();
     });
   };
@@ -160,7 +185,6 @@ export function createSessionCoordinator(
       await store(async () => {
         check(generation);
         await storage.set(tokens.refreshToken!);
-        await accessStorage?.set(tokens.accessToken);
       });
     }
     check(generation);
@@ -216,21 +240,17 @@ export function createSessionCoordinator(
       publish({ status: "restoring", error: null });
       const restoreGeneration = state.generation;
       try {
-        if (native && accessStorage && !state.token) {
-          const token = await store(() => accessStorage.get());
+        if (native) {
+          // Remove old installations' persisted access token without reading it.
+          await store(async () => { await legacyAccessStorage?.remove(); });
           check(restoreGeneration);
-          if (!token) {
-            invalidate();
-            return;
-          }
-          publish({ token });
         }
         if (!state.token) await refresh(null);
         check(restoreGeneration);
         const generation = state.generation;
         const user = await transport.me();
         check(generation);
-        publish({ status: "authenticated", user, error: null });
+        publish({ status: "authenticated", user, error: null, pendingVerification: null });
       } catch (error) {
         if (
           state.status === "restoring" &&
@@ -250,8 +270,7 @@ export function createSessionCoordinator(
     }
   }
   async function authenticate(
-    kind: "login" | "register",
-    body: { email: string; password: string; name?: string },
+    request: () => Promise<Tokens | PendingVerification>,
   ) {
     if (operation)
       throw new ApiError("busy", "Authentication is already in progress");
@@ -264,11 +283,18 @@ export function createSessionCoordinator(
       await refreshFlight?.catch(() => {});
       check(generation);
       await erase();
-      await coordination.run(async () => {
+      const result = await coordination.run(async () => {
         check(generation);
-        const tokens = await transport[kind](body);
-        await commit(tokens, generation);
+        const response = await request();
+        check(generation);
+        if ("status" in response) return response;
+        await commit(response, generation);
+        return null;
       });
+      if (result) {
+        publish({ status: "verificationRequired", pendingVerification: result });
+        return result;
+      }
       const user = await transport.me();
       check(generation);
       publish({ status: "authenticated", user });
@@ -305,9 +331,49 @@ export function createSessionCoordinator(
     refresh,
     reject: () => invalidate("Session expired. Please sign in again."),
     login: (body: { email: string; password: string }) =>
-      authenticate("login", body),
+      authenticate(() => transport.login(body)),
     register: (body: { email: string; password: string; name?: string }) =>
-      authenticate("register", body),
+      authenticate(() => transport.register(body)),
+    requestLoginOtp: (body: { email: string }) => authenticate(() => {
+      if (!transport.requestLoginOtp) throw new ApiError("validation", "Email login is unavailable");
+      return transport.requestLoginOtp(body);
+    }),
+    cancelVerification() { if (state.pendingVerification) invalidate(); },
+    async resendOtp() {
+      if (operation) throw new ApiError("busy", "Authentication is already in progress");
+      const pending = state.pendingVerification;
+      if (!pending || !transport.resendOtp) throw new ApiError("validation", "Request an email code first");
+      const generation = state.generation;
+      operation = true;
+      try {
+        const next = await transport.resendOtp({ email: pending.email, purpose: pending.purpose });
+        check(generation);
+        publish({ pendingVerification: next, error: null });
+        return next;
+      } finally { operation = false; }
+    },
+    async verifyOtp(code: string) {
+      if (operation) throw new ApiError("busy", "Authentication is already in progress");
+      const pending = state.pendingVerification;
+      if (!pending || !transport.verifyOtp) throw new ApiError("validation", "Request an email code first");
+      operation = true;
+      const generation = state.generation;
+      try {
+        const tokens = await transport.verifyOtp({ email: pending.email, code, purpose: pending.purpose });
+        await commit(tokens, generation);
+        const user = await transport.me();
+        check(generation);
+        publish({ status: "authenticated", user, pendingVerification: null, error: null });
+      } catch (error) {
+        if (generation === state.generation) {
+          if (state.token && asApiError(error).status !== 401 && asApiError(error).status !== 403)
+            publish({ status: "error", pendingVerification: null, error: sessionErrorMessage(error) });
+          else if (state.token) invalidate(sessionErrorMessage(error));
+          else publish({ error: sessionErrorMessage(error) });
+        }
+        throw error;
+      } finally { operation = false; }
+    },
     async logout() {
       const token = state.token;
       boundary("signedOut");

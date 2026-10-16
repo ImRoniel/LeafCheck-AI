@@ -180,6 +180,7 @@ test("login requires authentication and offers no token-free Dashboard bypass", 
   let localEntries = 0;
   const routes: string[] = [];
   const module = load("app/(auth)/login.tsx", {
+    "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: false, passwordRecovery: false }) },
     react: state.react,
     "@/components/auth-button": { AuthButton: "AuthButton" },
     "@/components/auth-layout": { AuthLayout: "AuthLayout", authStyles: {} },

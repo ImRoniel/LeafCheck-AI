@@ -1,5 +1,11 @@
 # LeafCheck AI frontend — Phase 2 authentication
 
+The current mobile Supabase implementation and rollout gates are documented in
+[`backend/AUTH_MIGRATION.md`](../backend/AUTH_MIGRATION.md). Recovery and email OTP
+are available when the backend uses `AUTH_PROVIDER=supabase`; legacy mode keeps
+its existing contracts. Native access tokens are memory-only, with refresh
+credentials in SecureStore and obsolete persisted access tokens removed.
+
 ## Setup
 
 The frontend remains on Expo SDK 57 / React Native 0.86. The repository-required
@@ -81,8 +87,8 @@ phones need a reachable LAN endpoint. Use HTTPS for deployed native traffic.
 - Login/register are available to guests. Private detail/settings screens are
   guarded. Terms are public. Registration combines first/last name, checks password
   confirmation and explicit policy acceptance, and never trims passwords.
-- Password recovery, OTP, account deletion, plant creation, archives and report
-  retrieval remain unavailable. Profile is read-only apart from sign-out.
+- Password recovery and email OTP are gated by backend capabilities. Account
+  deletion, email change and logged-in password change remain deferred.
 
 ## Verification and remaining live acceptance
 

@@ -3,6 +3,7 @@ import { AuthLayout, authStyles } from "@/components/auth-layout";
 import { CustomTextInput } from "@/components/custom-text-input";
 import { Notice } from "@/components/screen";
 import { useAuth } from "@/context/auth";
+import { useAuthCapabilities } from "@/hooks/use-auth-capabilities";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -10,6 +11,7 @@ import { Pressable, Text, View } from "react-native";
 export default function Register() {
   const router = useRouter();
   const auth = useAuth();
+  const capabilities = useAuthCapabilities();
   const submitting = useRef(false);
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -44,11 +46,12 @@ export default function Register() {
     setBusy(true);
     setError(null);
     try {
-      await auth.register({
+      const pending = await auth.register({
         email: email.trim().toLowerCase(),
         password,
         ...(name ? { name } : {}),
       });
+      if (pending) router.push("/otp-verification");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Registration failed");
     } finally {
@@ -61,7 +64,9 @@ export default function Register() {
     <AuthLayout
       compact
       title="Create your account"
-      description="A fresh start for you and your plants."
+      description={capabilities.emailOtp
+        ? "We'll email an eight-digit code to verify your account."
+        : "A fresh start for you and your plants."}
       onBack={() => router.replace("/login")}
     >
       <CustomTextInput

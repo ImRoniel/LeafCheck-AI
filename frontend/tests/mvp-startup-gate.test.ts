@@ -49,8 +49,8 @@ test('startup checks show splash, then enforce all three flag/token combinations
               assert.equal(key, '@leafcheck_onboarding_complete'); return flag;
             } },
           },
-          'expo-secure-store': { getItemAsync: async (key: string) => {
-            assert.equal(key, 'access_token'); return token;
+          'expo-secure-store': { getItemAsync: async () => {
+            throw new Error('Startup must never read persisted access tokens');
           } },
         }, [], {
           setTimeout(work: () => void) { elapse = work; return 1; },

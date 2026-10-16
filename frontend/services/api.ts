@@ -1,7 +1,7 @@
 import type { AIDiagnosisRequest, HealthStatus, ScanRequest } from "../types";
 import { ApiError, asApiError } from "./errors";
 import { platformOS } from "./platform";
-import { parseTokens, parseUser, type SessionBridge } from "./session";
+import { parseChallenge, parseRegistration, parseTokens, parseUser, type PendingVerification, type SessionBridge } from "./session";
 import * as v from "./validators";
 export { ApiError } from "./errors";
 export interface RequestOptions {
@@ -272,7 +272,21 @@ export function createApiClient(
     login: (body: { email: string; password: string }) =>
       request("/api/auth/login", parseTokens, {}, "POST", body),
     register: (body: { email: string; password: string; name?: string }) =>
-      request("/api/auth/register", parseTokens, {}, "POST", body),
+      request("/api/auth/register", parseRegistration, {}, "POST", body),
+    authCapabilities: (options?: RequestOptions) => request("/api/auth/capabilities", (value) => {
+      if (!value || typeof value !== "object" || !("emailOtp" in value) || typeof value.emailOtp !== "boolean" ||
+          !("passwordRecovery" in value) || typeof value.passwordRecovery !== "boolean")
+        throw new ApiError("validation", "Invalid authentication capabilities");
+      return { emailOtp: value.emailOtp, passwordRecovery: value.passwordRecovery };
+    }, options),
+    requestLoginOtp: (body: { email: string }) => request("/api/auth/otp/request", parseChallenge, {}, "POST", body),
+    resendOtp: (body: { email: string; purpose: PendingVerification["purpose"] }) =>
+      request("/api/auth/otp/resend", parseChallenge, {}, "POST", body),
+    verifyOtp: (body: { email: string; code: string; purpose: PendingVerification["purpose"] }) =>
+      request("/api/auth/otp/verify", parseTokens, {}, "POST", body),
+    forgotPassword: (body: { email: string }) => request("/api/auth/forgot-password", () => undefined, {}, "POST", body),
+    resetPassword: (body: { email: string; code: string; newPassword: string }) =>
+      request("/api/auth/reset-password", () => undefined, {}, "POST", body),
     refresh: (body: { refreshToken?: string }) =>
       request("/api/auth/refresh", parseTokens, {}, "POST", body),
     me: (options?: RequestOptions) =>

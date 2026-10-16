@@ -1,25 +1,35 @@
 import { AuthButton } from "@/components/auth-button";
-import { AuthLayout, authStyles } from "@/components/auth-layout";
+import { AuthLayout } from "@/components/auth-layout";
 import { CustomTextInput } from "@/components/custom-text-input";
+import { Notice } from "@/components/screen";
+import { api } from "@/services/api";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useRef, useState } from "react";
 
 export default function ForgotPassword() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const handleSendOTP = () => {};
-  const backToLogin = () => router.replace("/login");
-
-  return (
-    <AuthLayout recovery title="Forgot password?" description="Enter the email linked to your account to start resetting your password." onBack={backToLogin}>
-      <CustomTextInput label="Email address" value={email} onChangeText={setEmail} placeholder="Enter your email address" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" returnKeyType="done" onSubmitEditing={handleSendOTP} />
-      <Text style={authStyles.note}>Password recovery is unavailable. No email or code will be sent.</Text>
-      <AuthButton title="Send OTP unavailable" disabled onPress={handleSendOTP} />
-      <View style={authStyles.footer}>
-        <Text style={authStyles.footerText}>Remember your password?</Text>
-        <Pressable accessibilityRole="link" onPress={backToLogin} style={authStyles.linkButton}><Text style={authStyles.link}>Log in</Text></Pressable>
-      </View>
-    </AuthLayout>
-  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const submit = async () => {
+    if (submitting.current) return;
+    const address = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) { setError("Enter a valid email address."); return; }
+    submitting.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.forgotPassword({ email: address });
+      router.push({ pathname: "/reset-password", params: { email: address } });
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to send a recovery code"); }
+    finally { submitting.current = false; setBusy(false); }
+  };
+  return <AuthLayout title="Forgot password" description="Enter your email to request an eight-digit recovery code."
+    onBack={() => router.replace("/login")}>
+    <CustomTextInput label="Email" value={email} onChangeText={setEmail} keyboardType="email-address"
+      autoComplete="email" autoCorrect={false} editable={!busy} onSubmitEditing={() => void submit()} />
+    {error && <Notice>{error}</Notice>}
+    <AuthButton title="Send recovery code" loading={busy} onPress={() => void submit()} />
+  </AuthLayout>;
 }

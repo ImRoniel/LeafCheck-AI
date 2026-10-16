@@ -60,7 +60,7 @@ test('all root routes are explicitly guarded, including forbidden deep-link dest
 function startupHarness(intro: ReturnType<typeof createIntroStore>) {
   let ready = false;
   let stateCursor = 0;
-  const state: unknown[] = [null, null, false];
+  const state: unknown[] = [null, false];
   let status = 'restoring';
   let callback: (() => void) | undefined;
   let schedules = 0, clears = 0;
@@ -74,7 +74,7 @@ function startupHarness(intro: ReturnType<typeof createIntroStore>) {
     useRef: (current: unknown) => ({ current }),
     useState() {
       const index = stateCursor++;
-      if (index === 2) return [ready, setReady];
+      if (index === 1) return [ready, setReady];
       return [state[index], (value: unknown) => { state[index] = value; }];
     },
     useEffect(effect: () => void | (() => void), deps: readonly unknown[]) {
@@ -93,7 +93,6 @@ function startupHarness(intro: ReturnType<typeof createIntroStore>) {
       stateCursor = 0;
       // Model the settled AsyncStorage read separately from the timer.
       state[0] = intro.snapshot().phase === "completed";
-      state[1] = status === "authenticated";
       const root = introRoot(intro.snapshot(), status, {
         react,
         '@/context/install-onboarding': { InstallOnboardingProvider: 'IntroProvider', useInstallOnboarding: () => ({ ...intro.snapshot(), finishSplash: intro.finishSplash }) },

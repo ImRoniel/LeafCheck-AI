@@ -4,6 +4,15 @@ import type { User } from "../generated/postgres-client/index.js";
 import { authConfig } from "./auth-config.js";
 import { asyncRoute, HttpError } from "./http.js";
 import { prismaPg } from "./prisma-pg.js";
+import { authProvider } from "./auth-provider.js";
+import { authenticatedProviderSession } from "./supabase-session.js";
+
+// Explicit legacy projection also permits deploying before the additive migration.
+export const legacyUserSelect = {
+  id: true, email: true, name: true, password: true, isActive: true,
+  role: true, createdAt: true, updatedAt: true,
+} as const;
+type ApplicationUser = Pick<User, keyof typeof legacyUserSelect>;
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 export { hashPassword, verifyPassword } from "./password.js";
@@ -12,7 +21,7 @@ export const tokenHash = (token: string) =>
 const opaqueToken = () => randomBytes(32).toString("base64url");
 export const invalidSession = () =>
   new HttpError(401, "INVALID_SESSION", "Invalid or expired session.");
-export const safeUser = (user: User) => ({
+export const safeUser = (user: ApplicationUser) => ({
   id: user.id,
   email: user.email,
   name: user.name,
@@ -59,7 +68,7 @@ export async function rotateSession(token: string, client: string) {
     await tx.$queryRaw`SELECT "id" FROM "AuthSession" WHERE "id" = ${record.sessionId} FOR UPDATE`;
     const session = await tx.authSession.findUnique({
       where: { id: record.sessionId },
-      include: { user: true },
+      include: { user: { select: legacyUserSelect } },
     });
     if (
       !session ||
@@ -97,6 +106,12 @@ export const requireAuth = asyncRoute(async (req, res, next) => {
     req.get("authorization") ?? "",
   );
   if (!match || match[1].length > 2048) throw invalidSession();
+  if (authProvider() === "supabase") {
+    res.locals.auth = await authenticatedProviderSession(match[1]);
+    res.set("Cache-Control", "no-store");
+    next();
+    return;
+  }
   let claims;
   try {
     claims = (
@@ -116,7 +131,7 @@ export const requireAuth = asyncRoute(async (req, res, next) => {
     throw invalidSession();
   const session = await prismaPg.authSession.findUnique({
     where: { id: claims.sid },
-    include: { user: true },
+    include: { user: { select: legacyUserSelect } },
   });
   if (
     !session ||
@@ -133,7 +148,7 @@ export const requireAuth = asyncRoute(async (req, res, next) => {
 
 /** Must follow requireAuth; authorize the database user, never JWT role claims. */
 export const requireAdmin = asyncRoute((_req, res, next) => {
-  const user: User | undefined = res.locals.auth?.user;
+  const user: ApplicationUser | undefined = res.locals.auth?.user;
   if (!user) throw invalidSession();
   if (user.role !== "ADMIN" && user.role !== "LEAD_DEV") {
     throw new HttpError(403, "ADMIN_REQUIRED", "Administrator access required.");

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, mock, test } from "node:test";
 
+process.env.AUTH_PROVIDER = "legacy";
 process.env.AUTH_JWT_SECRET =
   "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM";
 process.env.AUTH_JWT_ISSUER = "test-issuer";

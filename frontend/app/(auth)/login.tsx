@@ -3,18 +3,32 @@ import { AuthLayout, authStyles } from "@/components/auth-layout";
 import { CustomTextInput } from "@/components/custom-text-input";
 import { Notice } from "@/components/screen";
 import { useAuth } from "@/context/auth";
+import { useAuthCapabilities } from "@/hooks/use-auth-capabilities";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 export default function Login() {
   const auth = useAuth();
   const router = useRouter();
+  const capabilities = useAuthCapabilities();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
+  const loginWithCode = async () => {
+    if (submitting.current) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Enter a valid email address."); return; }
+    submitting.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      await auth.requestLoginOtp({ email: email.trim().toLowerCase() });
+      router.push("/otp-verification");
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to send a code"); }
+    finally { submitting.current = false; setBusy(false); }
+  };
   const submit = async () => {
     if (submitting.current) return;
     if (!email.trim() || !password) {
@@ -65,6 +79,12 @@ export default function Login() {
           loading={busy}
           onPress={() => void submit()}
         />
+        {capabilities.passwordRecovery && <Pressable accessibilityRole="link" disabled={busy}
+          onPress={() => router.push("/forgot-password")} style={authStyles.linkButton}>
+          <Text style={authStyles.link}>Forgot password?</Text>
+        </Pressable>}
+        {capabilities.emailOtp && <AuthButton title="Login with email code" disabled={busy}
+          onPress={() => void loginWithCode()} />}
       </View>
       <View style={authStyles.footer}>
         <Text style={authStyles.footerText}>New to LeafCheck?</Text>

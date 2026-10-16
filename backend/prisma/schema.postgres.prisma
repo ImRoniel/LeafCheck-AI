@@ -31,6 +31,8 @@ model User {
   email     String   @unique
   name      String?
   password  String
+  supabaseUserId String? @unique
+  emailVerifiedAt DateTime?
   isActive  Boolean  @default(true)
   role      Role     @default(USER)
   createdAt DateTime @default(now())
