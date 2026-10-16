@@ -20,6 +20,7 @@
     "db:generate:pg": "prisma generate --schema=prisma/schema.postgres.prisma",
     "db:generate:auth-read": "prisma generate --schema=prisma/schema.auth-read.prisma",
     "auth:migration:dry-run": "node --import tsx/esm scripts/auth-migration-dry-run.mjs",
+    "auth:migration:apply": "node --import tsx/esm scripts/auth-migration-apply.mjs",
     "db:push:pg": "prisma db push --schema=prisma/schema.postgres.prisma",
     "db:generate:all": "npm run db:generate && npm run db:generate:pg && npm run db:generate:auth-read",
     "db:push:all": "npm run db:push && npm run db:push:pg"

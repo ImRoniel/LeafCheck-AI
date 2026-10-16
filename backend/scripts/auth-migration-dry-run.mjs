@@ -12,24 +12,26 @@ export const target = {
   expectedRelations: { plants: 2, devices: 2, scans: 5 },
 };
 const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+export { digest as migrationDigest };
 const userSelect = {
   id: true, email: true, name: true, password: true, role: true, isActive: true,
   createdAt: true, updatedAt: true,
 };
 const reads = new Set(["findUnique", "findFirst", "findMany", "count", "aggregate", "groupBy"]);
 
+export async function migrationSnapshot(db) {
+  const [user, plants, devices, scans, users, sessions, refreshTokens] = await Promise.all([
+    db.user.findUnique({ where: { id: target.id }, select: userSelect }),
+    db.plant.findMany({ where: { userId: target.id }, orderBy: { id: "asc" } }),
+    db.device.findMany({ where: { userId: target.id }, orderBy: { id: "asc" } }),
+    db.aIAnalysis.findMany({ where: { userId: target.id }, orderBy: { id: "asc" } }),
+    db.user.count(), db.authSession.count(), db.refreshToken.count(),
+  ]);
+  return { user, plants, devices, scans, totals: { users, sessions, refreshTokens } };
+}
+
 export async function migrationReport(db, providerReads) {
-  const snapshot = async () => {
-    const [user, plants, devices, scans, users, sessions, refreshTokens] = await Promise.all([
-      db.user.findUnique({ where: { id: target.id }, select: userSelect }),
-      db.plant.findMany({ where: { userId: target.id }, orderBy: { id: "asc" } }),
-      db.device.findMany({ where: { userId: target.id }, orderBy: { id: "asc" } }),
-      db.aIAnalysis.findMany({ where: { userId: target.id }, orderBy: { id: "asc" } }),
-      db.user.count(), db.authSession.count(), db.refreshToken.count(),
-    ]);
-    return { user, plants, devices, scans, totals: { users, sessions, refreshTokens } };
-  };
-  const before = await snapshot();
+  const before = await migrationSnapshot(db);
   const blockers = [];
   if (before.user?.email !== target.email) blockers.push("TARGET_ID_EMAIL_MISMATCH");
   const relations = { plants: before.plants.length, devices: before.devices.length, scans: before.scans.length };
@@ -54,7 +56,7 @@ export async function migrationReport(db, providerReads) {
     blockers.push("EXISTING_SUPABASE_IDENTITY_REQUIRES_REVIEW");
   const hash = before.user?.password ?? "";
   const argon = /^\$argon2id\$v=19\$([^$]+)\$[^$]+\$[^$]+$/.exec(hash);
-  const after = await snapshot();
+  const after = await migrationSnapshot(db);
   const unchanged = digest(before) === digest(after);
   if (!unchanged) blockers.push("CONCURRENT_DATABASE_CHANGE_DETECTED");
   return {
@@ -76,7 +78,7 @@ export async function migrationReport(db, providerReads) {
 async function main() {
   const args = process.argv.slice(2);
   if (args.length && (args.length !== 2 || args[0] !== "--output"))
-    throw new Error("Only --output <report.json> is supported. No apply/import mode exists.");
+    throw new Error("Only --output <report.json> is supported. Apply is a separate command.");
   const client = new PrismaClient({ log: [] });
   const db = client.$extends({ query: { $allModels: { async $allOperations({ operation, args: queryArgs, query }) {
     if (!reads.has(operation)) throw new Error("Dry-run refused a database mutation.");
