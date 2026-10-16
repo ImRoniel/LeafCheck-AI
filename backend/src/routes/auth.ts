@@ -13,7 +13,8 @@ import {
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { authProvider, requireSupabase } from "../lib/auth-provider.js";
-import { forgotPassword, loginProvider, refreshProvider, registerProvider, requestLoginOtp, resendOtp, resetPassword, verifyOtp, type OtpPurpose } from "../lib/supabase-auth.js";
+import { forgotPassword, invalidOtp, loginProvider, refreshProvider, registerProvider, requestLoginOtp, resendOtp, resetPassword, verifyOtp, type OtpPurpose } from "../lib/supabase-auth.js";
+import type { EmailOtpType } from "../lib/supabase-client.js";
 import { revokeProviderSession } from "../lib/supabase-session.js";
 
 export const authRouter = Router();
@@ -242,21 +243,31 @@ function purpose(value: unknown): OtpPurpose {
     throw new HttpError(400, "INVALID_INPUT", "Invalid verification purpose.");
   return value;
 }
+function verificationType(data: Record<string, unknown>): EmailOtpType {
+  const previous = data.purpose === undefined ? undefined
+    : purpose(data.purpose) === "registration" ? "signup" : "magiclink";
+  // Older native releases send purpose; new releases send the exact provider type.
+  const type = data.type ?? previous;
+  if (type !== "signup" && type !== "magiclink" && type !== "recovery")
+    throw new HttpError(400, "INVALID_INPUT", "A valid OTP type is required.");
+  if (previous && previous !== type) throw invalidOtp();
+  return type;
+}
 for (const path of ["/forgot-password", "/reset-password", "/otp/request", "/otp/verify", "/otp/resend"]) {
   authRouter.post(path, asyncRoute(async (req, res) => {
     requireSupabase();
     if (res.locals.client !== "native") throw new HttpError(400, "NATIVE_REQUIRED", "Use the mobile app.");
     const allowed = path === "/reset-password" ? ["email", "code", "newPassword"]
-      : path === "/otp/verify" ? ["email", "code", "purpose"]
-      : path === "/otp/resend" ? ["email", "purpose"] : ["email"];
+      : path === "/otp/verify" ? ["email", "code", "type", "purpose"]
+      : path === "/otp/resend" ? ["email", "type", "purpose"] : ["email"];
     const data = bodyObject(req.body, allowed);
     const address = email(data.email);
     if (path === "/forgot-password") { res.status(202).json(await forgotPassword(address)); return; }
     if (path === "/otp/request") { res.status(202).json(await requestLoginOtp(address)); return; }
-    if (path === "/otp/resend") { res.status(202).json(await resendOtp(address, purpose(data.purpose))); return; }
+    if (path === "/otp/resend") { res.status(202).json(await resendOtp(address, verificationType(data))); return; }
     const digits = code(data.code);
     if (path === "/otp/verify") {
-      const result = await verifyOtp(address, digits, purpose(data.purpose));
+      const result = await verifyOtp(address, digits, verificationType(data));
       sendTokens(res, result.tokens, 200, safeUser(result.user));
       return;
     }

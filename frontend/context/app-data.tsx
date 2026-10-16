@@ -47,10 +47,13 @@ const Context = createContext<{
 } | null>(null);
 export function AppDataProvider({ children }: PropsWithChildren) {
   const auth = useAuth();
-  // Remount all account data (and consumers) at every authentication boundary.
+  // Keep the public navigator mounted while a sign-in becomes an OTP challenge.
+  // Authenticated accounts and guests retain their full isolation boundaries.
   return (
     <AccountDataProvider
-      key={`${auth.generation}:${auth.status}:${auth.user?.id ?? "guest"}`}
+      key={auth.user || auth.isGuest
+        ? `${auth.generation}:${auth.status}:${auth.user?.id ?? "guest"}`
+        : "anonymous"}
     >
       {children}
     </AccountDataProvider>

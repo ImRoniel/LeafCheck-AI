@@ -4,7 +4,8 @@ import { CustomTextInput } from "@/components/custom-text-input";
 import { Notice } from "@/components/screen";
 import { useAuth } from "@/context/auth";
 import { useAuthCapabilities } from "@/hooks/use-auth-capabilities";
-import { useRouter } from "expo-router";
+import { otpRoute } from "@/services/email-otp";
+import { Redirect, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 export default function Login() {
@@ -25,7 +26,6 @@ export default function Login() {
     setError(null);
     try {
       await auth.requestLoginOtp({ email: email.trim().toLowerCase() });
-      router.push("/otp-verification");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to send a code"); }
     finally { submitting.current = false; setBusy(false); }
   };
@@ -47,6 +47,7 @@ export default function Login() {
       setBusy(false);
     }
   };
+  if (auth.pendingVerification) return <Redirect href={otpRoute(auth.pendingVerification)} />;
   return (
     <AuthLayout
       title="Welcome to LeafCheck AI"

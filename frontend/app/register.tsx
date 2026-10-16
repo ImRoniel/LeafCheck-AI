@@ -4,7 +4,8 @@ import { CustomTextInput } from "@/components/custom-text-input";
 import { Notice } from "@/components/screen";
 import { useAuth } from "@/context/auth";
 import { useAuthCapabilities } from "@/hooks/use-auth-capabilities";
-import { useRouter } from "expo-router";
+import { otpRoute } from "@/services/email-otp";
+import { Redirect, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -46,12 +47,11 @@ export default function Register() {
     setBusy(true);
     setError(null);
     try {
-      const pending = await auth.register({
+      await auth.register({
         email: email.trim().toLowerCase(),
         password,
         ...(name ? { name } : {}),
       });
-      if (pending) router.push("/otp-verification");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Registration failed");
     } finally {
@@ -60,6 +60,7 @@ export default function Register() {
     }
   };
 
+  if (auth.pendingVerification) return <Redirect href={otpRoute(auth.pendingVerification)} />;
   return (
     <AuthLayout
       compact

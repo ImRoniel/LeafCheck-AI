@@ -1,4 +1,5 @@
 import { ApiError, asApiError, sanitizeErrorMessage } from "./errors";
+import { INVALID_OTP_MESSAGE, OTP_RESEND_MS, otpType, type EmailOtpFlow, type EmailOtpType } from "./email-otp";
 
 export interface User {
   id: string;
@@ -20,6 +21,7 @@ export interface SessionState {
   generation: number;
   error: string | null;
   pendingVerification?: PendingVerification | null;
+  otpResendAt?: number | null;
 }
 export interface TokenStorage {
   get(): Promise<string | null>;
@@ -44,8 +46,8 @@ export interface SessionTransport {
     name?: string;
   }): Promise<Tokens | PendingVerification>;
   requestLoginOtp?(body: { email: string }): Promise<PendingVerification>;
-  verifyOtp?(body: { email: string; code: string; purpose: PendingVerification["purpose"] }): Promise<Tokens>;
-  resendOtp?(body: { email: string; purpose: PendingVerification["purpose"] }): Promise<PendingVerification>;
+  verifyOtp?(body: { email: string; code: string; type: EmailOtpType }): Promise<Tokens>;
+  resendOtp?(body: { email: string; type: EmailOtpType }): Promise<PendingVerification>;
   refresh(body: { refreshToken?: string }): Promise<Tokens>;
   me(): Promise<User>;
   updateProfile?(name: string): Promise<User>;
@@ -108,6 +110,12 @@ export function parseRegistration(value: unknown): Tokens | PendingVerification 
     ? parseChallenge(value) : parseTokens(value);
 }
 const cancelled = () => new ApiError("cancelled", "Session changed");
+function verificationType(pending: PendingVerification, flow?: EmailOtpFlow): EmailOtpType {
+  const type = otpType(pending.purpose);
+  if (flow && (flow.email !== pending.email || flow.type !== type))
+    throw new ApiError("http", INVALID_OTP_MESSAGE, 400);
+  return flow?.type ?? type;
+}
 const sessionErrorMessage = (error: unknown) => {
   const e = asApiError(error);
   return e.message;
@@ -126,6 +134,7 @@ export function createSessionCoordinator(
     generation: 0,
     error: null,
     pendingVerification: null,
+    otpResendAt: null,
   };
   let controller = new AbortController();
   let transport: SessionTransport;
@@ -155,6 +164,7 @@ export function createSessionCoordinator(
       token: null,
       error: null,
       pendingVerification: null,
+      otpResendAt: null,
       generation: state.generation + 1,
     });
   };
@@ -250,7 +260,7 @@ export function createSessionCoordinator(
         const generation = state.generation;
         const user = await transport.me();
         check(generation);
-        publish({ status: "authenticated", user, error: null, pendingVerification: null });
+        publish({ status: "authenticated", user, error: null, pendingVerification: null, otpResendAt: null });
       } catch (error) {
         if (
           state.status === "restoring" &&
@@ -292,7 +302,8 @@ export function createSessionCoordinator(
         return null;
       });
       if (result) {
-        publish({ status: "verificationRequired", pendingVerification: result });
+        publish({ status: "verificationRequired", pendingVerification: result,
+          otpResendAt: Date.now() + Math.max(OTP_RESEND_MS, result.resendAfter * 1000) });
         return result;
       }
       const user = await transport.me();
@@ -339,35 +350,60 @@ export function createSessionCoordinator(
       return transport.requestLoginOtp(body);
     }),
     cancelVerification() { if (state.pendingVerification) invalidate(); },
-    async resendOtp() {
+    resumeVerification(flow: EmailOtpFlow) {
+      const pending = state.pendingVerification;
+      if (pending) {
+        if (pending.email !== flow.email || otpType(pending.purpose) !== flow.type)
+          throw new ApiError("validation", "Request a new email code to continue.");
+        return;
+      }
+      if (operation || state.token || state.user || state.status === "restoring")
+        throw new ApiError("busy", "Authentication is already in progress");
+      boundary("verificationRequired");
+      publish({ pendingVerification: { status: "verification_required", email: flow.email,
+        purpose: flow.type === "signup" ? "registration" : "login", resendAfter: 60 },
+        otpResendAt: Date.now() + OTP_RESEND_MS });
+    },
+    async resendOtp(flow?: EmailOtpFlow) {
       if (operation) throw new ApiError("busy", "Authentication is already in progress");
       const pending = state.pendingVerification;
       if (!pending || !transport.resendOtp) throw new ApiError("validation", "Request an email code first");
+      const type = verificationType(pending, flow);
+      if (Date.now() < (state.otpResendAt ?? 0))
+        throw new ApiError("http", "Please wait 60 seconds before requesting another code.", 429);
       const generation = state.generation;
       operation = true;
       try {
-        const next = await transport.resendOtp({ email: pending.email, purpose: pending.purpose });
+        const next = await transport.resendOtp({ email: pending.email, type });
         check(generation);
-        publish({ pendingVerification: next, error: null });
+        if (next.email !== pending.email || next.purpose !== pending.purpose)
+          throw new ApiError("validation", "Invalid email verification response");
+        publish({ pendingVerification: next, error: null,
+          otpResendAt: Date.now() + Math.max(OTP_RESEND_MS, next.resendAfter * 1000) });
         return next;
+      } catch (error) {
+        if (generation === state.generation && asApiError(error).status === 429)
+          publish({ otpResendAt: Date.now() + OTP_RESEND_MS });
+        throw error;
       } finally { operation = false; }
     },
-    async verifyOtp(code: string) {
+    async verifyOtp(code: string, flow?: EmailOtpFlow) {
       if (operation) throw new ApiError("busy", "Authentication is already in progress");
       const pending = state.pendingVerification;
       if (!pending || !transport.verifyOtp) throw new ApiError("validation", "Request an email code first");
+      const type = verificationType(pending, flow);
       operation = true;
       const generation = state.generation;
       try {
-        const tokens = await transport.verifyOtp({ email: pending.email, code, purpose: pending.purpose });
+        const tokens = await transport.verifyOtp({ email: pending.email, code, type });
         await commit(tokens, generation);
         const user = await transport.me();
         check(generation);
-        publish({ status: "authenticated", user, pendingVerification: null, error: null });
+        publish({ status: "authenticated", user, pendingVerification: null, otpResendAt: null, error: null });
       } catch (error) {
         if (generation === state.generation) {
           if (state.token && asApiError(error).status !== 401 && asApiError(error).status !== 403)
-            publish({ status: "error", pendingVerification: null, error: sessionErrorMessage(error) });
+            publish({ status: "error", pendingVerification: null, otpResendAt: null, error: sessionErrorMessage(error) });
           else if (state.token) invalidate(sessionErrorMessage(error));
           else publish({ error: sessionErrorMessage(error) });
         }

@@ -3,15 +3,21 @@ import test from "node:test";
 import * as React from "react";
 import { ApiError, createApiClient } from "../services/api";
 import { createSessionCoordinator, type PendingVerification } from "../services/session";
+import * as emailOtp from "../services/email-otp";
+import * as errors from "../services/errors";
 import { loadComponent, nodes } from "./startup-test-helpers";
 
 const flush = () => new Promise<void>(resolve => setImmediate(resolve));
 type Props = { children?: React.ReactNode; label?: string; title?: string; description?: string;
   accessibilityRole?: string; maxLength?: number; disabled?: boolean;
+  href?: string | { pathname: string; params: Record<string, string> };
   onChangeText?: (text: string) => void; onPress?: () => void; value?: string };
 function screen(path: string, overrides: Record<string, unknown>) {
   let cursor = 0;
   const slots: unknown[] = [];
+  const dependencies: (readonly unknown[])[] = [];
+  const effects: (() => void)[] = [];
+  const cleanups: (() => void)[] = [];
   const react = {
     ...React,
     useState(initial: unknown) {
@@ -24,7 +30,14 @@ function screen(path: string, overrides: Record<string, unknown>) {
       if (!(index in slots)) slots[index] = { current: initial };
       return slots[index];
     },
-    useEffect() {},
+    useEffect(effect: () => void | (() => void), deps: readonly unknown[]) {
+      const index = cursor++;
+      const previous = dependencies[index];
+      if (!previous || deps.some((value, position) => !Object.is(value, previous[position]))) {
+        dependencies[index] = deps;
+        effects.push(() => { cleanups[index]?.(); cleanups[index] = effect() || (() => {}); });
+      }
+    },
   };
   const Component = loadComponent(path, {
     react,
@@ -32,10 +45,11 @@ function screen(path: string, overrides: Record<string, unknown>) {
     "@/components/auth-layout": { AuthLayout: "AuthLayout", authStyles: {} },
     "@/components/custom-text-input": { CustomTextInput: "CustomTextInput" },
     "@/components/screen": { Notice: "Notice" },
+    "@/services/errors": errors,
     "react-native": { Text: "Text", Pressable: "Pressable", View: "View" },
     ...overrides,
-  }, [], { Error });
-  const render = () => { cursor = 0; return Component(); };
+  }, [], { Error, Date });
+  const render = () => { cursor = 0; const element = Component(); effects.splice(0).forEach(effect => effect()); return element; };
   const elements = () => nodes(render()) as React.ReactElement<Props>[];
   return {
     render,
@@ -51,6 +65,7 @@ function screen(path: string, overrides: Record<string, unknown>) {
       button.props.onPress();
     },
     elements,
+    unmount: () => cleanups.forEach(cleanup => cleanup()),
   };
 }
 
@@ -69,18 +84,19 @@ test("forgot-password screen requests a recovery code and navigates with email o
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test" }]);
   assert.equal(routes.length, 0);
   release(); await flush();
-  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/reset-password", params: { email: "person@example.test" } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/reset-password", params: { email: "person@example.test", type: "recovery" } }]);
 });
 
 test("registration explains eight-digit verification and opens the shared OTP screen", async () => {
   const calls: unknown[] = [], routes: unknown[] = [];
+  let pending: PendingVerification | null = null;
   const app = screen("app/register.tsx", {
-    "@/context/auth": { useAuth: () => ({ async register(body: unknown) {
+    "@/context/auth": { useAuth: () => ({ pendingVerification: pending, async register(body: unknown) {
       calls.push(body);
-      return { status: "verification_required", email: "person@example.test", purpose: "registration", resendAfter: 60 };
+      pending = { status: "verification_required", email: "person@example.test", purpose: "registration", resendAfter: 60 };
     } }) },
     "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
-    "expo-router": { useRouter: () => ({ push: (route: unknown) => routes.push(route), replace() {} }) },
+    "expo-router": { Redirect: "Redirect", useRouter: () => ({ push: (route: unknown) => routes.push(route), replace() {} }) },
   });
   assert.match(app.elements()[0].props.description ?? "", /eight-digit code/);
   app.fill("Email", "Person@Example.test"); app.fill("First name", "Plant"); app.fill("Last name", "Owner");
@@ -89,23 +105,28 @@ test("registration explains eight-digit verification and opens the shared OTP sc
   assert.ok(terms?.props.onPress); terms.props.onPress();
   app.press("Create account"); await flush();
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test", password: "password", name: "Plant Owner" }]);
-  assert.deepEqual(routes, ["/otp-verification"]);
+  assert.deepEqual(routes, []);
+  assert.equal(app.render().type, "Redirect");
+  assert.deepEqual(JSON.parse(JSON.stringify(app.elements()[0].props.href)), emailOtp.otpRoute(pending!));
 });
 
 test("login offers a passwordless request using only the email when enabled", async () => {
   const calls: unknown[] = [], routes: unknown[] = [];
+  let pending: PendingVerification | null = null;
   const app = screen("app/(auth)/login.tsx", {
-    "@/context/auth": { useAuth: () => ({
-      async requestLoginOtp(body: unknown) { calls.push(body); },
+    "@/context/auth": { useAuth: () => ({ pendingVerification: pending,
+      async requestLoginOtp(body: unknown) { calls.push(body); pending = { status: "verification_required", email: "person@example.test", purpose: "login", resendAfter: 60 }; },
       async login() { throw new Error("Password login must not be used"); },
     }) },
     "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
-    "expo-router": { useRouter: () => ({ push: (route: unknown) => routes.push(route) }) },
+    "expo-router": { Redirect: "Redirect", useRouter: () => ({ push: (route: unknown) => routes.push(route) }) },
   });
+  assert.ok(app.elements().some(node => node.props.children === "Forgot password?"));
   app.fill("Email", "  Person@Example.test  "); app.press("Login with email code"); await flush();
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ email: "person@example.test" }]);
-  assert.deepEqual(routes, ["/otp-verification"]);
-  assert.ok(app.elements().some(node => node.props.children === "Forgot password?"));
+  assert.deepEqual(routes, []);
+  assert.equal(app.render().type, "Redirect");
+  assert.deepEqual(JSON.parse(JSON.stringify(app.elements()[0].props.href)), emailOtp.otpRoute(pending!));
 });
 
 test("reset-password screen validates the code and confirmation, retries and clears secrets after success", async () => {
@@ -133,7 +154,8 @@ test("reset-password screen validates the code and confirmation, retries and cle
 });
 
 for (const purpose of ["registration", "login"] as const) {
-  test(`${purpose} OTP screen retries an invalid code and completes the coordinator session`, async () => {
+  test(`${purpose} navigates with the right OTP type, verifies, and enforces the resend cooldown`, async (t) => {
+    t.mock.timers.enable({ apis: ["Date", "setTimeout"] });
     const pending: PendingVerification = { status: "verification_required", email: "person@example.test", purpose, resendAfter: 0 };
     const requests: { path: string; body: unknown }[] = [];
     let stored: string | null = null;
@@ -152,14 +174,42 @@ for (const purpose of ["registration", "login"] as const) {
       async get() { return stored; }, async set(value) { stored = value; }, async remove() { stored = null; },
     }, true, { run: work => work(), broadcastLogout() {}, listenLogout: () => () => {} });
     session.bind(api); api.bindSession(session);
-    if (purpose === "registration") await session.register({ email: pending.email, password: "password" });
-    else await session.requestLoginOtp({ email: pending.email });
+    const useAuth = () => ({ ...session.snapshot(),
+      register: async (body: { email: string; password: string; name?: string }) => { await session.register(body); },
+      requestLoginOtp: async (body: { email: string }) => { await session.requestLoginOtp(body); },
+      verifyOtp: session.verifyOtp, resendOtp: session.resendOtp, cancelVerification: session.cancelVerification,
+      resumeVerification: session.resumeVerification,
+    });
+    const entry = screen(purpose === "registration" ? "app/register.tsx" : "app/(auth)/login.tsx", {
+      "@/context/auth": { useAuth },
+      "@/hooks/use-auth-capabilities": { useAuthCapabilities: () => ({ emailOtp: true, passwordRecovery: true }) },
+      "expo-router": { Redirect: "Redirect", useRouter: () => ({ push() {}, replace() {} }) },
+    });
+    entry.fill("Email", pending.email);
+    if (purpose === "registration") {
+      entry.fill("Password", "password"); entry.fill("Confirm password", "password");
+      const terms = entry.elements().find(node => node.props.accessibilityRole === "checkbox");
+      assert.ok(terms?.props.onPress); terms.props.onPress(); entry.press("Create account");
+    } else entry.press("Login with email code");
+    await flush();
+    const redirect = entry.elements()[0];
+    assert.equal(redirect.type, "Redirect");
+    assert.deepEqual(JSON.parse(JSON.stringify(redirect.props.href)), {
+      pathname: "/otp-verification", params: { email: pending.email,
+        type: purpose === "registration" ? "signup" : "magiclink", message: `We sent an 8-digit code to ${pending.email}` },
+    });
+    const params = (redirect.props.href as { params: Record<string, string> }).params;
     assert.equal(session.snapshot().token, null); assert.equal(stored, null);
     const app = screen("app/otp-verification.tsx", {
-      "@/context/auth": { useAuth: () => ({ ...session.snapshot(), verifyOtp: session.verifyOtp, resendOtp: session.resendOtp, cancelVerification: session.cancelVerification }) },
-      "expo-router": { useRouter: () => ({ replace() {} }) },
+      "@/context/auth": { useAuth },
+      "expo-router": { Redirect: "Redirect", useLocalSearchParams: () => params, useRouter: () => ({ replace() {} }) },
     });
+    assert.equal(app.elements()[0].props.description, `Enter the 8-digit code sent to ${pending.email}`);
     assert.equal(app.elements().find(node => node.props.label === "Email code")?.props.maxLength, 8);
+    await assert.rejects(session.verifyOtp("00123456", { email: pending.email,
+      type: purpose === "registration" ? "magiclink" : "signup" }),
+      (e: unknown) => e instanceof ApiError && e.status === 400 && e.message === emailOtp.INVALID_OTP_MESSAGE);
+    assert.equal(requests.filter(request => request.path === "auth/otp/verify").length, 0);
     for (const invalid of ["123456", "1234567", "123456789", "1234abcd"]) {
       app.fill("Email code", invalid); app.press("Verify code"); await flush();
       assert.equal(requests.filter(request => request.path === "auth/otp/verify").length, 0);
@@ -168,18 +218,80 @@ for (const purpose of ["registration", "login"] as const) {
     app.fill("Email code", "00000000"); app.press("Verify code"); await flush();
     assert.equal(session.snapshot().status, "verificationRequired");
     assert.equal(session.snapshot().token, null);
-    assert.ok(app.elements().some(node => node.props.children === "Code invalid"));
+    assert.ok(app.elements().some(node => node.props.children === emailOtp.INVALID_OTP_MESSAGE));
+    const resendCount = () => requests.filter(request => request.path === "auth/otp/resend").length;
+    const firstResend = app.elements().find(node => node.props.title === "Resend code in 60s");
+    assert.equal(firstResend?.props.disabled, true); firstResend?.props.onPress?.(); await flush();
+    await assert.rejects(session.resendOtp(), (e: unknown) => e instanceof ApiError && e.status === 429);
+    assert.equal(resendCount(), 0);
+    t.mock.timers.tick(59_999);
+    const almostReady = app.elements().find(node => node.props.title === "Resend code in 1s");
+    assert.equal(almostReady?.props.disabled, true); almostReady?.props.onPress?.(); await flush();
+    assert.equal(resendCount(), 0);
+    const remounted = screen("app/otp-verification.tsx", {
+      "@/context/auth": { useAuth },
+      "expo-router": { Redirect: "Redirect", useLocalSearchParams: () => params, useRouter: () => ({ replace() {} }) },
+    });
+    assert.equal(remounted.elements().find(node => node.props.title === "Resend code in 1s")?.props.disabled, true);
+    remounted.unmount();
+    t.mock.timers.tick(1);
     app.press("Resend code"); await flush();
-    assert.ok(requests.some(request => request.path === "auth/otp/resend"));
+    assert.equal(resendCount(), 1);
+    assert.deepEqual(requests.find(request => request.path === "auth/otp/resend")?.body,
+      { email: pending.email, type: purpose === "registration" ? "signup" : "magiclink" });
+    assert.equal(app.elements().find(node => node.props.title === "Resend code in 60s")?.props.disabled, true);
     app.fill("Email code", "00123456"); app.press("Verify code"); await flush();
     assert.equal(session.snapshot().status, "authenticated");
     assert.equal(session.snapshot().user?.id, "user-id");
     assert.equal(session.snapshot().token, "memory-only"); assert.equal(stored, "secure-refresh");
     assert.equal(session.snapshot().pendingVerification, null);
     assert.deepEqual(requests.filter(request => request.path === "auth/otp/verify").at(-1)?.body,
-      { email: pending.email, code: "00123456", purpose });
+      { email: pending.email, code: "00123456", type: purpose === "registration" ? "signup" : "magiclink" });
+    assert.equal(app.elements()[0].props.href, "/(tabs)");
+    app.unmount();
   });
 }
+
+test("route email and signup type restore verification after the native screen is remounted", async (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"] });
+  const requests: unknown[] = [];
+  let stored: string | null = null;
+  const session = createSessionCoordinator({ async get() { return stored; }, async set(value) { stored = value; }, async remove() { stored = null; } },
+    true, { run: work => work(), broadcastLogout() {}, listenLogout: () => () => {} });
+  session.bind({ async login() { throw new Error("Unused"); }, async register() { throw new Error("Unused"); },
+    async refresh() { throw new Error("No refresh credential should be submitted"); },
+    async verifyOtp(body) { requests.push(body); return { accessToken: "memory", refreshToken: "refresh" }; },
+    async me() { return { id: "user", email: "person@example.test", name: null }; }, async logout() {} });
+  await session.restore();
+  const app = screen("app/otp-verification.tsx", {
+    "@/context/auth": { useAuth: () => ({ ...session.snapshot(), verifyOtp: session.verifyOtp, resumeVerification: session.resumeVerification }) },
+    "expo-router": { Redirect: "Redirect", useLocalSearchParams: () => ({ email: "person@example.test", type: "signup", message: "We sent an 8-digit code to person@example.test" }), useRouter: () => ({ replace() {} }) },
+  });
+  app.render();
+  assert.equal(session.snapshot().pendingVerification?.purpose, "registration");
+  assert.equal(app.elements()[0].props.description, "Enter the 8-digit code sent to person@example.test");
+  app.fill("Email code", "00123456"); app.press("Verify code"); await flush();
+  assert.deepEqual(requests, [{ email: "person@example.test", code: "00123456", type: "signup" }]);
+  assert.equal(session.snapshot().status, "authenticated");
+  assert.equal(app.elements()[0].props.href, "/(tabs)");
+  app.unmount();
+});
+
+test("the entry route sends a pending signup to verification instead of login", () => {
+  const Entry = loadComponent("app/index.tsx", {
+    "@/context/auth": { useAuth: () => ({ status: "verificationRequired", pendingVerification: {
+      email: "person@example.test", purpose: "registration", status: "verification_required", resendAfter: 60,
+    } }) },
+    "@/context/install-onboarding": { useInstallOnboarding: () => ({ phase: "completed" }) },
+    "expo-router": { Redirect: "Redirect" },
+  });
+  const entry = Entry();
+  assert.equal(typeof entry.type, "function");
+  const redirected = (entry.type as () => React.ReactElement<Props>)();
+  assert.deepEqual(JSON.parse(JSON.stringify(redirected.props.href)), {
+    pathname: "/otp-verification", params: { email: "person@example.test", type: "signup", message: "We sent an 8-digit code to person@example.test" },
+  });
+});
 
 test("canceling OTP verification discards a late session response", async () => {
   let finish!: (value: { accessToken: string; refreshToken: string }) => void;

@@ -1,5 +1,6 @@
 import { useInstallOnboarding } from '@/context/install-onboarding';
 import { useAuth } from '@/context/auth';
+import { otpRoute } from '@/services/email-otp';
 import { Redirect } from 'expo-router';
 export default function Entry() {
   const intro = useInstallOnboarding();
@@ -13,5 +14,6 @@ export default function Entry() {
 function CompletedEntry() {
   const auth = useAuth();
   if (auth.status === 'authenticated') return <Redirect href="/(tabs)" />;
+  if (auth.pendingVerification) return <Redirect href={otpRoute(auth.pendingVerification)} />;
   return <Redirect href="/(auth)/login" />;
 }

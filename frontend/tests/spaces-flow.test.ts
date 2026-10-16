@@ -13,6 +13,7 @@ import * as validators from "../services/validators";
 import type { Plant } from "../types/plant";
 import { createApiClient, type CreatePlantInput, type UpdatePlantInput } from "../services/api";
 import { CONNECTION_ERROR_MESSAGE } from "../services/errors";
+import * as emailOtp from "../services/email-otp";
 
 const requireModule = createRequire(`${process.cwd()}/package.json`);
 type Props = {
@@ -81,6 +82,7 @@ function load(path: string, overrides: Record<string, unknown>) {
     exports, Error, AbortController, setTimeout, clearTimeout,
     require(name: string) {
       if (name in overrides) return overrides[name];
+      if (name === "@/services/email-otp") return emailOtp;
       if (name === "@react-native-async-storage/async-storage") return { __esModule: true, default: { getItem: async () => "true" } };
       if (name === "expo-secure-store") return { getItemAsync: async () => "access-fixture" };
       if ((name === "@/components/plant-sensor-badge" || name === "./plant-sensor-badge")) return load("components/plant-sensor-badge.tsx", { "@expo/vector-icons": { Ionicons: "Icon" } });
@@ -195,6 +197,29 @@ test("login requires authentication and offers no token-free Dashboard bypass", 
   assert.equal(localEntries, 0);
   assert.deepEqual(routes, []);
   assert.ok(!nodes.some(node => typeof node.props.children === "string" && /guest mode/i.test(node.props.children)));
+});
+
+test("public authentication keeps the navigator mounted while accounts retain isolation keys", () => {
+  const state = hooks();
+  let auth = { generation: 0, status: "signedOut", user: null as { id: string } | null, isGuest: false };
+  const module = load("context/app-data.tsx", {
+    react: state.react, "@/services/api": {},
+    "./auth": { useAuth: () => auth }, "./local-state": {},
+  });
+  const key = () => (module.AppDataProvider({ children: null }) as React.ReactElement).key;
+  const anonymous = key();
+  for (const status of ["authenticating", "verificationRequired", "signedOut", "restoring", "error"]) {
+    auth = { ...auth, status, generation: auth.generation + 1 };
+    assert.equal(key(), anonymous, `${status} must preserve the public navigator`);
+  }
+  auth = { ...auth, user: { id: "first" }, status: "authenticated" };
+  const firstAccount = key(); assert.notEqual(firstAccount, anonymous);
+  auth = { ...auth, generation: auth.generation + 1 };
+  assert.notEqual(key(), firstAccount);
+  auth = { ...auth, user: { id: "second" } };
+  assert.notEqual(key(), firstAccount);
+  auth = { ...auth, user: null, status: "guest", isGuest: true };
+  assert.notEqual(key(), anonymous);
 });
 
 test("profile keeps Rename and Settings without account roadmap placeholders", async () => {

@@ -78,7 +78,7 @@ async function providerRequest(input, init = {}) {
   if (path === "/recover" || path === "/otp" || path === "/resend") {
     if (path === "/otp") assert.equal(body.create_user, false);
     const identity = [...identities.values()].find(user => user.email === body.email);
-    if (identity) sendCode(body.email, path === "/recover" ? "recovery" : path === "/resend" ? "signup" : "email");
+    if (identity) sendCode(body.email, path === "/recover" ? "recovery" : path === "/resend" ? "signup" : "magiclink");
     return json({});
   }
   if (path === "/verify") {
@@ -169,7 +169,7 @@ async function request(path, body, token, method = "POST") {
 async function registered(email = "new@example.test") {
   const pending = await request("/register", { email, password: "original password", name: "Name" });
   assert.equal(pending.status, 202);
-  const result = await request("/otp/verify", { email, code: codes.get(`${email}:signup`), purpose: "registration" });
+  const result = await request("/otp/verify", { email, code: codes.get(`${email}:signup`), type: "signup" });
   assert.equal(result.status, 200);
   return result.body;
 }
@@ -189,10 +189,10 @@ test("registration requires the emailed OTP, provisions once, and preserves the 
   assert.equal(pending.body.status, "verification_required");
   assert.equal(pending.body.accessToken, undefined);
   assert.equal(users.size, 1);
-  assert.equal((await request("/otp/verify", { email: "new@example.test", code: "00000000", purpose: "registration" })).status, 400);
+  assert.equal((await request("/otp/verify", { email: "new@example.test", code: "00000000", type: "signup" })).status, 400);
   const code = "00123456";
   codes.set("new@example.test:signup", code);
-  const verified = await request("/otp/verify", { email: "new@example.test", code, purpose: "registration" });
+  const verified = await request("/otp/verify", { email: "new@example.test", code, type: "signup" });
   assert.equal(verified.status, 200);
   assert.equal(users.size, 2);
   const user = users.get(verified.body.user.id);
@@ -200,7 +200,7 @@ test("registration requires the emailed OTP, provisions once, and preserves the 
   assert.ok(user.supabaseUserId);
   assert.ok(user.emailVerifiedAt instanceof Date);
   assert.equal(await (await import("../src/lib/password.ts")).verifyPassword("original password", user.password), false);
-  assert.equal((await request("/otp/verify", { email: user.email, code, purpose: "registration" })).status, 400);
+  assert.equal((await request("/otp/verify", { email: user.email, code, type: "signup" })).status, 400);
   assert.deepEqual(users.get(preservedId), preserved);
   assert.equal((await request("/api/users/me", undefined, verified.body.accessToken, "GET")).body.id, user.id);
 });
@@ -226,8 +226,8 @@ test("password reset consumes the recovery code, rejects old password and revoke
 });
 test("OTP endpoints reject incorrect lengths, nondigits and numeric values before contacting Supabase", async () => {
   const bodies = [
-    ["/otp/verify", { email: "person@example.test", purpose: "registration" }],
-    ["/otp/verify", { email: "person@example.test", purpose: "login" }],
+    ["/otp/verify", { email: "person@example.test", type: "signup" }],
+    ["/otp/verify", { email: "person@example.test", type: "magiclink" }],
     ["/reset-password", { email: "person@example.test", newPassword: "replacement password" }],
   ];
   for (const code of ["123456", "1234567", "123456789", "1234abcd", " 12345678", 12345678]) {
@@ -248,13 +248,69 @@ test("optional passwordless login never enrolls unknown or unmigrated accounts",
     assert.equal(result.body.purpose, "login");
   }
   assert.equal(upstreamCalls.filter(call => call.path === "/otp").length, 1);
-  const invalidKnown = await request("/otp/verify", { email: account.user.email, code: "00000000", purpose: "login" });
-  const invalidUnknown = await request("/otp/verify", { email: "unknown@example.test", code: "00000000", purpose: "login" });
+  const invalidKnown = await request("/otp/verify", { email: account.user.email, code: "00000000", type: "magiclink" });
+  const invalidUnknown = await request("/otp/verify", { email: "unknown@example.test", code: "00000000", type: "magiclink" });
   assert.deepEqual(invalidKnown.body, invalidUnknown.body);
-  const code = codes.get(`${account.user.email}:email`);
-  const login = await request("/otp/verify", { email: account.user.email, code, purpose: "login" });
+  const code = codes.get(`${account.user.email}:magiclink`);
+  const login = await request("/otp/verify", { email: account.user.email, code, type: "magiclink" });
   assert.equal(login.status, 200);
   assert.equal(login.body.user.id, account.user.id);
+  assert.equal(upstreamCalls.filter(call => call.path === "/verify").at(-1).body.type, "magiclink");
+});
+
+test("wrong OTP types return a clear 400 and do not consume the correctly typed code", async () => {
+  const email = "typed@example.test";
+  await request("/register", { email, password: "original password" });
+  const signup = codes.get(`${email}:signup`);
+  const wrong = await request("/otp/verify", { email, code: signup, type: "magiclink" });
+  assert.equal(wrong.status, 400);
+  assert.deepEqual(wrong.body, { code: "INVALID_CODE", error: "Invalid or expired code. Request a new one." });
+  const correct = await request("/otp/verify", { email, code: signup, type: "signup" });
+  assert.equal(correct.status, 200);
+  assert.equal(upstreamCalls.filter(call => call.path === "/verify").at(-1).body.type, "signup");
+  await request("/otp/request", { email });
+  const login = codes.get(`${email}:magiclink`);
+  const wrongSignup = await request("/otp/verify", { email, code: login, type: "signup" });
+  assert.equal(wrongSignup.status, 400); assert.deepEqual(wrongSignup.body, wrong.body);
+  assert.equal((await request("/otp/verify", { email, code: login, type: "magiclink" })).status, 200);
+  const conflicting = await request("/otp/verify", { email, code: login, type: "signup", purpose: "login" });
+  assert.equal(conflicting.status, 400); assert.deepEqual(conflicting.body, wrong.body);
+});
+
+test("resend dispatches signup, magiclink and recovery through their original provider flows", async () => {
+  const email = "resend@example.test";
+  await request("/register", { email, password: "original password" });
+  const oldCode = codes.get(`${email}:signup`);
+  assert.equal((await request("/otp/resend", { email, type: "signup" })).status, 202);
+  assert.equal(upstreamCalls.at(-1).path, "/resend");
+  assert.deepEqual(upstreamCalls.at(-1).body, { email, type: "signup" });
+  assert.equal((await request("/otp/verify", { email, code: oldCode, type: "signup" })).status, 400);
+  assert.equal((await request("/otp/verify", { email, code: codes.get(`${email}:signup`), type: "signup" })).status, 200);
+  assert.equal((await request("/otp/resend", { email, type: "magiclink" })).status, 202);
+  assert.equal(upstreamCalls.at(-1).path, "/otp");
+  assert.equal(upstreamCalls.at(-1).body.create_user, false);
+  assert.equal((await request("/otp/verify", { email, code: codes.get(`${email}:magiclink`), type: "magiclink" })).status, 200);
+  assert.equal((await request("/otp/resend", { email, type: "recovery" })).status, 202);
+  assert.equal(upstreamCalls.at(-1).path, "/recover");
+  assert.equal((await request("/reset-password", { email, code: codes.get(`${email}:recovery`), newPassword: "replacement password" })).status, 204);
+});
+
+test("existing purpose-only clients retain their OTP verify and resend contracts", async () => {
+  const email = "compatible@example.test";
+  await request("/register", { email, password: "original password" });
+  assert.equal((await request("/otp/resend", { email, purpose: "registration" })).status, 202);
+  assert.equal((await request("/otp/verify", { email, code: codes.get(`${email}:signup`), purpose: "registration" })).status, 200);
+  await request("/otp/request", { email });
+  assert.equal((await request("/otp/verify", { email, code: codes.get(`${email}:magiclink`), purpose: "login" })).status, 200);
+});
+
+test("the OTP verification endpoint forwards an explicit recovery type unchanged", async () => {
+  const account = await registered();
+  await request("/forgot-password", { email: account.user.email });
+  const verified = await request("/otp/verify", { email: account.user.email, code: codes.get(`${account.user.email}:recovery`), type: "recovery" });
+  assert.equal(verified.status, 200);
+  assert.equal(verified.body.user.id, account.user.id);
+  assert.equal(upstreamCalls.filter(call => call.path === "/verify").at(-1).body.type, "recovery");
 });
 test("logout invalidates JWT immediately; refresh keeps the existing contract and database roles win", async () => {
   const account = await registered();
@@ -285,7 +341,7 @@ test("identity collisions never link by matching email or update a preserved Use
   const identity = { id: randomUUID(), email: before.email, emailConfirmedAt: new Date(), password: "password", name: null, bannedUntil: null };
   identities.set(identity.id, identity);
   sendCode(before.email, "signup");
-  const result = await request("/otp/verify", { email: before.email, code: codes.get(`${before.email}:signup`), purpose: "registration" });
+  const result = await request("/otp/verify", { email: before.email, code: codes.get(`${before.email}:signup`), type: "signup" });
   assert.equal(result.status, 409);
   assert.equal(sessions.size, 0);
   assert.deepEqual(users.get(preservedId), before);
@@ -338,7 +394,7 @@ test("native coordinator and API complete registration, passwordless login and p
   const id = coordinator.snapshot().user.id;
   await coordinator.logout();
   await coordinator.requestLoginOtp({ email: "native@example.test" });
-  await coordinator.verifyOtp(codes.get("native@example.test:email"));
+  await coordinator.verifyOtp(codes.get("native@example.test:magiclink"));
   assert.equal(coordinator.snapshot().user.id, id);
   await coordinator.logout();
   await api.forgotPassword({ email: "native@example.test" });

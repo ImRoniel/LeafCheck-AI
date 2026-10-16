@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import * as React from 'react';
 import ts from 'typescript';
+import * as emailOtp from '../services/email-otp';
 const requireModule = createRequire(import.meta.url);
 type NodeProps = { children?: React.ReactNode; guard?: boolean; name?: string; title?: string; screenOptions?: { animation: string }; href?: string };
 type Element = React.ReactElement<NodeProps>;
@@ -15,6 +16,7 @@ export function loadComponent(path: string, overrides: Record<string, unknown>, 
   runInNewContext(ts.transpileModule(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     exports, setTimeout, clearTimeout, ...globals, require: (name: string): unknown => {
       if (name in overrides) return overrides[name];
+      if (name === '@/services/email-otp') return emailOtp;
       if (name === "@react-native-async-storage/async-storage") return { __esModule: true, default: { getItem: async () => "true" } };
       if (name === "expo-secure-store") return { getItemAsync: async () => "access-fixture" };
       if (name === 'react') return { ...React, useState: () => [true, () => {}], useRef: (current: unknown) => ({ current }), useEffect: (effect: () => void) => effects.push(effect) };

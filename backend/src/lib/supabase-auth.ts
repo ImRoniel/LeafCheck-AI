@@ -2,17 +2,18 @@ import { HttpError } from "./http.js";
 import { prismaPg } from "./prisma-pg.js";
 import { applicationUser, mappedEmail } from "./supabase-identity.js";
 import { authenticatedProviderSession, providerSession, revokeProviderSession } from "./supabase-session.js";
-import { object, ProviderError, supabaseAdmin, supabasePublic } from "./supabase-client.js";
+import { object, ProviderError, supabaseAdmin, supabasePublic, type EmailOtpType } from "./supabase-client.js";
 
 export type OtpPurpose = "registration" | "login";
+export const invalidOtp = () => new HttpError(400, "INVALID_CODE", "Invalid or expired code. Request a new one.");
 export const challenge = (email: string, purpose: OtpPurpose) => ({
   status: "verification_required" as const, email, purpose, resendAfter: 60,
 });
-async function verifyEmailCode(email: string, code: string, type: "signup" | "email" | "recovery") {
+async function verifyEmailCode(email: string, code: string, type: EmailOtpType) {
   try { return await supabasePublic.verify(email, code, type); }
   catch (error) {
     if (error instanceof ProviderError && error.status === 400)
-      throw new HttpError(400, "INVALID_CODE", "The code is invalid or expired.");
+      throw invalidOtp();
     throw error;
   }
 }
@@ -61,16 +62,16 @@ export async function requestLoginOtp(email: string) {
   if (await mappedEmail(email)) await supabasePublic.requestLoginCode(email);
   return challenge(email, "login");
 }
-export async function resendOtp(email: string, purpose: OtpPurpose) {
-  if (purpose === "login") return requestLoginOtp(email);
+export async function resendOtp(email: string, type: EmailOtpType) {
+  if (type === "magiclink") return requestLoginOtp(email);
+  if (type === "recovery") return forgotPassword(email);
   // A legacy application account is never enrolled by resend.
   if (!await prismaPg.user.findUnique({ where: { email } })) await supabasePublic.resendRegistration(email);
-  return challenge(email, purpose);
+  return challenge(email, "registration");
 }
-export async function verifyOtp(email: string, code: string, purpose: OtpPurpose) {
-  if (purpose === "login" && !await mappedEmail(email))
-    throw new HttpError(400, "INVALID_CODE", "The code is invalid or expired.");
-  return complete(await verifyEmailCode(email, code, purpose === "registration" ? "signup" : "email"), purpose === "registration");
+export async function verifyOtp(email: string, code: string, type: EmailOtpType) {
+  if (type !== "signup" && !await mappedEmail(email)) throw invalidOtp();
+  return complete(await verifyEmailCode(email, code, type), type === "signup");
 }
 export async function forgotPassword(email: string) {
   if (await mappedEmail(email)) await supabasePublic.recover(email);

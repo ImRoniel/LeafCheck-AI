@@ -1,7 +1,8 @@
 import type { AIDiagnosisRequest, HealthStatus, ScanRequest } from "../types";
 import { ApiError, asApiError } from "./errors";
 import { platformOS } from "./platform";
-import { parseChallenge, parseRegistration, parseTokens, parseUser, type PendingVerification, type SessionBridge } from "./session";
+import { parseChallenge, parseRegistration, parseTokens, parseUser, type SessionBridge } from "./session";
+import type { EmailOtpType } from "./email-otp";
 import * as v from "./validators";
 export { ApiError } from "./errors";
 export interface RequestOptions {
@@ -280,9 +281,9 @@ export function createApiClient(
       return { emailOtp: value.emailOtp, passwordRecovery: value.passwordRecovery };
     }, options),
     requestLoginOtp: (body: { email: string }) => request("/api/auth/otp/request", parseChallenge, {}, "POST", body),
-    resendOtp: (body: { email: string; purpose: PendingVerification["purpose"] }) =>
+    resendOtp: (body: { email: string; type: EmailOtpType }) =>
       request("/api/auth/otp/resend", parseChallenge, {}, "POST", body),
-    verifyOtp: (body: { email: string; code: string; purpose: PendingVerification["purpose"] }) =>
+    verifyOtp: (body: { email: string; code: string; type: EmailOtpType }) =>
       request("/api/auth/otp/verify", parseTokens, {}, "POST", body),
     forgotPassword: (body: { email: string }) => request("/api/auth/forgot-password", () => undefined, {}, "POST", body),
     resetPassword: (body: { email: string; code: string; newPassword: string }) =>

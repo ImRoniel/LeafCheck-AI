@@ -47,6 +47,7 @@ function useSession() {
     verifyOtp: session.verifyOtp,
     resendOtp: session.resendOtp,
     cancelVerification: session.cancelVerification,
+    resumeVerification: session.resumeVerification,
     logout: session.logout,
     retryRestore: session.restore,
     enterGuest: session.enterGuest,

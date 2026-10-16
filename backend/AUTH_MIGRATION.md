@@ -106,8 +106,8 @@ all auth responses are `Cache-Control: no-store`.
 | POST `/api/auth/forgot-password` | `{email}` | Generic 202 `{message,resendAfter:60}` |
 | POST `/api/auth/reset-password` | `{email,code,newPassword}` | Empty 204; recovery credentials never returned; all provider sessions revoked |
 | POST `/api/auth/otp/request` | `{email}` | 202 login challenge; never creates a provider user |
-| POST `/api/auth/otp/resend` | `{email,purpose}` | 202 challenge |
-| POST `/api/auth/otp/verify` | `{email,code,purpose}` | 200 existing token envelope + safe application user |
+| POST `/api/auth/otp/resend` | `{email,type}` | 202 challenge (generic recovery message for recovery) |
+| POST `/api/auth/otp/verify` | `{email,code,type}` | 200 existing token envelope + safe application user |
 
 A challenge is `{status:"verification_required",email,purpose,resendAfter:60}`;
 `purpose` is `registration` or `login`. Codes are eight-digit strings (leading
@@ -118,6 +118,23 @@ accounts. These new POST routes return 503 while the legacy switch is active;
 capabilities hides the corresponding login controls. Supabase registration's
 verification challenge is the deliberate provider-specific response; legacy
 registration still returns its original 201 session.
+
+OTP requests carry the exact Supabase type: `signup` for registration, `magiclink`
+for email-code login, and `recovery` for recovery. The backend forwards it without
+substituting a different type. Existing purpose-only clients remain supported;
+conflicting `type` and `purpose` values are rejected. Register, password login,
+refresh, logout and password reset contracts are unchanged.
+
+Registration and email-code login navigate from the pending verification state,
+with email, type and display message in native route parameters. The public
+navigator stays mounted during authentication transitions; account and guest
+isolation still remount private data. Successful verification opens Home only
+after the session and application profile are loaded. A wrong or expired code
+returns `400 INVALID_CODE` with “Invalid or expired code. Request a new one.”
+Resend retains the original type, uses a minimum 60-second deadline in memory,
+and keeps that deadline across screen remounts. Supabase also enforces its email
+rate limits. Password recovery continues through the existing reset-password
+screen and endpoint, with `type=recovery` on its native route.
 
 Expo holds access tokens only in the coordinator's memory. SecureStore holds
 only the refresh token. Old `access_token` entries are deleted without reading

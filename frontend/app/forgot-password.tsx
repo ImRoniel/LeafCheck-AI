@@ -21,7 +21,7 @@ export default function ForgotPassword() {
     setError(null);
     try {
       await api.forgotPassword({ email: address });
-      router.push({ pathname: "/reset-password", params: { email: address } });
+      router.push({ pathname: "/reset-password", params: { email: address, type: "recovery" } });
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to send a recovery code"); }
     finally { submitting.current = false; setBusy(false); }
   };

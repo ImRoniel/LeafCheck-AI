@@ -12,6 +12,7 @@ export interface ProviderTokens {
   refreshToken: string;
   expiresIn: number;
 }
+export type EmailOtpType = "signup" | "magiclink" | "recovery";
 export class ProviderError extends HttpError {
   constructor(status: number) {
     super(status === 429 ? 429 : status >= 500 ? 503 : 400,
@@ -77,7 +78,7 @@ export const supabasePublic = {
   requestLoginCode: (email: string) => request("/otp", "POST", { email, create_user: false }),
   resendRegistration: (email: string) => request("/resend", "POST", { email, type: "signup" }),
   recover: (email: string) => request("/recover", "POST", { email }),
-  verify: (email: string, code: string, type: "signup" | "email" | "recovery") =>
+  verify: (email: string, code: string, type: EmailOtpType) =>
     request("/verify", "POST", { email, token: code, type }).then(providerTokens),
   user: (token: string) => request("/user", "GET", undefined, token).then(providerUser),
   updatePassword: (token: string, password: string) => request("/user", "PUT", { password }, token),
