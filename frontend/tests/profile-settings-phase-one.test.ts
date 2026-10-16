@@ -148,9 +148,10 @@ function harness(file: string, guest = false, exportName = "default") {
   };
 }
 
-test("Profile exposes read-only email/password and roadmap rows while retaining sign out and terms", async t => {
+test("Profile omits placeholder account rows while retaining account email, sign out and terms", async t => {
   const h = harness("app/profile.tsx"); t.after(h.dispose);
-  assert.match(h.text, /roniel@example.test/); assert.match(h.text, /Email and password changes coming soon/);
+  assert.match(h.text, /roniel@example.test/);
+  assert.doesNotMatch(h.text, /ACCOUNT|[Cc]oming soon|not available yet|Password|Avatar sync|Account deletion|Sign out everywhere/);
   for (const label of ["Device settings", "Edit Email", "Edit Password", "Email", "Password", "Avatar sync", "Account deletion", "Sign out everywhere"]) {
     assert.equal(h.button(label), undefined);
   }
@@ -179,11 +180,13 @@ test("Profile header retains Back and its gear opens Settings for both account a
   }
 });
 
-test("Settings routes working rows and sensor modal actions while roadmap/About remain informational", t => {
+test("Settings routes working rows and sensor modal actions without roadmap placeholders", t => {
   const h = harness("app/settings.tsx"); t.after(h.dispose);
-  for (const label of ["Notifications", "Appearance", "Temperature units", "Help & Support", "Privacy policy", "About LeafCheck AI"]) {
-    assert.match(h.text, new RegExp(label)); assert.equal(h.button(label), undefined);
+  assert.doesNotMatch(h.text, /[Cc]oming soon|not available yet/);
+  for (const label of ["Notifications", "Appearance", "Temperature units", "Help & Support", "Privacy policy"]) {
+    assert.ok(!h.text.includes(label)); assert.equal(h.button(label), undefined);
   }
+  assert.match(h.text, /About LeafCheck AI/); assert.equal(h.button("About LeafCheck AI"), undefined);
   assert.match(h.text, /Version 1.0.0/); assert.doesNotMatch(h.text, /Save local mapping|Plant ID:/);
   h.press("Pair a new sensor"); h.press("AI & sensor limitations");
   assert.deepEqual(h.routes, ["/device-connection/scanner", "/terms"]);

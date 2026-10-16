@@ -24,13 +24,6 @@ export default function Settings() {
       <SettingsSection title="ABOUT">
         <SettingsRow label="About LeafCheck AI" detail={`Version ${Constants.expoConfig?.version ?? "1.0.0"}`} icon="leaf-outline" />
       </SettingsSection>
-      {authenticated && <SettingsSection title="Coming soon">
-        <SettingsRow label="Notifications" icon="notifications-outline" muted />
-        <SettingsRow label="Appearance" icon="color-palette-outline" muted />
-        <SettingsRow label="Temperature units" icon="thermometer-outline" muted />
-        <SettingsRow label="Help & Support" icon="help-circle-outline" muted />
-        <SettingsRow label="Privacy policy" icon="shield-checkmark-outline" muted />
-      </SettingsSection>}
     </Screen>
     {authenticated && sensorSheet && <DashboardSensorStatusSheet onClose={() => setSensorSheet(false)}
       onOpenPlant={id => { setSensorSheet(false); router.push({ pathname: "/plant-profile", params: { id } }); }}

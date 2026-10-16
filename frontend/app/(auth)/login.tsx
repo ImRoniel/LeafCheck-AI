@@ -61,11 +61,10 @@ export default function Login() {
           onSubmitEditing={() => void submit()}
         />
         <AuthButton
-          title={busy ? "Signing in…" : "Sign in"}
-          disabled={busy}
+          title={busy ? "Signing in..." : "Sign in"}
+          loading={busy}
           onPress={() => void submit()}
         />
-
       </View>
       <View style={authStyles.footer}>
         <Text style={authStyles.footerText}>New to LeafCheck?</Text>

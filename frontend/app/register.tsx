@@ -138,8 +138,8 @@ export default function Register() {
         <Text style={authStyles.link}>Read terms and limitations</Text>
       </Pressable>
       <AuthButton
-        title={busy ? "Creating account…" : "Create account"}
-        disabled={busy}
+        title={busy ? "Creating account..." : "Create account"}
+        loading={busy}
         onPress={() => void handleRegister()}
       />
       <View style={authStyles.footer}>

@@ -196,7 +196,7 @@ test("login requires authentication and offers no token-free Dashboard bypass", 
   assert.ok(!nodes.some(node => typeof node.props.children === "string" && /guest mode/i.test(node.props.children)));
 });
 
-test("profile keeps Rename and the read-only account notice, with Settings accessible from its header", async () => {
+test("profile keeps Rename and Settings without account roadmap placeholders", async () => {
   const state = hooks();
   const routes: string[] = [];
   const names: string[] = [];
@@ -217,7 +217,7 @@ test("profile keeps Rename and the read-only account notice, with Settings acces
   const settings = render().find(node => typeof node.type === "function" && node.type.name === "SettingsButton");
   assert.ok(settings); invoke(settings).props.onPress!();
   assert.deepEqual(routes, ["/settings"]);
-  assert.ok(render().some(node => node.props.children === "Email and password changes coming soon."));
+  assert.ok(!render().some(node => typeof node.props.children === "string" && /coming soon|not available yet/i.test(node.props.children)));
   render().find(node => node.props.accessibilityLabel === "Edit profile name")!.props.onPress!();
   assert.ok(render().some(node => node.props.accessibilityLabel === "Profile name"));
   render().find(node => node.props.accessibilityLabel === "Profile name")!.props.onChangeText!("New Name");

@@ -1,7 +1,5 @@
 import { Action, Notice, ui } from "@/components/screen";
 import { ProfilePhotoCrop } from "@/components/profile-photo-crop";
-import { SettingsSection } from "@/components/SettingsSection";
-import { SettingsRow } from "@/components/SettingsRow";
 import { SettingsButton } from "@/components/settings-button";
 import { useAuth } from "@/context/auth";
 import { useProfile } from "@/context/profile";
@@ -70,18 +68,6 @@ export default function Profile() {
           <Text style={styles.name}>{profile.name}</Text><Ionicons name="pencil-outline" size={17} color="#555" />
         </Pressable>
         <Text style={styles.email}>{profile.email || "Local session · On this device"}</Text>
-        <View style={styles.account}>
-          <SettingsSection title="ACCOUNT">
-            <SettingsRow label="Email" detail={profile.email || "No email for local profiles"} icon="mail-outline" />
-            <SettingsRow label="Password" detail={auth.isLocal ? "No password for local profiles" : "Password set"} icon="lock-closed-outline" />
-          </SettingsSection>
-          <Text style={styles.hint}>Email and password changes coming soon.</Text>
-          {!auth.isLocal && <SettingsSection title="Coming soon">
-            <SettingsRow label="Avatar sync" muted />
-            <SettingsRow label="Account deletion" muted />
-            <SettingsRow label="Sign out everywhere" muted />
-          </SettingsSection>}
-        </View>
         <View style={styles.actions}>
           {!!(notice || auth.error) && <Notice>{notice || auth.error}</Notice>}
           {auth.isLocal ? <>
@@ -129,9 +115,9 @@ const styles = StyleSheet.create({
   plus: { position: "absolute", bottom: 0, right: 0, width: 25, height: 25, borderRadius: 13, backgroundColor: "#20A64A", alignItems: "center", justifyContent: "center" },
   nameRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 18 },
   name: { fontSize: 22, fontWeight: "700", color: "#222", flexShrink: 1 }, email: { textAlign: "center", color: "#777", marginTop: 6 },
-  account: { gap: 12, marginTop: 28 }, actions: { gap: 12, marginTop: 24 },
+  actions: { gap: 12, marginTop: 24 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", padding: 24 },
   modal: { width: "100%", maxWidth: 360, backgroundColor: "#fff", borderRadius: 20, padding: 20, gap: 16 },
-  modalTitle: { fontSize: 20, fontWeight: "700", color: "#222" }, hint: { color: "#66766B", fontSize: 12, lineHeight: 18 },
+  modalTitle: { fontSize: 20, fontWeight: "700", color: "#222" },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 12 }, modalButton: { padding: 12 }, save: { color: "#20A64A", fontWeight: "700" },
 });

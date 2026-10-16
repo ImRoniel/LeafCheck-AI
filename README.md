@@ -120,6 +120,12 @@ Leaf-Check-AI intelligently adjusts its threshold alerts based on standard indoo
 
 ---
 
+## Roadmap
+
+Multi-factor authentication via OTP is planned for Phase 2.
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
