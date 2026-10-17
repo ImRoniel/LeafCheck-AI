@@ -19,10 +19,12 @@ export function matches(row, where = {}) {
 }
 
 function project(row, select, resolveUser) {
+  if (!row) return null;
   if (!select) return structuredClone(row);
   return Object.fromEntries(Object.entries(select).filter(([, value]) => value).map(([key, value]) =>
     [key, key === "_count" ? { plants: 0, devices: 0, careTasks: 0, sessions: 0 }
       : key === "user" && resolveUser ? project(resolveUser(row.userId), value.select)
+      : key === "actor" && resolveUser ? project(resolveUser(row.actorId), value.select)
       : structuredClone(row[key])]));
 }
 

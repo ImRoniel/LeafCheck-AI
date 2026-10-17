@@ -56,11 +56,11 @@ export function AdminOtpPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-12">
-      <section aria-labelledby="otp-heading" className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+      <section aria-labelledby="otp-heading" className="w-full max-w-md rounded-2xl border border-edge bg-panel p-8 shadow-sm">
         <span aria-hidden="true" className="mb-6 flex size-11 items-center justify-center rounded-xl bg-emerald-800 text-sm font-bold text-white">LC</span>
-        <p className="text-sm font-semibold text-emerald-800">SuperAdmin verification</p>
+        <p className="text-sm font-semibold text-brand">SuperAdmin verification</p>
         <h1 id="otp-heading" className="mt-3 text-2xl font-semibold tracking-tight">Check your email</h1>
-        <p id="otp-instructions" className="mt-3 text-sm leading-6 text-slate-600">Enter the 8-digit code sent to your email.</p>
+        <p id="otp-instructions" className="mt-3 text-sm leading-6 text-secondary">Enter the 8-digit code sent to your email.</p>
         <p className="mt-1 break-all text-sm font-medium">{pending.maskedEmail}</p>
 
         <form onSubmit={handleSubmit} aria-busy={busy} className="mt-7 space-y-5">
@@ -70,13 +70,13 @@ export function AdminOtpPage() {
               autoFocus required minLength={8} maxLength={8} pattern="[0-9]{8}" value={code}
               onChange={event => setCode(event.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
               disabled={busy || expiresIn === 0} aria-describedby="otp-instructions otp-expiry" aria-invalid={!!error}
-              className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-center font-mono text-2xl tracking-[0.25em] disabled:bg-slate-50" />
-            <p id="otp-expiry" className={`mt-2 text-xs ${expiresIn === 0 ? 'text-amber-800' : 'text-slate-500'}`}>
+              className="mt-2 w-full rounded-lg border border-edge px-3 py-3 text-center font-mono text-2xl tracking-[0.25em] disabled:bg-canvas" />
+            <p id="otp-expiry" className={`mt-2 text-xs ${expiresIn === 0 ? 'text-amber-800' : 'text-subtle'}`}>
               {expiresIn > 0 ? `Code expires in ${Math.floor(expiresIn / 60)}:${String(expiresIn % 60).padStart(2, '0')}.` : 'This code has expired. Cancel and sign in again.'}
             </p>
           </div>
-          {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-          {notice && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">{notice}</p>}
+          {error && <p role="alert" className="notice-error">{error}</p>}
+          {notice && <p role="status" className="notice-warning">{notice}</p>}
           <button type="submit" disabled={busy || code.length !== 8 || expiresIn === 0 || retryIn > 0} className="button-primary w-full">
             {action === 'verify' ? 'Verifying...' : 'Verify Code'}
           </button>
@@ -86,11 +86,11 @@ export function AdminOtpPage() {
           <button type="button" onClick={() => { void run('resend') }} disabled={busy || resendIn > 0 || expiresIn === 0} className="button-secondary">
             {action === 'resend' ? 'Sending...' : resendIn > 0 ? `Resend Code (${resendIn}s)` : 'Resend Code'}
           </button>
-          <button type="button" onClick={() => { void run('cancel') }} disabled={busy} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+          <button type="button" onClick={() => { void run('cancel') }} disabled={busy} className="rounded-lg px-3 py-2 text-sm font-medium text-secondary hover:bg-panel-muted disabled:opacity-50">
             {action === 'cancel' ? 'Cancelling...' : 'Cancel'}
           </button>
         </div>
-        <p className="mt-6 border-t border-slate-100 pt-5 text-xs leading-5 text-slate-500">Your session starts only after verification. Keep this tab open while you retrieve your code.</p>
+        <p className="mt-6 border-t border-edge pt-5 text-xs leading-5 text-subtle">Your session starts only after verification. Keep this tab open while you retrieve your code.</p>
       </section>
     </main>
   )

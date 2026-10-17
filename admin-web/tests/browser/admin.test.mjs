@@ -3,6 +3,8 @@ import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 
 let vite, browser, origin
 const admin = { id: 'admin-1', email: 'admin@example.test', name: 'Platform Admin', role: 'ADMIN' }
@@ -11,8 +13,8 @@ const member = { id: 'member-1', email: 'member@example.test', name: 'Member', r
 const sensor = { id: 'sensor-1', macAddress: 'AA:BB:CC:DD:EE:FF', name: 'Office sensor',
   plants: [{ id: 'plant-1', name: 'Monstera' }], connectionStatus: 'ONLINE' }
 const reply = (body, status = 200, headers = {}) => ({ status, body: JSON.stringify(body), contentType: 'application/json', headers })
-const list = (data, page = 1, total = data.length, meta = {}) => ({ data,
-  pagination: { page, pageSize: 25, total, totalPages: Math.ceil(total / 25) }, meta })
+const list = (data, page = 1, total = data.length, meta = {}, pageSize = 25) => ({ data,
+  pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }, meta })
 
 before(async () => {
   process.env.VITE_API_URL = '/api'
@@ -34,8 +36,9 @@ async function app(t, options = {}) {
   const requests = []
   const actor = options.actor ?? admin
   const state = { signedIn: options.restored ?? false, challenges: 0,
-    users: options.users ?? [{ id: admin.id, name: admin.name, emailMasked: 'a***@example.test', role: 'ADMIN', isActive: true },
-      { id: member.id, name: member.name, emailMasked: 'm***@example.test', role: 'USER', isActive: true }] }
+    users: options.users ?? [{ id: admin.id, name: admin.name, email: admin.email, emailMasked: 'a***@example.test', role: 'ADMIN', isActive: true },
+      { id: member.id, name: member.name, email: member.email, emailMasked: 'm***@example.test', role: 'USER', isActive: true }] }
+  const device = { ...sensor, lastReadingAt: new Date(Date.now() - 120_000).toISOString(), readingError: false }
   let pending
   page.on('pageerror', error => errors.push(error.message))
   await page.clock.install()
@@ -89,8 +92,12 @@ async function app(t, options = {}) {
         assert.equal(state.signedIn, true, 'admin data must not be fetched before authentication')
         assert.equal(entry.headers.authorization, 'Bearer verified-memory-jwt')
       }
+      if (path === '/admin/stats') return await route.fulfill(reply({
+        data: { totalUsers: state.users.length, totalActiveDevices: 1, totalPlants: 23, totalAiScans: 48 },
+        meta: { asOf: new Date().toISOString(), telemetryDegraded: false, freshnessWindowSeconds: 1800 },
+      }))
       if (path === '/admin/users' && entry.method === 'POST') {
-        const user = { id: 'created-user', name: entry.body.name ?? null, emailMasked: 'n***@example.test',
+        const user = { id: 'created-user', name: entry.body.name ?? null, email: entry.body.email, emailMasked: 'n***@example.test',
           role: entry.body.role, isActive: true }
         state.users.unshift(user)
         return await route.fulfill(reply({ data: user }, 201))
@@ -98,24 +105,34 @@ async function app(t, options = {}) {
       if (path.startsWith('/admin/users/') && entry.method === 'PATCH') {
         const user = state.users.find(row => row.id === path.split('/').at(-1))
         assert.ok(user)
-        user.isActive = entry.body.isActive
+        for (const key of ['name', 'role', 'isActive']) if (key in entry.body) user[key] = entry.body[key]
         return await route.fulfill(reply({ data: user }))
+      }
+      if (path.startsWith('/admin/users/') && entry.method === 'DELETE') {
+        state.users = state.users.filter(row => row.id !== path.split('/').at(-1))
+        return await route.fulfill({ status: 204 })
       }
       if (path === '/admin/users') {
         assert.equal(actor.role, 'ADMIN', 'LEAD_DEV must never request the users endpoint')
         const pageNumber = Number(entry.query.get('page'))
         const query = entry.query.get('q')?.toLowerCase() ?? ''
         const users = state.users.filter(row => `${row.name} ${row.emailMasked}`.toLowerCase().includes(query))
-        return await route.fulfill(reply(list(users.slice((pageNumber - 1) * 25, pageNumber * 25), pageNumber, users.length)))
+        const rows = users.slice((pageNumber - 1) * 25, pageNumber * 25).map(({ email, ...row }) => ({
+          ...row, ...(entry.query.get('revealEmails') === 'true' ? { email: email ?? row.id + '@example.test' } : {}),
+        }))
+        return await route.fulfill(reply(list(rows, pageNumber, users.length)))
       }
-      if (path === '/admin/devices') return await route.fulfill(reply(list([sensor])))
+      if (path === '/admin/devices') return await route.fulfill(reply(list([device])))
       if (path === '/admin/audit') {
         assert.equal(actor.role, 'ADMIN', 'LEAD_DEV must never request audit logs')
-        return await route.fulfill(reply(list([
-          { id: 'log-1', actorId: admin.id, targetId: member.id, action: 'USER_UPDATED', createdAt: new Date().toISOString(), metadata: {} },
-          { id: 'log-2', actorId: admin.id, targetId: admin.id, action: 'ADMIN_OTP_FAILED', createdAt: new Date().toISOString(), metadata: {} },
-          { id: 'log-3', actorId: null, targetId: null, action: 'USER_DELETE_REQUESTED', createdAt: new Date().toISOString(), metadata: { actorId: 'deleted-admin' } },
-        ])))
+        const logs = options.auditEntries ?? [
+          { id: 'log-1', actorId: admin.id, actorEmail: admin.email, targetId: member.id, targetEmail: member.email, action: 'USER_UPDATED', createdAt: new Date().toISOString(), metadata: {} },
+          { id: 'log-2', actorId: admin.id, actorEmail: admin.email, targetId: admin.id, targetEmail: admin.email, action: 'ADMIN_OTP_FAILED', createdAt: new Date().toISOString(), metadata: {} },
+          { id: 'log-3', actorId: null, actorEmail: null, targetId: null, targetEmail: null, action: 'USER_DELETE_REQUESTED', createdAt: new Date().toISOString(), metadata: { actorId: 'deleted-admin' } },
+        ]
+        const pageSize = Number(entry.query.get('pageSize') ?? 25)
+        const pageNumber = Number(entry.query.get('page') ?? 1)
+        return await route.fulfill(reply(list(logs.slice((pageNumber - 1) * pageSize, pageNumber * pageSize), pageNumber, logs.length, {}, pageSize)))
       }
       throw new Error(`Unexpected API request: ${entry.method} ${path}`)
     } catch (error) {
@@ -141,6 +158,13 @@ async function signIn(page, duplicate = false) {
 
 async function memoryToken(page) {
   return page.evaluate(async () => (await import('/src/lib/api.ts')).getAccessToken())
+}
+
+async function screenshot(page, name) {
+  const directory = process.env.ADMIN_WEB_SCREENSHOT_DIR
+  if (!directory) return
+  await mkdir(directory, { recursive: true })
+  await page.screenshot({ path: join(directory, name + '.png'), fullPage: true })
 }
 
 test('202 starts an in-memory OTP challenge, prevents duplicate login and verifies a leading-zero code', async t => {
@@ -265,6 +289,7 @@ test('LEAD_DEV signs in immediately, sees operational devices and cannot fetch u
   const { page, requests } = await app(t, { actor: operator })
   await signIn(page)
   await page.waitForURL('**/dashboard')
+  await page.getByRole('article', { name: 'Plants registered', exact: true }).getByText('23', { exact: true }).waitFor()
   assert.equal(await memoryToken(page), 'verified-memory-jwt')
   assert.equal(await page.getByRole('link', { name: 'Users', exact: true }).count(), 0)
   assert.equal(await page.getByRole('link', { name: 'Audit logs', exact: true }).count(), 0)
@@ -278,8 +303,10 @@ test('LEAD_DEV signs in immediately, sees operational devices and cannot fetch u
   assert.equal(await page.getByRole('cell', { name: 'Monstera', exact: true }).count(), 1)
   assert.equal(await page.getByRole('cell', { name: 'Online', exact: true }).count(), 1)
   assert.equal(requests.filter(request => ['/admin/users', '/admin/audit', '/auth/verify-admin-otp'].includes(request.path)).length, 0)
+  assert.ok(requests.some(request => request.path === '/admin/stats'))
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  await screenshot(page, 'devices-mobile')
 })
 
 test('USER accounts are logged out and never receive admin page data', async t => {
@@ -297,7 +324,7 @@ test('users table supports paginated search, creation, ban/unban and prevents se
     name: index === 0 ? admin.name : `Person ${index}`, emailMasked: `p***${index}@example.test`, role: index === 0 ? 'ADMIN' : 'USER', isActive: true }))
   const { page, requests } = await app(t, { restored: true, users })
   await page.goto(`${origin}/users`)
-  await page.getByRole('cell', { name: 'Your account', exact: true }).waitFor()
+  await page.getByText('Your account', { exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: `Ban ${admin.name}`, exact: true }).count(), 0)
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await page.getByRole('cell', { name: 'Person 25', exact: true }).waitFor()
@@ -324,12 +351,13 @@ test('users table supports paginated search, creation, ban/unban and prevents se
   assert.equal(await page.getByRole('cell', { name: 'n***@example.test', exact: true }).count(), 1)
 })
 
-test('audit table renders actor IDs and distinguishes success, failure and requested actions', async t => {
+test('audit table renders actor emails and distinguishes success, failure and requested actions', async t => {
   const { page } = await app(t, { restored: true })
   await page.goto(`${origin}/audit`)
   for (const outcome of ['Succeeded', 'Failed', 'Requested']) await page.getByRole('cell', { name: outcome, exact: true }).waitFor()
-  assert.equal(await page.getByRole('cell', { name: 'deleted-admin', exact: true }).count(), 1)
-  assert.equal(await page.getByRole('cell', { name: 'USER_UPDATED', exact: true }).count(), 1)
+  assert.equal(await page.getByRole('cell', { name: 'Deleted account', exact: true }).count(), 1)
+  assert.equal(await page.getByRole('cell', { name: 'User Updated', exact: true }).count(), 1)
+  assert.equal(await page.getByRole('cell', { name: member.email, exact: true }).count(), 1)
 })
 
 test('a failed ban leaves the account active and shows the backend error', async t => {
@@ -368,4 +396,127 @@ test('table failures are retryable and degraded telemetry is reported without in
   await page.getByRole('button', { name: 'Try again', exact: true }).click()
   await page.getByRole('cell', { name: 'Unknown', exact: true }).waitFor()
   await page.getByRole('status').filter({ hasText: 'Some sensor readings are temporarily unavailable.' }).waitFor()
+})
+
+test('Overview shows real metric cards and only the five most recent audit entries', async t => {
+  const auditEntries = Array.from({ length: 7 }, (_, index) => ({ id: 'log-' + index, actorId: admin.id,
+    actorEmail: admin.email, targetId: 'target-' + index, targetEmail: 'target' + index + '@example.test',
+    action: 'ADMIN_LOGIN_VERIFIED', createdAt: new Date().toISOString(), metadata: {} }))
+  const { page, requests } = await app(t, { restored: true, auditEntries })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('article', { name: 'Plants registered', exact: true }).getByText('23', { exact: true }).waitFor()
+  await page.getByRole('article', { name: 'AI scans', exact: true }).getByText('48', { exact: true }).waitFor()
+  await page.getByRole('cell', { name: 'target4@example.test', exact: true }).waitFor()
+  assert.equal(await page.getByRole('table').getByRole('row').count(), 6)
+  assert.equal(await page.getByRole('cell', { name: 'target5@example.test', exact: true }).count(), 0)
+  assert.ok(requests.some(request => request.path === '/admin/audit' && request.query.get('pageSize') === '5'))
+  await screenshot(page, 'overview-light')
+})
+
+test('unavailable telemetry does not turn active-device metrics into a false zero', async t => {
+  const { page } = await app(t, { restored: true, handle: async entry => {
+    if (entry.path === '/admin/stats') return reply({ data: { totalUsers: 18, totalActiveDevices: null, totalPlants: 23, totalAiScans: 48 },
+      meta: { asOf: new Date().toISOString(), telemetryDegraded: true } })
+  } })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('article', { name: 'Active devices', exact: true }).getByText('Unavailable', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('article', { name: 'Total users', exact: true }).getByText('18', { exact: true }).count(), 1)
+  await page.getByRole('status').filter({ hasText: 'Live device connectivity is temporarily unavailable.' }).waitFor()
+})
+
+test('email reveal requests full addresses only when enabled and hides them again', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('cell', { name: 'm***@example.test', exact: true }).waitFor()
+  assert.equal(await page.getByRole('cell', { name: member.email, exact: true }).count(), 0)
+  await page.getByRole('button', { name: 'Reveal emails', exact: true }).click()
+  await page.getByRole('cell', { name: member.email, exact: true }).waitFor()
+  assert.equal(requests.filter(request => request.path === '/admin/users').at(-1).query.get('revealEmails'), 'true')
+  await page.getByRole('button', { name: 'Hide emails', exact: true }).click()
+  await page.getByRole('cell', { name: 'm***@example.test', exact: true }).waitFor()
+  assert.equal(await page.getByRole('cell', { name: member.email, exact: true }).count(), 0)
+  assert.equal(requests.filter(request => request.path === '/admin/users').at(-1).query.get('revealEmails'), null)
+})
+
+test('edit dialog changes name and role, with Escape restoring focus to its trigger', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Edit user', exact: true }).waitFor()
+  await screenshot(page, 'edit-user')
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  assert.equal(await page.getByRole('button', { name: 'Edit Member', exact: true }).evaluate(element => element === document.activeElement), true)
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await page.getByLabel('Name', { exact: true }).fill('Updated Member')
+  await page.getByLabel('Role', { exact: true }).selectOption('LEAD_DEV')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.getByRole('cell', { name: 'Updated Member', exact: true }).waitFor()
+  assert.equal(await page.getByRole('cell', { name: 'System Administrator', exact: true }).count(), 1)
+  assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { name: 'Updated Member', role: 'LEAD_DEV' })
+})
+
+test('delete requires explicit confirmation, removes the user and never offers self-deletion', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Delete Member', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Delete user?', exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Delete user', exact: true }).isDisabled(), true)
+  assert.equal(requests.filter(request => request.method === 'DELETE').length, 0)
+  await page.getByLabel('Type DELETE to confirm.').fill('DELETE')
+  await page.getByRole('button', { name: 'Delete user', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Member deleted successfully.' }).waitFor()
+  assert.equal(requests.filter(request => request.method === 'DELETE').length, 1)
+  assert.equal(await page.getByRole('button', { name: 'Delete ' + admin.name, exact: true }).count(), 0)
+  await page.getByRole('button', { name: 'Edit ' + admin.name, exact: true }).waitFor()
+  assert.equal(await page.getByRole('cell', { name: 'Member', exact: true }).count(), 0)
+})
+
+test('last-SuperAdmin protection remains visible in the edit dialog without changing local privileges', async t => {
+  const { page, requests } = await app(t, { restored: true, handle: async entry => {
+    if (entry.path === '/admin/users/' + admin.id && entry.method === 'PATCH') return reply({ code: 'LAST_ADMIN', error: 'The last active SuperAdmin cannot be removed or demoted.' }, 409)
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit ' + admin.name, exact: true }).click()
+  await page.getByLabel('Role', { exact: true }).selectOption('LEAD_DEV')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.getByRole('dialog').getByRole('alert').filter({ hasText: 'last active SuperAdmin cannot be removed' }).waitFor()
+  assert.equal(await memoryToken(page), 'verified-memory-jwt')
+  assert.equal(requests.filter(request => request.path === '/auth/logout').length, 0)
+})
+
+test('changing your own role signs out rather than retaining an obsolete admin session', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit ' + admin.name, exact: true }).click()
+  await page.getByLabel('Role', { exact: true }).selectOption('LEAD_DEV')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.waitForURL('**/login')
+  assert.equal(await memoryToken(page), null)
+  assert.equal(requests.filter(request => request.path === '/auth/logout').length, 1)
+})
+
+test('Last Seen advances with time and online status has both a dot and a text label', async t => {
+  const { page } = await app(t, { actor: operator, restored: true })
+  await page.goto(origin + '/devices')
+  await page.getByRole('cell', { name: '2 minutes ago', exact: true }).waitFor()
+  assert.equal(await page.getByRole('cell', { name: 'Online', exact: true }).locator('[aria-hidden="true"]').count(), 1)
+  await page.clock.fastForward(61_000)
+  await page.getByRole('cell', { name: '3 minutes ago', exact: true }).waitFor()
+})
+
+test('dark mode persists only the theme preference and remains usable on narrow screens', async t => {
+  const { page } = await app(t, { restored: true })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click()
+  assert.equal(await page.locator('html').evaluate(element => element.classList.contains('dark')), true)
+  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), ['leafcheck-admin-theme'])
+  await page.getByRole('article', { name: 'AI scans', exact: true }).getByText('48', { exact: true }).waitFor()
+  await screenshot(page, 'overview-dark')
+  await page.reload()
+  await page.getByRole('button', { name: 'Switch to light mode', exact: true }).waitFor()
+  assert.equal(await page.locator('html').evaluate(element => element.classList.contains('dark')), true)
+  await page.setViewportSize({ width: 390, height: 844 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  await screenshot(page, 'overview-dark-mobile')
 })

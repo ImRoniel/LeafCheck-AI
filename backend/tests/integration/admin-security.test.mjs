@@ -228,3 +228,27 @@ test("real PostgreSQL: concurrent administrator demotions preserve one authorize
   assert.ok(results.some(result => [401, 403, 409].includes(result.status)));
   assert.equal(await db.user.count({ where: { role: "ADMIN", isActive: true } }), 1);
 });
+
+test("real PostgreSQL: opt-in emails and audit identities retain deleted-account history", async () => {
+  const admin = await verified(), target = await account("USER");
+  const event = await db.auditLog.create({ data: {
+    actorId: target.id, targetId: admin.id, action: "HISTORIC_EVENT", metadata: { actorId: target.id },
+  } });
+  const masked = await request("/api/admin/users", { method: "GET", token: admin.accessToken });
+  assert.equal(masked.status, 200);
+  assert.ok(masked.body.data.every(row => !("email" in row)));
+  const revealed = await request("/api/admin/users?revealEmails=true", { method: "GET", token: admin.accessToken });
+  assert.equal(revealed.body.data.find(row => row.id === target.id).email, target.email);
+  const history = () => request("/api/admin/audit?action=HISTORIC_EVENT", { method: "GET", token: admin.accessToken });
+  const before = await history();
+  assert.equal(before.status, 200);
+  assert.equal(before.body.data[0].actorEmail, target.email);
+  assert.equal(before.body.data[0].targetEmail, admin.user.email);
+  assert.equal((await request(`/api/admin/users/${target.id}`, { method: "DELETE", token: admin.accessToken })).status, 204);
+  const after = await history();
+  assert.equal(after.body.data[0].id, event.id);
+  assert.equal(after.body.data[0].actorEmail, null);
+  assert.equal(after.body.data[0].actorId, null);
+  assert.equal(after.body.data[0].metadata.actorId, target.id);
+  assert.equal(after.body.data[0].targetEmail, admin.user.email);
+});

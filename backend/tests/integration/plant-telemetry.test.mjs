@@ -35,12 +35,33 @@ const {plantsRouter} = await import("../../src/routes/plants.ts");
 const {telemetryRouter} = await import("../../src/routes/telemetry.ts");
 const {errorHandler} = await import("../../src/lib/http.ts");
 const {backfillOpenPairingSessions} = await import("../../src/lib/backfill-pairing-sessions.ts");
+const {readAdminStats} = await import("../../src/lib/admin-stats.ts");
 
 before(async () => {
   await pg.user.create({data:{id:userId,email:`${userId}@test.invalid`,password:"unused"}});
   const app=express(); app.use(express.json()); app.use("/api/plants",plantsRouter); app.use("/api/telemetry",telemetryRouter); app.use(errorHandler);
   server=app.listen(0,"127.0.0.1"); await new Promise(resolve => server.once("listening",resolve));
   base=`http://127.0.0.1:${server.address().port}`;
+});
+
+test("admin stats aggregate actual Mongo timestamps for PostgreSQL-registered physical devices", async () => {
+  const asOf = new Date();
+  const baseline = await readAdminStats(asOf);
+  assert.equal(baseline.meta.telemetryDegraded, false);
+  assert.equal(baseline.data.totalUsers, 1);
+  await mongo.sensorReading.create({ data: { deviceId: device.macAddress, temperature: 24, humidity: 55, timestamp: asOf } });
+  const fresh = await readAdminStats(asOf);
+  assert.equal(fresh.data.totalActiveDevices, baseline.data.totalActiveDevices + 1);
+  assert.ok(fresh.data.totalPlants >= 2);
+  const demo = await pg.device.create({ data: { userId, name: "Stats demo", macAddress: `DEMO:${randomUUID()}` } });
+  await mongo.sensorReading.createMany({ data: [
+    { deviceId: demo.id, temperature: 24, humidity: 55, timestamp: asOf },
+    { deviceId: `unregistered-${randomUUID()}`, temperature: 24, humidity: 55, timestamp: asOf },
+  ] });
+  assert.equal((await readAdminStats(asOf)).data.totalActiveDevices, fresh.data.totalActiveDevices);
+  await mongo.sensorReading.create({ data: { deviceId: device.macAddress, temperature: 24, humidity: 55,
+    timestamp: new Date(asOf.getTime() + 61_000) } });
+  assert.equal((await readAdminStats(asOf)).data.totalActiveDevices, baseline.data.totalActiveDevices);
 });
 beforeEach(async () => {
   queries=[]; transactions=0;

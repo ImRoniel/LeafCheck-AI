@@ -40,6 +40,7 @@ function relation(model, row, key) {
     if (relations[key]) return many(relations[key], "userId");
   }
   if (model === "device" && key === "plants") return many("plant", "deviceId");
+  if (model === "auditLog" && key === "actor") return one("user", "actorId");
   if (key === "user") return one("user", "userId");
   if (key === "plant") return one("plant", "plantId");
   return null;
@@ -50,6 +51,8 @@ function scalarMatches(value, condition) {
   if ("in" in condition && !condition.in.includes(value)) return false;
   if ("not" in condition && scalarMatches(value, condition.not)) return false;
   if ("gt" in condition && !(value > condition.gt)) return false;
+  if ("gte" in condition && !(value >= condition.gte)) return false;
+  if ("lt" in condition && !(value < condition.lt)) return false;
   if ("lte" in condition && !(value <= condition.lte)) return false;
   if ("contains" in condition) {
     const text = condition.mode === "insensitive" ? value?.toLowerCase() : value;
@@ -104,7 +107,7 @@ function project(model, row, select) {
 }
 
 const db = {};
-for (const model of ["user", "plant", "device", "careTask", "aIAnalysis", "authSession", "adminSessionVerification"]) {
+for (const model of ["user", "plant", "device", "careTask", "aIAnalysis", "authSession", "adminSessionVerification", "auditLog"]) {
   db[model] = {};
   for (const method of ["findMany", "findUnique", "count"]) {
     db[model][method] = async query => {
@@ -141,6 +144,16 @@ before(async () => {
         return selectRows("sensorReading", records.sensorReading.filter(row => matches("sensorReading", row, query.where)), query)[0] ?? null;
       } finally { readingConcurrency--; }
     },
+    groupBy: async query => {
+      calls.push({ model: "sensorReading", method: "groupBy", query });
+      if (query.where.deviceId.in.some(key => failedReadings.has(key))) throw new Error("mongodb://PRIVATE_DB credentials");
+      const groups = new Map();
+      for (const row of records.sensorReading.filter(row => matches("sensorReading", row, query.where))) {
+        const previous = groups.get(row.deviceId);
+        if (!previous || row.timestamp > previous) groups.set(row.deviceId, row.timestamp);
+      }
+      return [...groups].map(([deviceId, timestamp]) => ({ deviceId, _max: { timestamp } }));
+    },
   } } } });
   const { adminRouter, adminErrorHandler, adminResponseHeaders } = await import("../src/routes/admin.ts");
   const { accessToken } = await import("../src/lib/auth.ts");
@@ -162,7 +175,7 @@ before(async () => {
 });
 
 beforeEach(() => {
-  records = { user: [user(actorId, { role: "ADMIN" })], plant: [], device: [], careTask: [], aIAnalysis: [], sensorReading: [],
+  records = { user: [user(actorId, { role: "ADMIN" })], plant: [], device: [], careTask: [], aIAnalysis: [], sensorReading: [], auditLog: [],
     adminSessionVerification: [{ id: randomUUID(), userId: actorId, supabaseSessionId: sessionId, verifiedAt: earlier, expiresAt: later, authVersion: 0 }],
     authSession: [{ id: sessionId, userId: actorId, client: "native", createdAt: now, expiresAt: later, revokedAt: null, tokenHash: "SECRET_TOKEN_HASH" }] };
   calls = []; failPg = false; failedReadings = new Set(); readingConcurrency = 0; maxReadingConcurrency = 0; inTransaction = false;
@@ -195,7 +208,7 @@ function checkTransactions() {
   assert.ok(calls.filter(call => call.model !== "transaction" && call.model !== "sensorReading"
     && !(["authSession", "adminSessionVerification"].includes(call.model) && call.method === "findUnique")).every(call => call.inTransaction));
 }
-const paths = ["/users", `/users/${targetId}`, "/devices", "/devices/whitelist", "/admins"];
+const paths = ["/users", `/users/${targetId}`, "/devices", "/devices/whitelist", "/admins", "/audit", "/stats"];
 
 test("admin endpoints require current roles; LEAD_DEV is restricted to operational devices", async () => {
   records.user.push(user(targetId));
@@ -212,7 +225,7 @@ test("admin endpoints require current roles; LEAD_DEV is restricted to operation
     records.user[0].role = role;
     for (const path of paths) {
       const result = await get(path);
-      if (role === "LEAD_DEV" && path !== "/devices") {
+      if (role === "LEAD_DEV" && path !== "/devices" && path !== "/stats") {
         checkError(result, 403, "FORBIDDEN");
         continue;
       }
@@ -253,6 +266,82 @@ test("users mask emails, return filtered counts and paginate/search with stable 
   assert.equal(second.body.data[0].email, undefined);
   assert.deepEqual((await get("/users")).body.pagination, { page: 1, pageSize: 25, total: 4, totalPages: 1 });
   checkPrivacy(first.body); checkTransactions();
+});
+
+test("full emails require an explicit SuperAdmin reveal request and never change the masked default", async () => {
+  records.user.push(user(targetId, { email: "private@example.test" }));
+  const revealed = await get("/users?revealEmails=true");
+  assert.equal(revealed.status, 200);
+  assert.equal(revealed.body.data.find(row => row.id === targetId).email, "private@example.test");
+  assert.equal(revealed.headers.get("cache-control"), "no-store");
+  assert.ok((await get("/users?revealEmails=false")).body.data.every(row => !("email" in row)));
+  assert.ok((await get("/users")).body.data.every(row => !("email" in row)));
+  checkError(await get("/users?revealEmails=yes"), 400, "INVALID_INPUT");
+  records.user[0].role = "LEAD_DEV";
+  checkError(await get("/users?revealEmails=true"), 403, "FORBIDDEN");
+});
+
+test("stats count domain records and only registered physical devices with a fresh latest sample", async () => {
+  records.user.push(user(targetId, { isActive: false }));
+  records.plant.push(plant(id(10)), plant(id(11)));
+  records.aIAnalysis.push({ id: id(20), plantId: id(10) }, { id: id(21), plantId: id(11) });
+  const offsets = [0, -1800_000, -1800_001, 60_000, 60_001, null];
+  for (const [index, offset] of offsets.entries()) {
+    const item = device(id(100 + index), `LC-${String(index).padStart(6, "0")}`);
+    records.device.push(item);
+    if (offset !== null) records.sensorReading.push(reading(item.macAddress, { timestamp: new Date(now.getTime() + offset) }));
+  }
+  records.device.push(device(id(200), `DEMO:${id(201)}`));
+  records.sensorReading.push(reading(id(200)), reading("UNREGISTERED"),
+    reading(records.device[4].macAddress, { timestamp: now }));
+  const result = await get("/stats");
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.data, { totalUsers: 2, totalPlants: 2, totalAiScans: 2, totalActiveDevices: 3 });
+  assert.equal(result.body.meta.telemetryDegraded, false);
+  assert.equal(result.body.meta.freshnessWindowSeconds, 1800);
+  assert.equal(result.body.meta.asOf, now.toISOString());
+  assert.equal(calls.filter(call => call.method === "groupBy").length, 1);
+  checkPrivacy(result.body); checkTransactions();
+  records.user[0].role = "LEAD_DEV";
+  assert.deepEqual((await get("/stats")).body.data, result.body.data);
+  checkError(await get("/stats?role=ADMIN"), 400, "INVALID_INPUT");
+});
+
+test("stats return unknown connectivity on telemetry failure, truthful zero when empty, and bound batch sizes", async () => {
+  assert.equal((await get("/stats")).body.data.totalActiveDevices, 0);
+  assert.equal(calls.some(call => call.model === "sensorReading"), false);
+  for (let index = 0; index < 501; index++) records.device.push(device(id(1000 + index), `LC-${String(index).padStart(6, "0")}`));
+  calls = [];
+  const available = await get("/stats");
+  assert.equal(available.body.data.totalActiveDevices, 0);
+  assert.deepEqual(calls.filter(call => call.method === "groupBy").map(call => call.query.where.deviceId.in.length), [500, 1]);
+  failedReadings.add(records.device[0].macAddress);
+  const unavailable = await get("/stats");
+  assert.equal(unavailable.status, 200);
+  assert.equal(unavailable.body.data.totalActiveDevices, null);
+  assert.equal(unavailable.body.meta.telemetryDegraded, true);
+  assert.equal(unavailable.body.data.totalUsers, 1);
+  assert.ok(!JSON.stringify(unavailable.body).includes("PRIVATE_DB"));
+});
+
+test("audit lists resolve actor and target emails in a bounded batch and retain deleted IDs", async () => {
+  records.user.push(user(targetId, { email: "target@example.test" }));
+  records.auditLog.push(
+    { id: id(10), actorId, targetId, action: "USER_UPDATED", metadata: {}, ipAddress: null, createdAt: now },
+    { id: id(11), actorId: null, targetId: id(999), action: "USER_DELETED", metadata: { actorId: id(888) }, ipAddress: null, createdAt: earlier },
+  );
+  const result = await get("/audit?pageSize=5");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.pagination.total, 2);
+  assert.equal(result.body.data[0].actorEmail, "operator@example.test");
+  assert.equal(result.body.data[0].targetEmail, "target@example.test");
+  assert.equal(result.body.data[0].actorId, actorId);
+  assert.equal(result.body.data[1].actorEmail, null);
+  assert.equal(result.body.data[1].targetEmail, null);
+  assert.equal(result.body.data[1].targetId, id(999));
+  assert.equal(result.body.data[1].metadata.actorId, id(888));
+  assert.equal(calls.filter(call => call.model === "user" && call.method === "findMany").length, 1);
+  checkPrivacy(result.body); checkTransactions();
 });
 
 test("empty and out-of-range pages stay 200 with truthful pagination", async () => {

@@ -60,26 +60,47 @@ survive that cutoff, including after an account is unbanned. Pending challenges
 and verification records are invalidated. Logout removes verification records and
 clears the browser cookie before attempting provider revocation.
 
-The next frontend step must handle the 202 response and provide an OTP screen;
-the existing React login implementation expects a completed 200 response.
+The React session provider handles the 202 response, keeps the challenge in memory,
+and routes to `/login/otp`. Only successful verification establishes its session.
 
 ## User CRUD and audits
 
 | Endpoint | Contract |
 | --- | --- |
-| GET `/api/admin/users` | Existing pagination/search/filter envelope; users.read |
+| GET `/api/admin/users` | Pagination/search/filter envelope; users.read; `revealEmails=true` opts into full emails |
 | POST `/api/admin/users` | `{email,password,name?,role?,isActive?}`; defaults USER/active; 201 `{data,meta}` |
 | PATCH `/api/admin/users/:id` | Nonempty subset of `{name,role,isActive}`; 200 `{data,meta}` |
 | DELETE `/api/admin/users/:id` | Empty body; 204 |
 | GET `/api/admin/audit` | `{data,pagination,meta}`; audit.read |
+| GET `/api/admin/stats` | Aggregate platform counts; users.read OR devices.read |
 
 The audit query supports `page`, `pageSize` (maximum 100), `action`, `actorId`,
 `targetId`, `from` and `to`. Results sort by descending timestamp with an ID tie
 break. There is no audit mutation endpoint. Events contain allowlisted metadata,
-actor/target IDs, time and IP; no passwords, OTPs, challenge credentials or JWTs.
+actor/target IDs, resolved `actorEmail`/`targetEmail`, time and IP; no passwords,
+OTPs, challenge credentials or JWTs. Actor email uses the current User relation;
+target emails use one bounded lookup for the page, inside the read transaction.
+IDs remain in the response for traceability. Deleted accounts return null emails;
+historical emails are not reconstructed or added to stored event metadata.
 An actor's deletion sets the audit FK to null while retaining the original actor
 ID in immutable event metadata. New logs begin at rollout; old application events
 cannot be reconstructed.
+
+User lists always include `emailMasked`. Full `email` is present only when
+`revealEmails=true`; false or omission retains the masked response. Existing
+SuperAdmin permission/session verification and no-store headers cover both modes.
+
+Stats return `{data:{totalUsers,totalActiveDevices,totalPlants,totalAiScans},meta}`.
+Counts describe currently retained database records, rather than lifetime counters
+after deletion. Both staff roles may read aggregate counts; LEAD_DEV still cannot
+read user records, full addresses, or audit entries. PostgreSQL counts and
+registered physical MACs are read in a RepeatableRead transaction. MongoDB Prisma
+groupBy queries (batches of at most 500 MACs) find latest timestamps. Active means
+a physical device seen within 30 minutes, allowing 60 seconds of future clock
+tolerance. Demo/unregistered devices are excluded. A MongoDB failure returns null
+active devices with `meta.telemetryDegraded=true`, retaining other totals. Meta
+includes the observation time and freshness window; the two databases are not one
+atomic snapshot. These additions require no schema changes or migration.
 
 Manual creation provisions a confirmed Supabase identity server-side and links
 its immutable provider ID to the new application user. The required legacy

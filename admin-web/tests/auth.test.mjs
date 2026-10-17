@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 process.env.VITE_API_URL = '/api'
-let vite, api, auth, admin, permissions, unsubscribe
+let vite, api, auth, admin, permissions, format, unsubscribe
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json' },
 })
@@ -18,6 +18,7 @@ before(async () => {
   auth = await vite.ssrLoadModule('/src/lib/auth.ts')
   admin = await vite.ssrLoadModule('/src/lib/admin.ts')
   permissions = await vite.ssrLoadModule('/src/lib/permissions.ts')
+  format = await vite.ssrLoadModule('/src/lib/format.ts')
 })
 afterEach(() => {
   unsubscribe?.()
@@ -231,10 +232,12 @@ test('frontend permissions limit LEAD_DEV to devices and allow ADMIN user manage
 
 test('table parsers accept masked user emails and operational devices without retaining owner data', () => {
   const user = admin.readUserRow({ id: 'u1', name: null, emailMasked: 'a***@example.test', role: 'USER', isActive: true })
-  assert.equal(user.email, 'a***@example.test')
+  assert.equal(user.email, null)
+  assert.equal(user.emailMasked, 'a***@example.test')
+  assert.equal(admin.readUserRow({ ...user, email: 'actual@example.test' }).email, 'actual@example.test')
   assert.throws(() => admin.readUserRow({ ...user, isActive: 'false' }), /unexpected response/)
   const device = { id: 'd1', name: 'Sensor', macAddress: '00:11:22:33:44:55', plants: [], connectionStatus: 'ONLINE' }
-  assert.deepEqual(admin.readDeviceRow(device), device)
+  assert.deepEqual(admin.readDeviceRow(device), { ...device, lastReadingAt: null, readingError: false })
   assert.equal('owner' in admin.readDeviceRow({ ...device, owner: { email: 'private@example.test' } }), false)
   assert.throws(() => admin.readAdminList({ data: [], pagination: { page: 1, pageSize: 0, total: 0, totalPages: 0 } }, admin.readUserRow), /unexpected response/)
 })
@@ -247,4 +250,33 @@ test('audit outcomes distinguish failed, requested, cancelled, successful and un
   }
   assert.equal(admin.auditOutcome({ ...row, action: 'CUSTOM_ACTION', metadata: { outcome: 'Pending' } }), 'Pending')
   assert.throws(() => admin.readAuditRow({ ...row, action: 'CUSTOM_ACTION', createdAt: 'invalid' }), /unexpected response/)
+})
+
+test('dashboard stats validate counts and preserve unavailable connectivity instead of inventing zero', () => {
+  const payload = { data: { totalUsers: 12, totalActiveDevices: 3, totalPlants: 25, totalAiScans: 48 },
+    meta: { asOf: new Date().toISOString(), telemetryDegraded: false } }
+  assert.equal(admin.readAdminStats(payload).totalUsers, 12)
+  assert.equal(admin.readAdminStats({ ...payload, data: { ...payload.data, totalActiveDevices: null },
+    meta: { ...payload.meta, telemetryDegraded: true } }).totalActiveDevices, null)
+  for (const value of [-1, '3', 1.5]) {
+    assert.throws(() => admin.readAdminStats({ ...payload, data: { ...payload.data, totalUsers: value } }), /unexpected response/)
+  }
+})
+
+test('audit identities are optional for deleted accounts and action labels remain readable', () => {
+  const row = { id: 'log-1', actorId: null, actorEmail: null, targetId: 'deleted-user', targetEmail: null,
+    action: 'ADMIN_LOGIN_VERIFIED', createdAt: new Date().toISOString(), metadata: null }
+  assert.equal(admin.readAuditRow(row).actorEmail, null)
+  assert.equal(admin.readAuditRow({ ...row, actorEmail: 'admin@example.test' }).actorEmail, 'admin@example.test')
+  assert.equal(format.formatAuditAction('ADMIN_LOGIN_VERIFIED'), 'Admin Login Verified')
+  assert.equal(format.formatAuditAction('ADMIN_OTP_FAILED'), 'Admin OTP Failed')
+})
+
+test('last-seen formatting handles missing readings, elapsed time and clock errors', () => {
+  const now = Date.parse('2026-10-17T08:00:00Z')
+  assert.equal(format.formatLastSeen(null, now), 'Never seen')
+  assert.equal(format.formatLastSeen('invalid', now), 'Unavailable')
+  assert.equal(format.formatLastSeen(new Date(now).toISOString(), now), 'Just now')
+  assert.equal(format.formatLastSeen(new Date(now - 120_000).toISOString(), now), '2 minutes ago')
+  assert.equal(format.formatLastSeen(new Date(now + 120_000).toISOString(), now), 'Clock ahead')
 })

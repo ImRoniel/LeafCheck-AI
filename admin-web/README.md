@@ -38,8 +38,8 @@ npm run preview --workspace=admin-web
 | --- | --- |
 | `/login` | Email/password sign-in |
 | `/login/otp` | Eight-digit SuperAdmin email verification |
-| `/dashboard` | Overview placeholder |
-| `/users` | SuperAdmin user table, creation, ban/unban |
+| `/dashboard` | Four live metrics and Recent Activity for SuperAdmins |
+| `/users` | SuperAdmin create/edit/delete, ban/unban, and email reveal |
 | `/devices` | Device inventory for both staff roles |
 | `/audit` | SuperAdmin audit table |
 | `/forbidden` | Explains a staff role restriction |
@@ -53,12 +53,34 @@ The topbar displays the current email and labels `ADMIN` as SuperAdmin and
 `LEAD_DEV` as System Administrator.
 
 Lists use the backend's `page`, `pageSize=25`, and (for users/devices) `q` parameters.
-Email addresses remain masked as returned by the users API. Devices display their
-computed connection status, and support the operational response without owner
-fields. Audit actors/targets use IDs; outcomes come from recorded metadata or
-known action names, with unknown actions marked Recorded. Tables include loading,
+Email addresses are masked by default. Reveal emails requests `revealEmails=true`
+from the server for the current page; Hide emails drops that option. Full addresses
+are never persisted in browser storage. Devices display computed connection status,
+labeled status dots, and relative Last Seen timestamps with exact times on hover.
+They support operational responses without owner fields. Audit actors/targets show
+emails with a deleted-account fallback; original IDs and action codes remain
+available on hover. Outcomes come from metadata or known action names, with unknown
+actions marked Recorded. Tables include loading,
 empty, error/retry and pagination states. The UI prevents banning your own account;
 the backend remains authoritative for every permission and mutation.
+
+The Overview requests `/admin/stats` for total users, active physical devices,
+registered plants, and saved AI analyses. Active means the latest sensor reading
+is within the existing 30-minute window (with 60 seconds of future tolerance).
+Demo and unregistered devices are excluded. Unavailable connectivity displays
+Unavailable instead of zero. Both staff roles may read aggregate totals, but
+only ADMIN fetches the five latest audit entries with `pageSize=5`.
+
+Create and Edit use accessible native dialogs. Edit sends only name and role;
+changing your own role signs you out immediately. Delete requires typing DELETE
+and explains the cascade. A failed deletion can leave an account disabled; the
+table refreshes to reflect the backend state and the dialog permits a retry.
+
+The interface uses Lucide icons and shared theme-aware surfaces, badges, inputs,
+and table styles. The theme toggle defaults to the system preference and stores
+only `leafcheck-admin-theme` after an explicit toggle. An early HTML initializer
+applies saved dark mode before the app renders. Dialogs trap focus, support Escape,
+and return focus to their trigger when it remains present.
 
 ## Authentication
 
@@ -132,8 +154,11 @@ The Node test suite uses mocked fetch responses for token handling, retries,
 concurrency, API errors, challenge validation, table responses and permissions.
 The Chromium suite starts Vite on an ephemeral local port and intercepts every
 API request, exercising the React session/router, OTP failures and cooldowns,
-role restrictions, tables, user creation and ban/unban. Neither suite contacts
+role restrictions, metrics, table actions, email reveal, dialogs and dark mode. Neither suite contacts
 Render, Supabase or the local backend.
+
+Set `ADMIN_WEB_SCREENSHOT_DIR=/tmp/admin-web-previews` when running the browser
+suite to save selected desktop/mobile previews with mocked data.
 
 ## Static hosting
 

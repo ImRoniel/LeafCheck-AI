@@ -15,9 +15,14 @@ export function hasPermission(role: Role, permission: Permission): boolean {
 
 /** Must follow authentication; the role comes from the current application row. */
 export function requirePermission(permission: Permission) {
+  return requireAnyPermission(permission);
+}
+
+/** Use for aggregate endpoints shared by distinct read permissions. */
+export function requireAnyPermission(...required: readonly Permission[]) {
   return asyncRoute((_req, res, next) => {
     const role: Role | undefined = res.locals.auth?.user?.role;
-    if (!role || !hasPermission(role, permission))
+    if (!role || !required.some(permission => hasPermission(role, permission)))
       throw new HttpError(403, "FORBIDDEN", "You do not have permission to perform this action.");
     next();
   });

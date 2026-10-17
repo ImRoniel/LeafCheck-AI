@@ -30,7 +30,7 @@ const db = {
     attempts: 0, maxAttempts: 5, consumedAt: null, createdAt: new Date(), lastSentAt: new Date(),
   }) }),
   adminSessionVerification: memoryModel(verifications, { unique: ["supabaseSessionId"], defaults: () => ({ verifiedAt: new Date(), authVersion: 0 }) }),
-  auditLog: memoryModel(auditLogs, { defaults: () => ({ createdAt: new Date(), targetId: null, ipAddress: null }) }),
+  auditLog: memoryModel(auditLogs, { resolveUser: id => users.get(id), defaults: () => ({ createdAt: new Date(), targetId: null, ipAddress: null }) }),
   device: memoryModel(devices, { resolveUser: id => users.get(id) }),
   // Provider auth must not write either legacy table.
   authSession: { create() { throw new Error("Legacy session write forbidden"); }, updateMany() { throw new Error("Legacy revocation forbidden"); } },
@@ -522,6 +522,8 @@ test("audit endpoint is paginated, filterable, and read only", async () => {
   const result = await adminRequest(`/audit?action=ADMIN_LOGIN_VERIFIED&actorId=${admin.user.id}&pageSize=1`, admin.accessToken);
   assert.equal(result.status, 200); assert.equal(result.body.pagination.total, 1);
   assert.equal(result.body.data[0].actorId, admin.user.id);
+  assert.equal(result.body.data[0].actorEmail, admin.user.email);
+  assert.equal(result.body.data[0].targetEmail, admin.user.email);
   assert.equal((await adminRequest("/audit?from=invalid", admin.accessToken)).status, 400);
   assert.equal((await adminRequest("/audit?unknown=true", admin.accessToken)).status, 400);
   assert.equal((await adminRequest("/audit", admin.accessToken, "DELETE")).status, 404);

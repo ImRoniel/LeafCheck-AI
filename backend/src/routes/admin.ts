@@ -4,7 +4,8 @@ import type { Prisma } from "../generated/postgres-client/index.js";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { diagnosisTelemetrySnapshot, readingIsFresh } from "../lib/diagnosis-telemetry.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
-import { requirePermission } from "../lib/permissions.js";
+import { requireAnyPermission, requirePermission } from "../lib/permissions.js";
+import { readAdminStats } from "../lib/admin-stats.js";
 import { requireAdminVerification } from "../lib/admin-verification.js";
 import { createAdminUser, updateAdminUser, deleteAdminUser, type AdminActor, type UpdateAdminUser } from "../lib/admin-users.js";
 import { credentials, validateName } from "../lib/auth-input.js";
@@ -135,6 +136,12 @@ function roleValue(value: unknown) {
   return value;
 }
 
+adminRouter.get("/stats", requireAnyPermission("users.read", "devices.read"), asyncRoute(async (req, res) => {
+  queryParams(req, []);
+  const stats = await readAdminStats(context(res).asOf);
+  res.json({ data: stats.data, meta: { ...meta(res), ...stats.meta } });
+}));
+
 adminRouter.post("/users", requirePermission("users.manage"), asyncRoute(async (req, res) => {
   const data = bodyObject(req.body, ["email", "password", "name", "role", "isActive"]);
   const login = credentials({ email: data.email, password: data.password, name: data.name }, true);
@@ -166,7 +173,8 @@ adminRouter.delete("/users/:id", requirePermission("users.manage"), asyncRoute(a
 }));
 
 adminRouter.get("/users", requirePermission("users.read"), asyncRoute(async (req, res) => {
-  const query = queryParams(req, ["page", "pageSize", "q", "role", "isActive", "sort", "order"]);
+  const query = queryParams(req, ["page", "pageSize", "q", "role", "isActive", "sort", "order", "revealEmails"]);
+  const revealEmails = booleanValue(query.revealEmails) ?? false;
   const page = pageQuery(query);
   const where = userWhere(query, page.q);
   const sort = enumValue(query.sort, ["createdAt", "updatedAt", "name", "email"]) ?? "createdAt";
@@ -179,7 +187,7 @@ adminRouter.get("/users", requirePermission("users.read"), asyncRoute(async (req
     tx.user.count({ where }),
   ]), transactionOptions);
   listResponse(res, users.map(({ email, _count, ...user }) => ({
-    ...user, emailMasked: maskedEmail(email),
+    ...user, emailMasked: maskedEmail(email), ...(revealEmails ? { email } : {}),
     counts: { plants: _count.plants, devices: _count.devices, pendingCareTasks: _count.careTasks },
   })), page, total);
 }));
@@ -358,11 +366,22 @@ adminRouter.get("/audit", requirePermission("audit.read"), asyncRoute(async (req
     targetId: query.targetId,
     ...(from || to ? { createdAt: { gte: from, lte: to } } : {}),
   };
-  const [logs, total] = await prismaPg.$transaction(async tx => Promise.all([
-    tx.auditLog.findMany({ where, skip: page.skip, take: page.pageSize, orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      select: { id: true, actorId: true, action: true, targetId: true, metadata: true, ipAddress: true, createdAt: true } }),
-    tx.auditLog.count({ where }),
-  ]), transactionOptions);
+  const [logs, total] = await prismaPg.$transaction(async tx => {
+    const [entries, count] = await Promise.all([
+      tx.auditLog.findMany({ where, skip: page.skip, take: page.pageSize, orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        select: { id: true, actorId: true, actor: { select: { email: true } }, action: true,
+          targetId: true, metadata: true, ipAddress: true, createdAt: true } }),
+      tx.auditLog.count({ where }),
+    ]);
+    // targetId is deliberately not a foreign key: deleted targets retain history.
+    const ids = [...new Set(entries.flatMap(entry => entry.targetId ? [entry.targetId] : []))];
+    const targets = ids.length ? await tx.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true } }) : [];
+    const emails = new Map(targets.map(target => [target.id, target.email]));
+    return [entries.map(({ actor, ...entry }) => ({
+      ...entry, actorEmail: actor?.email ?? null,
+      targetEmail: entry.targetId ? emails.get(entry.targetId) ?? null : null,
+    })), count] as const;
+  }, transactionOptions);
   listResponse(res, logs, page, total);
 }));
 
