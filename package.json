@@ -4,11 +4,13 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "admin-web"
   ],
   "scripts": {
     "frontend": "npm run start --workspace=frontend",
     "backend": "npm run dev --workspace=backend",
+    "admin-web": "npm run dev --workspace=admin-web",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
     "install:all": "npm install --workspaces"
   },

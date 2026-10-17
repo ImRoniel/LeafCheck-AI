@@ -18,12 +18,17 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env) {
       "AUTH_JWT_ISSUER and AUTH_JWT_AUDIENCE are required (maximum 200 characters)",
     );
   }
-  const origins = (env.AUTH_ALLOWED_ORIGINS ?? "").split(",").filter(Boolean);
+  const origins = (env.AUTH_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   for (const origin of origins) {
     const url = new URL(origin);
-    if (url.origin !== origin || url.protocol !== "https:") {
+    const localDevelopment =
+      env.NODE_ENV === "development" && origin === "http://localhost:5174";
+    if (url.origin !== origin || (url.protocol !== "https:" && !localDevelopment)) {
       throw new Error(
-        "AUTH_ALLOWED_ORIGINS must contain exact HTTPS origins without trailing slashes",
+        "AUTH_ALLOWED_ORIGINS must contain exact HTTPS origins without trailing slashes; http://localhost:5174 is allowed only in development",
       );
     }
   }

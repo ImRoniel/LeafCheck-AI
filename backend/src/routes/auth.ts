@@ -25,6 +25,7 @@ const cookieOptions = {
   sameSite: "strict" as const,
   path: "/",
 };
+const browserSupabasePaths = new Set(["/login", "/refresh", "/logout", "/logout-all"]);
 
 // Native clients explicitly opt into JSON; any browser signal forces cookie mode.
 export function clientMode(req: Request): "browser" | "native" {
@@ -51,7 +52,10 @@ authRouter.use(
   asyncRoute((req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.locals.client = clientMode(req);
-    if (authProvider() === "supabase" && res.locals.client !== "native")
+    if (
+      authProvider() === "supabase" && res.locals.client !== "native" &&
+      (req.method !== "POST" || !browserSupabasePaths.has(req.path))
+    )
       throw new HttpError(400, "NATIVE_REQUIRED", "Email authentication requires the mobile app.");
     next();
   }),
@@ -207,16 +211,15 @@ for (const path of ["/logout", "/logout-all"]) {
       bodyObject(req.body ?? {}, []);
       if (authProvider() === "supabase") {
         await revokeProviderSession(req.get("authorization")!.slice(7), path === "/logout" ? "local" : "global");
-        res.status(204).end();
-        return;
+      } else {
+        await prismaPg.authSession.updateMany({
+          where:
+            path === "/logout"
+              ? { id: res.locals.auth.sessionId }
+              : { userId: res.locals.auth.user.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
       }
-      await prismaPg.authSession.updateMany({
-        where:
-          path === "/logout"
-            ? { id: res.locals.auth.sessionId }
-            : { userId: res.locals.auth.user.id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
       res.clearCookie(cookieName, cookieOptions);
       res.status(204).end();
     }),

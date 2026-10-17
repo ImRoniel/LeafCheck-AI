@@ -7,6 +7,7 @@ import { errorHandler } from "./lib/http.js";
 import "./lib/provider-startup.js";
 import { ensureTTLIndex } from "./lib/ttl.js";
 import { aiRouter } from "./routes/ai.js";
+import { adminErrorHandler, adminResponseHeaders, adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { devicesRouter } from "./routes/devices.js";
 import { plantsRouter } from "./routes/plants.js";
@@ -21,6 +22,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 // Trust one proxy hop; earlier forwarding-chain entries are not trusted.
 app.set("trust proxy", 1);
 app.use(helmet());
+app.use("/api/admin", adminResponseHeaders);
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -95,6 +97,8 @@ app.use("/api/ai", aiRouter);
 app.use("/api/scan", scanRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/admin", adminErrorHandler);
 app.use(errorHandler);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────

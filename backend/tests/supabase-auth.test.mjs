@@ -174,6 +174,76 @@ async function registered(email = "new@example.test") {
   return result.body;
 }
 
+async function browserRequest(path, { body = {}, token, cookie, headers = {} } = {}) {
+  const requestHeaders = new Headers({ Origin: "https://example.test",
+    "X-CSRF-Protection": "1", "Content-Type": "application/json" });
+  if (token) requestHeaders.set("Authorization", `Bearer ${token}`);
+  if (cookie) requestHeaders.set("Cookie", cookie);
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === null) requestHeaders.delete(name);
+    else requestHeaders.set(name, value);
+  }
+  const response = await fetch(`${base}/api/auth${path}`, {
+    method: "POST", headers: requestHeaders, body: JSON.stringify(body),
+  });
+  return { status: response.status, body: response.status === 204 ? null : await response.json(), headers: response.headers };
+}
+
+test("Supabase browser login and refresh use cookies; both logout scopes clear and revoke them", async () => {
+  for (const path of ["/logout", "/logout-all"]) {
+    const account = await registered(`${path.slice(1)}@example.test`);
+    users.get(account.user.id).role = "ADMIN";
+    const login = await browserRequest("/login", {
+      body: { email: account.user.email, password: "original password" },
+    });
+    assert.equal(login.status, 200);
+    assert.equal(login.body.user.role, "ADMIN");
+    assert.equal(login.body.refreshToken, undefined);
+    const cookie = login.headers.get("set-cookie");
+    assert.ok(cookie.startsWith("__Host-leafcheck-refresh="));
+    for (const attribute of ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"])
+      assert.ok(cookie.includes(attribute));
+
+    const refreshed = await browserRequest("/refresh", { cookie: cookie.split(";")[0] });
+    assert.equal(refreshed.status, 200);
+    assert.deepEqual(Object.keys(refreshed.body).sort(), ["accessToken", "expiresIn"]);
+    const rotatedCookie = refreshed.headers.get("set-cookie").split(";")[0];
+    assert.notEqual(rotatedCookie, cookie.split(";")[0]);
+    assert.equal((await browserRequest("/refresh", {
+      body: { refreshToken: account.refreshToken }, cookie: rotatedCookie,
+    })).status, 400);
+
+    const logout = await browserRequest(path, { token: refreshed.body.accessToken, cookie: rotatedCookie });
+    assert.equal(logout.status, 204);
+    const cleared = logout.headers.get("set-cookie");
+    assert.ok(cleared.startsWith("__Host-leafcheck-refresh=;"));
+    assert.match(cleared, /Expires=Thu, 01 Jan 1970/);
+    for (const attribute of ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"])
+      assert.ok(cleared.includes(attribute));
+    assert.equal((await browserRequest("/refresh", { cookie: rotatedCookie })).status, 401);
+    assert.equal((await request("/api/users/me", undefined, refreshed.body.accessToken, "GET")).status, 401);
+    assert.equal((await request("/api/users/me", undefined, account.accessToken, "GET")).status,
+      path === "/logout-all" ? 401 : 200);
+  }
+});
+
+test("Supabase browser actions enforce origin/CSRF and keep registration, OTP and recovery native-only", async () => {
+  for (const path of ["/login", "/refresh", "/logout", "/logout-all"]) {
+    for (const headers of [{ Origin: null }, { Origin: "https://evil.test", "X-Auth-Client": "native" },
+      { "X-CSRF-Protection": null }, { "X-CSRF-Protection": "0" }]) {
+      const result = await browserRequest(path, { headers });
+      assert.equal(result.status, 403);
+      assert.equal(result.body.code, "ORIGIN_REJECTED");
+    }
+  }
+  for (const path of ["/register", "/otp/request", "/otp/verify", "/otp/resend", "/forgot-password", "/reset-password"]) {
+    const result = await browserRequest(path);
+    assert.equal(result.status, 400);
+    assert.equal(result.body.code, "NATIVE_REQUIRED");
+  }
+  assert.equal(upstreamCalls.length, 0);
+});
+
 test("legacy switch gates every new mutation and does not contact Supabase", async () => {
   process.env.AUTH_PROVIDER = "legacy";
   for (const path of ["/forgot-password", "/reset-password", "/otp/request", "/otp/verify", "/otp/resend"])
