@@ -2,12 +2,16 @@ import express from 'express';
 import assert from 'node:assert/strict';
 import { after, before, mock, test } from 'node:test';
 import { SignJWT } from 'jose';
+import { randomUUID } from 'node:crypto';
 
 let server, baseUrl, token, otherToken;
 const rows = new Map();
 const calls = [];
 let raceOwner, storageFailure = false;
 let findBarrier;
+let claimsEnabled = true;
+const rejectedHardware = new Set();
+const provisions = new Map();
 const secret = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM';
 const device = {
   findUnique: async ({where}) => {
@@ -21,6 +25,7 @@ const device = {
     return row;
   },
   create: async ({data}) => {
+    data = {id: randomUUID(), ...data};
     calls.push(['create', data]);
     if (storageFailure) throw new Error('private storage details');
     if (rows.has(data.macAddress)) throw Object.assign(new Error('unique conflict'), {code:'P2002'});
@@ -39,10 +44,21 @@ const device = {
 };
 before(async () => {
   Object.assign(process.env, { AUTH_PROVIDER: 'legacy', AUTH_JWT_SECRET: secret, AUTH_JWT_ISSUER: 'test', AUTH_JWT_AUDIENCE: 'test', AUTH_ALLOWED_ORIGINS: 'https://example.test', PORT: '0' });
-  mock.module(new URL('../src/lib/prisma-pg.js', import.meta.url).href, {namedExports: {prismaPg: {
+  const pg = {
     device,
+    platformSettings: {findUnique: async () => ({deviceClaimsEnabled: claimsEnabled})},
+    deviceProvision: {
+      findUnique: async ({where}) => {
+        if(rejectedHardware.has(where.macAddress)) return null;
+        if(!provisions.has(where.macAddress)) provisions.set(where.macAddress,{id:where.macAddress,macAddress:where.macAddress,status:'APPROVED',claimedDeviceId:null});
+        return provisions.get(where.macAddress);
+      },
+      update: async ({where,data}) => Object.assign(provisions.get(where.id),data),
+    },
     authSession: {findUnique: async ({where}) => ({id: where.id, userId: where.id, user: {id: where.id, role: 'USER', isActive: true}, expiresAt: new Date(Date.now() + 60000), revokedAt: null})},
-  }}});
+  };
+  pg.$transaction = async operation => operation(pg);
+  mock.module(new URL('../src/lib/prisma-pg.js', import.meta.url).href, {namedExports: {prismaPg: pg}});
   mock.module(new URL('../src/lib/prisma.js', import.meta.url).href, {namedExports: {prisma: {}}});
   for (const name of ['telemetry','plants','ai','scan','auth','users']) {
     mock.module(new URL(`../src/routes/${name}.js`, import.meta.url).href, {namedExports: {[`${name}Router`]: express.Router()}});
@@ -114,4 +130,20 @@ test('parallel claims yield one creation and an owner-appropriate conflict resol
     for (const result of results.filter(result => result.status < 300)) assert.equal(result.body.id,stored.id);
     if(expected === 409) assert.equal(results.find(result => result.status === 409).body.code,'DEVICE_ALREADY_CLAIMED');
   }
+});
+
+test('claims require enabled platform policy and approved registry before ownership changes', async () => {
+  const before = rows.size;
+  rejectedHardware.add('LC-999998');
+  const rejected = await claim({macAddress:'LC-999998'});
+  assert.equal(rejected.status,403); assert.equal(rejected.body.code,'HARDWARE_NOT_APPROVED');
+  provisions.set('LC-999997',{id:'LC-999997',macAddress:'LC-999997',status:'REVOKED',claimedDeviceId:null});
+  assert.equal((await claim({macAddress:'LC-999997'})).status,403);
+  claimsEnabled = false;
+  const disabled = await claim({macAddress:'LC-999996'});
+  assert.equal(disabled.status,503); assert.equal(disabled.body.code,'DEVICE_CLAIMS_DISABLED');
+  claimsEnabled = true;
+  assert.equal(rows.size,before);
+  const created = await claim({macAddress:'LC-999996'});
+  assert.equal(created.status,201); assert.equal(provisions.get('LC-999996').claimedDeviceId,created.body.id);
 });

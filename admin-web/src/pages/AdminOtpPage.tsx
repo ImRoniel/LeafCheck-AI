@@ -58,7 +58,7 @@ export function AdminOtpPage() {
     <main className="flex min-h-screen items-center justify-center px-6 py-12">
       <section aria-labelledby="otp-heading" className="w-full max-w-md rounded-2xl border border-edge bg-panel p-8 shadow-sm">
         <span aria-hidden="true" className="mb-6 flex size-11 items-center justify-center rounded-xl bg-emerald-800 text-sm font-bold text-white">LC</span>
-        <p className="text-sm font-semibold text-brand">SuperAdmin verification</p>
+        <p className="text-sm font-semibold text-brand">Staff verification</p>
         <h1 id="otp-heading" className="mt-3 text-2xl font-semibold tracking-tight">Check your email</h1>
         <p id="otp-instructions" className="mt-3 text-sm leading-6 text-secondary">Enter the 8-digit code sent to your email.</p>
         <p className="mt-1 break-all text-sm font-medium">{pending.maskedEmail}</p>

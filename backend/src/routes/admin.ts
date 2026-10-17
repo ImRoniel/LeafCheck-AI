@@ -14,12 +14,13 @@ import { resourceId } from "../lib/ownership.js";
 import { prisma } from "../lib/prisma.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { serializeTelemetry } from "../lib/telemetry-payload.js";
+import { adminPlatformRouter } from "./admin-platform.js";
+import { adminOperationsRouter } from "./admin-operations.js";
 
 const identitySelect = {
   id: true, name: true, email: true, role: true, isActive: true,
   createdAt: true, updatedAt: true,
 } satisfies Prisma.UserSelect;
-const physicalMac = /^(?:LC-[0-9a-f]{6}|[0-9a-f]{2}(?::[0-9a-f]{2}){5}|[0-9a-f]{2}(?:-[0-9a-f]{2}){5})$/i;
 const transactionOptions = { isolationLevel: "RepeatableRead" } as const;
 const freshnessWindowSeconds = 1800;
 const futureToleranceSeconds = 60;
@@ -131,6 +132,8 @@ function userWhere(query: Record<string, string>, q: string | undefined, operato
 
 export const adminRouter = Router();
 adminRouter.use(adminResponseHeaders, requireAuth, requireAdmin, requireAdminVerification);
+// Register provisioning before the parameterized device details route.
+adminRouter.use(adminPlatformRouter, adminOperationsRouter);
 
 const actor = (req: Request, res: Response): AdminActor => ({
   actorId: res.locals.auth.user.id, sessionId: res.locals.auth.sessionId, ipAddress: req.ip,
@@ -261,28 +264,6 @@ adminRouter.get("/users/:id", requirePermission("users.read"), asyncRoute(async 
     };
   }, transactionOptions);
   res.json({ data, meta: meta(res) });
-}));
-
-adminRouter.get("/devices/whitelist", requirePermission("devices.manage"), asyncRoute(async (req, res) => {
-  const query = queryParams(req, ["page", "pageSize", "q", "userId"]);
-  const page = pageQuery(query);
-  const where: Prisma.DeviceWhereInput = {
-    NOT: { macAddress: { startsWith: "DEMO:" } },
-    userId: query.userId === undefined ? undefined : resourceId(query.userId),
-    ...(page.q ? { OR: [{ name: textSearch(page.q) }, { macAddress: textSearch(page.q) }] } : {}),
-  };
-  const [devices, total] = await prismaPg.$transaction(async tx => Promise.all([
-    tx.device.findMany({ where, skip: page.skip, take: page.pageSize, orderBy: [{ macAddress: "asc" }, { id: "asc" }], select: {
-      id: true, macAddress: true, name: true, userId: true, createdAt: true, user: { select: { isActive: true } },
-    } }),
-    tx.device.count({ where }),
-  ]), transactionOptions);
-  listResponse(res, devices.map(device => ({
-    deviceId: device.id, macAddress: device.macAddress, name: device.name,
-    ownerId: device.userId, ownerIsActive: device.user.isActive,
-    ingestionAllowed: physicalMac.test(device.macAddress), authorizationBasis: "REGISTERED_DEVICE",
-    proofOfPossessionVerified: false, registeredAt: device.createdAt,
-  })), page, total, { policy: "REGISTERED_DEVICE", independentWhitelist: false });
 }));
 
 adminRouter.get("/devices", requirePermission("devices.read"), asyncRoute(async (req, res) => {

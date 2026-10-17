@@ -17,8 +17,7 @@ export async function assertAdminVerification(
   sessionId: string,
   client: Pick<Prisma.TransactionClient, "adminSessionVerification"> = prismaPg,
 ) {
-  // LEAD_DEV is intentionally password-only; permission guards limit it to reads.
-  if (user.role !== "ADMIN") return;
+  if (user.role !== "ADMIN" && user.role !== "LEAD_DEV") return;
   if (authProvider() !== "supabase") throw verificationRequired();
   const proof = await client.adminSessionVerification.findUnique({ where: { supabaseSessionId: sessionId } });
   const now = new Date();
@@ -27,10 +26,13 @@ export async function assertAdminVerification(
 }
 
 /** Mounted for the entire admin router, including unknown paths and mutations. */
-export const requireAdminVerification = asyncRoute(async (_req, res, next) => {
+export const requireAdminVerification = asyncRoute(async (req, res, next) => {
   const auth: { user: AdminIdentity; sessionId: string } | undefined = res.locals.auth;
   if (!auth) throw new HttpError(401, "INVALID_SESSION", "Invalid or expired session.");
-  await assertAdminVerification(auth.user, auth.sessionId);
+  // Existing operator sessions can still inspect diagnostics. Every write must
+  // carry a current password-plus-OTP proof, including writes by LEAD_DEV.
+  if (!(auth.user.role === "LEAD_DEV" && ["GET", "HEAD", "OPTIONS"].includes(req.method)))
+    await assertAdminVerification(auth.user, auth.sessionId);
   next();
 });
 

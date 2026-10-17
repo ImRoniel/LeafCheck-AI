@@ -83,7 +83,7 @@ export function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 border-t border-edge pt-5 text-xs leading-5 text-subtle">Access is limited to SuperAdmin and System Administrator accounts. SuperAdmins verify an email code before signing in.</p>
+        <p className="mt-6 border-t border-edge pt-5 text-xs leading-5 text-subtle">Access is limited to SuperAdmin and System Administrator accounts. Both staff roles verify an email code before signing in.</p>
       </section>
     </main>
   )

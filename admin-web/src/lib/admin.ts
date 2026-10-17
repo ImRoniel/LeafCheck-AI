@@ -167,7 +167,7 @@ export function auditOutcome(row: AuditRow): string {
   if (/(?:FAILED|DENIED|REJECTED)$/.test(row.action)) return 'Failed'
   if (/CANCELLED$/.test(row.action)) return 'Cancelled'
   if (/REQUESTED$/.test(row.action)) return 'Requested'
-  if (/(?:VERIFIED|RESENT|CREATED|UPDATED|DELETED)$/.test(row.action)) return 'Succeeded'
+  if (/(?:VERIFIED|RESENT|CREATED|UPDATED|DELETED|RENAMED|UNLINKED|REVOKED|PROVISIONED|BACKFILLED)$/.test(row.action)) return 'Succeeded'
   return 'Recorded'
 }
 

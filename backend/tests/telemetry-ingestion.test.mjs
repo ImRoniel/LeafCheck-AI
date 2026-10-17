@@ -8,7 +8,7 @@ import { matchesWhere } from "./helpers/mongo-filter.mjs";
 const userId = randomUUID(), plantId = randomUUID(), deviceId = randomUUID();
 const device = { id: deviceId, userId, name: "Sensor", macAddress: "LC-A50528", status: "ONLINE", createdAt: new Date(), updatedAt: new Date() };
 const plant = { id: plantId, userId, name: "Snake plant", species: "Dracaena hyacinthoides", deviceId, imageUrl: "data:image/jpeg;base64,/9j/2Q==", healthStatus: "healthy", minMoisture: 30, maxMoisture: 80 };
-let server, base, rows, prompts, queries, activePairing, inTransaction, lookupCount, lookupFailures, insertGate;
+let server, base, rows, prompts, queries, activePairing, inTransaction, lookupCount, lookupFailures, insertGate, provisionStatus;
 const matches = (query, row) => matchesWhere(row,query.where);
 before(async () => {
   mock.module(new URL("../src/lib/auth.js", import.meta.url).href, { namedExports: { requireAuth(req, res, next) {
@@ -26,6 +26,8 @@ before(async () => {
     count: async query => rows.filter(row => matches(query, row)).length,
   } } } });
   const pg = {
+    platformSettings: { findUnique: async () => null },
+    deviceProvision: { findUnique: async () => provisionStatus ? {id:deviceId,status:provisionStatus,claimedDeviceId:deviceId} : null },
     device: { findUnique: async ({ where }) => where.macAddress === device.macAddress ? device : null,
       findFirst: async ({ where }) => where.id === deviceId && where.userId === userId ? device : null,
       findMany: async () => [{ ...device, plants: [plant] }] },
@@ -67,6 +69,7 @@ before(async () => {
 });
 beforeEach(() => {
   rows = []; prompts = []; queries = []; inTransaction = false; lookupCount = 0; lookupFailures = 0; insertGate = null;
+  provisionStatus = "APPROVED";
   activePairing = {id:randomUUID(),plantId};
 });
 after(async () => { await new Promise(resolve => server.close(resolve)); mock.restoreAll(); });
@@ -174,4 +177,15 @@ test("firmware cannot supply plant, pairing or context version", async () => {
     assert.equal((await post("/api/telemetry",{...payload,...fields})).status,400);
   }
   assert.equal(lookupCount,0); assert.equal(rows.length,0);
+});
+
+test("revoked and unregistered hardware cannot upload or alter existing reading history", async () => {
+  assert.equal((await post("/api/telemetry",payload)).status,201);
+  const original = structuredClone(rows);
+  for (const status of ["REVOKED",null]) {
+    provisionStatus = status;
+    const response = await post("/api/telemetry",payload);
+    assert.equal(response.status,403); assert.equal((await response.json()).code,"HARDWARE_NOT_APPROVED");
+    assert.deepEqual(rows,original);
+  }
 });

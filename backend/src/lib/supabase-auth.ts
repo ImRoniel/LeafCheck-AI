@@ -80,7 +80,7 @@ export async function resendOtp(email: string, type: EmailOtpType) {
 export async function verifyOtp(email: string, code: string, type: EmailOtpType) {
   if (type !== "signup" && !await mappedEmail(email)) throw invalidOtp();
   const result = await complete(await verifyEmailCode(email, code, type), type === "signup");
-  if (result.user.role === "ADMIN") {
+  if (result.user.role === "ADMIN" || result.user.role === "LEAD_DEV") {
     await supabaseAdmin.logout(result.tokens.accessToken, "local");
     throw verificationRequired();
   }

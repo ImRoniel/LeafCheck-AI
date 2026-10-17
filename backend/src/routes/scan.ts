@@ -17,6 +17,7 @@
 import { randomUUID } from "node:crypto";
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
+import { requireAiScanning } from "../lib/platform-policy.js";
 import { geminiModel } from "../lib/gemini.js";
 import { diagnosisFailure, logDiagnosisError } from "../lib/diagnosis-error.js";
 import { diagnosisTelemetrySnapshot, readingIsFresh } from "../lib/diagnosis-telemetry.js";
@@ -60,6 +61,7 @@ function sendNonlivingScan(res: Response, subjectKind: Exclude<SubjectKind, "liv
 
 scanRouter.post(
   "/",
+  requireAiScanning,
   asyncRoute(async (req, res, next) => {
     const data = bodyObject(req.body, [
       "imageBase64",

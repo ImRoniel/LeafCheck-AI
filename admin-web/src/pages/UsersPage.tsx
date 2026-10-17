@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Ban, CheckCircle2, Eye, EyeOff, Mail, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Undo2, Users } from 'lucide-react'
+import { Ban, CheckCircle2, Eye, EyeOff, LogOut, Mail, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Undo2, Users } from 'lucide-react'
 import { RequestError, TableMessage, TablePagination } from '../components/AdminTable'
 import { Modal } from '../components/Modal'
 import { FieldError } from '../components/FieldError'
@@ -11,6 +11,8 @@ import { errorMessage, readUserRow, type UserRow } from '../lib/admin'
 import { apiFetch, ApiError } from '../lib/api'
 import { initials } from '../lib/format'
 import { userFieldErrors, validateUserForm, type UserField, type UserFieldErrors } from '../lib/user-form'
+import { ForceLogoutModal } from '../components/ForceLogoutModal'
+import { hasPermission } from '../lib/permissions'
 
 type UserDialog = { kind: 'create' } | { kind: 'edit' | 'delete'; user: UserRow }
 const userLabel = (row: UserRow) => row.name ?? row.email ?? row.emailMasked
@@ -22,6 +24,7 @@ export function UsersPage() {
   const [query, setQuery] = useState('')
   const [revealEmails, setRevealEmails] = useState(false)
   const [dialog, setDialog] = useState<UserDialog | null>(null)
+  const [revoking, setRevoking] = useState<UserRow | null>(null)
   const [deleteText, setDeleteText] = useState('')
   const [mutation, setMutation] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -209,6 +212,7 @@ export function UsersPage() {
                       {row.id === user?.id ? <span className="ml-2 text-xs text-subtle">Your account</span> : <>
                         <button type="button" disabled={busy} aria-label={(row.isActive ? 'Ban ' : 'Unban ') + userLabel(row)} onClick={() => { void toggleBan(row) }} className="button-quiet">{row.isActive ? <Ban size={13} aria-hidden="true" /> : <Undo2 size={13} aria-hidden="true" />}{mutation === row.id ? 'Saving...' : row.isActive ? 'Ban' : 'Unban'}</button>
                         <button type="button" disabled={busy} aria-label={'Delete ' + userLabel(row)} onClick={() => openDialog({ kind: 'delete', user: row })} className="button-quiet text-danger-fg hover:bg-danger-bg hover:text-danger-fg"><Trash2 size={13} aria-hidden="true" />Delete</button>
+                        {user && hasPermission(user.role, 'sessions.revoke') && <button type="button" disabled={busy} aria-label={'Force Logout ' + userLabel(row)} onClick={() => setRevoking(row)} className="button-quiet"><LogOut size={13} aria-hidden="true" />Force Logout</button>}
                       </>}
                     </div>
                   </td>
@@ -267,7 +271,7 @@ export function UsersPage() {
               </div>}
             </fieldset>
             {editing?.id === user?.id && <p className="notice-warning mt-4">Changing your own role signs you out. The last active SuperAdmin cannot be demoted.</p>}
-            <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-subtle"><ShieldCheck size={14} className="mt-0.5 shrink-0" aria-hidden="true" />SuperAdmin accounts must verify an email code at sign-in.</p>
+            <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-subtle"><ShieldCheck size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Staff accounts must verify an email code at sign-in before making changes.</p>
             {mutationError && <div className="mt-4"><RequestError message={mutationError} /></div>}
             {staleEdit && <button type="button" className="button-secondary" onClick={() => { closeDialog(); reload() }}>Close and refresh</button>}
             <div className="mt-6 flex justify-end gap-2 border-t border-edge pt-5"><button type="button" onClick={closeDialog} className="button-secondary">Cancel</button><button type="submit" disabled={busy || staleEdit} className="button-primary">{mutation === 'save' ? 'Saving...' : editing ? 'Save changes' : 'Create account'}</button></div>
@@ -286,6 +290,7 @@ export function UsersPage() {
           </form>
         </Modal>
       )}
+      {revoking && <ForceLogoutModal user={revoking} onClose={() => setRevoking(null)} onSaved={() => { setNotice(`Application sessions revoked for ${userLabel(revoking)}.`); setRevoking(null); reload() }} />}
     </section>
   )
 }

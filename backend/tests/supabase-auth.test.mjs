@@ -225,12 +225,11 @@ async function browserRequest(path, { body = {}, token, cookie, headers = {} } =
 test("Supabase browser login and refresh use cookies; both logout scopes clear and revoke them", async () => {
   for (const path of ["/logout", "/logout-all"]) {
     const account = await registered(`${path.slice(1)}@example.test`);
-    users.get(account.user.id).role = "LEAD_DEV";
     const login = await browserRequest("/login", {
       body: { email: account.user.email, password: "original password" },
     });
     assert.equal(login.status, 200);
-    assert.equal(login.body.user.role, "LEAD_DEV");
+    assert.equal(login.body.user.role, "USER");
     assert.equal(login.body.refreshToken, undefined);
     const cookie = login.headers.get("set-cookie");
     assert.doesNotMatch(cookie, /(?:^|;)\s*(?:Max-Age|Expires)=/i);
@@ -284,8 +283,8 @@ async function staffAccount(role = "ADMIN") {
   users.get(account.user.id).role = role;
   return account;
 }
-async function verifiedAdministrator() {
-  const account = await staffAccount();
+async function verifiedAdministrator(role = "ADMIN") {
+  const account = await staffAccount(role);
   const challenge = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
   assert.equal(challenge.status, 202);
   const verified = await browserRequest("/verify-admin-otp", { body: {
@@ -303,24 +302,22 @@ async function adminRequest(path, token, method = "GET", body) {
   return { status: response.status, body: response.status === 204 ? null : await response.json(), headers: response.headers };
 }
 
-test("LEAD_DEV password login returns a JWT immediately but all user and audit operations are forbidden", async () => {
-  const account = await staffAccount("LEAD_DEV");
-  const login = await request("/login", { email: account.user.email, password: "original password" });
-  assert.equal(login.status, 200);
-  assert.equal(typeof login.body.accessToken, "string");
-  assert.equal(challenges.size, 0);
-  assert.equal((await adminRequest("/devices", login.body.accessToken)).status, 200);
+test("LEAD_DEV password login requires OTP and verified operators cannot access platform administration", async () => {
+  const account = await verifiedAdministrator("LEAD_DEV");
+  assert.equal(typeof account.accessToken, "string");
+  assert.equal(challenges.size, 1);
+  assert.equal((await adminRequest("/devices", account.accessToken)).status, 200);
   for (const [path, method, body] of [["/users", "GET"], ["/admins", "GET"], ["/audit", "GET"],
     ["/devices/whitelist", "GET"], [`/users/${account.user.id}`, "GET"], ["/users", "POST", {}],
     [`/users/${account.user.id}`, "PATCH", { role: "ADMIN" }], [`/users/${account.user.id}`, "DELETE"]]) {
-    const result = await adminRequest(path, login.body.accessToken, method, body);
+    const result = await adminRequest(path, account.accessToken, method, body);
     assert.equal(result.status, 403, `${method} ${path}`);
     assert.equal(result.body.code, "FORBIDDEN");
   }
   for (const [path, method, body] of [["/api/devices/claim", "POST", { macAddress: "LC-A50528" }],
     [`/api/plants/${randomUUID()}/pair-device`, "PATCH", { deviceId: randomUUID() }],
     [`/api/plants/${randomUUID()}/seed-telemetry`, "POST", {}]]) {
-    const denied = await request(path, body, login.body.accessToken, method);
+    const denied = await request(path, body, account.accessToken, method);
     assert.equal(denied.status, 403); assert.equal(denied.body.code, "FORBIDDEN");
   }
 });
@@ -406,6 +403,20 @@ test("ADMIN refresh requires the same verified session and clears unverified bro
   assert.equal(expired.status, 403); assert.equal(expired.body.code, "ADMIN_VERIFICATION_REQUIRED");
 });
 
+test("LEAD_DEV refresh requires an OTP proof and generic OTP cannot replace password-plus-OTP login", async () => {
+  const account = await staffAccount("LEAD_DEV");
+  const denied = await browserRequest("/refresh", { cookie: `__Host-leafcheck-refresh=${account.refreshToken}` });
+  assert.equal(denied.status, 403); assert.equal(denied.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  await request("/otp/request", { email: account.user.email });
+  const generic = await request("/otp/verify", { email: account.user.email,
+    code: codes.get(`${account.user.email}:magiclink`), type: "magiclink" });
+  assert.equal(generic.status, 403); assert.equal(generic.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  const lead = await verifiedAdministrator("LEAD_DEV");
+  const refreshed = await browserRequest("/refresh", { cookie: lead.cookie });
+  assert.equal(refreshed.status, 200);
+  assert.equal((await adminRequest("/devices", refreshed.body.accessToken)).status, 200);
+});
+
 test("proofs cannot be transferred between accounts, session IDs, or account security versions", async () => {
   const admin = await verifiedAdministrator();
   const proof = [...verifications.values()][0];
@@ -448,7 +459,7 @@ test("resend increments the shared attempt budget without extending expiry; canc
 });
 
 test("expired challenges and changed roles fail closed before a privileged session can be issued", async () => {
-  for (const mutate of [record => { record.expiresAt = new Date(Date.now() - 1); }, record => { users.get(record.userId).role = "LEAD_DEV"; }]) {
+  for (const mutate of [record => { record.expiresAt = new Date(Date.now() - 1); }, record => { users.get(record.userId).role = "USER"; }]) {
     const account = await staffAccount();
     const login = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
     mutate([...challenges.values()].find(record => record.userId === account.user.id));

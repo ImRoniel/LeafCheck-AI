@@ -108,6 +108,7 @@ before(async () => {
 });
 beforeEach(async () => {
   pauseVerification = null; failProviderDeletion = false; failAudit = false;
+  await db.deviceProvision.deleteMany(); await db.platformSettings.deleteMany();
   await db.auditLog.deleteMany(); await db.user.deleteMany();
   identities.clear(); sessions.clear(); tokens.clear(); codes.clear();
 });
@@ -133,10 +134,14 @@ async function verified() {
   assert.equal(result.status, 200); return { ...result.body, id: user.id, updatedAt: user.updatedAt.toISOString(), cookie: result.headers.get("set-cookie").split(";")[0] };
 }
 
-test("real PostgreSQL: LEAD_DEV receives a JWT, cannot read users, and receives no owner identity", async () => {
+test("real PostgreSQL: LEAD_DEV completes OTP, cannot read users, and receives no owner identity", async () => {
   const lead = await account("LEAD_DEV"), owner = await account("USER");
   await db.device.create({ data: { name: "Sensor", macAddress: "LC-A50528", userId: owner.id } });
-  const result = await login(lead); assert.equal(result.status, 200);
+  const challenge = await login(lead); assert.equal(challenge.status, 202);
+  const result = await request("/api/auth/verify-admin-otp", { body: {
+    challengeToken: challenge.body.challengeToken, code: codes.get(lead.email),
+  } });
+  assert.equal(result.status, 200);
   const users = await request("/api/admin/users", { method: "GET", token: result.body.accessToken });
   assert.equal(users.status, 403); assert.equal(users.body.code, "FORBIDDEN");
   const devices = await request("/api/admin/devices", { method: "GET", token: result.body.accessToken });
@@ -251,10 +256,15 @@ test("real PostgreSQL: CRUD audits are transactional and role changes invalidate
   const admin = await verified();
   const created = await request("/api/admin/users", { token: admin.accessToken, body: { email: "created@example.test", password: "integration password", role: "LEAD_DEV" } });
   assert.equal(created.status, 201); const target = created.body.data;
-  const oldSession = await login(target); assert.equal(oldSession.status, 200);
+  const challenge = await login(target); assert.equal(challenge.status, 202);
+  const oldSession = await request("/api/auth/verify-admin-otp", { body: {
+    challengeToken: challenge.body.challengeToken, code: codes.get(target.email),
+  } });
+  assert.equal(oldSession.status, 200);
   const edited = await request(`/api/admin/users/${target.id}`, { token: admin.accessToken, method: "PATCH", body: { role: "ADMIN", updatedAt: target.updatedAt } });
   assert.equal(edited.status, 200);
   assert.equal((await request("/api/admin/devices", { method: "GET", token: oldSession.body.accessToken })).status, 401);
+  await db.adminChallenge.updateMany({ where: { userId: target.id }, data: { lastSentAt: new Date(Date.now() - 61000) } });
   assert.equal((await login(target)).status, 202);
   assert.equal(await db.auditLog.count({ where: { action: "USER_CREATED", targetId: target.id } }), 1);
   assert.equal(await db.auditLog.count({ where: { action: "USER_UPDATED", targetId: target.id } }), 1);
@@ -352,4 +362,141 @@ test("real PostgreSQL: opt-in emails and audit identities retain deleted-account
   assert.equal(after.body.data[0].actorId, null);
   assert.equal(after.body.data[0].metadata.actorId, target.id);
   assert.equal(after.body.data[0].targetEmail, admin.user.email);
+});
+
+async function verifiedOperator() {
+  const user = await account("LEAD_DEV");
+  const challenge = await login(user);
+  assert.equal(challenge.status, 202);
+  const result = await request("/api/auth/verify-admin-otp", { body: {
+    challengeToken: challenge.body.challengeToken, code: codes.get(user.email),
+  } });
+  assert.equal(result.status, 200);
+  return { ...result.body, id: user.id };
+}
+
+async function pairedHardware(owner) {
+  const device = await db.device.create({ data: { name: "Hall sensor", macAddress: "LC-A50528", userId: owner.id } });
+  const plant = await db.plant.create({ data: { name: "Monstera", species: "Monstera deliciosa", userId: owner.id, deviceId: device.id } });
+  const pairing = await db.devicePairingHistory.create({ data: { deviceId: device.id, plantId: plant.id } });
+  return { device, plant, pairing };
+}
+
+test("real PostgreSQL: operator writes require OTP and concurrent rename preserves the winning version and audit", async () => {
+  const lead = await account("LEAD_DEV"), owner = await account("USER");
+  const { device } = await pairedHardware(owner);
+  const raw = await issue(identities.get(lead.supabaseUserId));
+  const path = `/api/admin/devices/${device.id}`;
+  const detail = await request(path, { method: "GET", token: raw.access_token });
+  assert.equal(detail.status, 200);
+  assert.equal("owner" in detail.body.data, false);
+  assert.ok(!JSON.stringify(detail.body).includes(owner.email));
+  const denied = await request(path, { method: "PATCH", token: raw.access_token,
+    body: { name: "Unverified", updatedAt: device.updatedAt.toISOString(), reason: "Relocated hardware" } });
+  assert.equal(denied.status, 403); assert.equal(denied.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  const challenge = await login(lead);
+  assert.equal(challenge.status, 202);
+  const verified = await request("/api/auth/verify-admin-otp", { body: {
+    challengeToken: challenge.body.challengeToken, code: codes.get(lead.email),
+  } });
+  assert.equal(verified.status, 200);
+  const changes = await Promise.all(["First room", "Second room"].map(name => request(path, {
+    method: "PATCH", token: verified.body.accessToken,
+    body: { name, updatedAt: device.updatedAt.toISOString(), reason: "Relocated hardware" },
+  })));
+  assert.deepEqual(changes.map(result => result.status).sort(), [200, 409]);
+  assert.equal("owner" in changes.find(result => result.status === 200).body.data, false);
+  const logs = await db.auditLog.findMany({ where: { action: "DEVICE_RENAMED", targetId: device.id } });
+  assert.equal(logs.length, 1); assert.equal(logs[0].actorId, lead.id);
+  assert.equal(logs[0].metadata.reason, "Relocated hardware");
+  assert.equal(logs[0].metadata.before.name, "Hall sensor");
+  assert.equal(logs[0].metadata.after.name, (await db.device.findUnique({ where: { id: device.id } })).name);
+});
+
+test("real PostgreSQL: unlink rejects a changed assignment and rolls back every change when auditing fails", async () => {
+  const lead = await verifiedOperator(), owner = await account("USER");
+  const { device, plant, pairing } = await pairedHardware(owner);
+  const replacement = await db.plant.create({ data: { name: "Fern", species: "Fern", userId: owner.id } });
+  const analysis = await db.aIAnalysis.create({ data: {
+    plantId: plant.id, userId: owner.id, healthStatus: "healthy", diagnoses: [], recommendations: [],
+  } });
+  const { pairPlantDevice } = await import("../../src/lib/plant-pairing.ts");
+  await pairPlantDevice(replacement.id, owner.id, device.id);
+  const current = await db.devicePairingHistory.findFirst({ where: { deviceId: device.id, unpairedAt: null } });
+  assert.notEqual(current.id, pairing.id);
+  const path = `/api/admin/devices/${device.id}/unlink`;
+  const version = (await db.device.findUnique({ where: { id: device.id } })).updatedAt.toISOString();
+  const unlink = expectedPairingId => request(path, { token: lead.accessToken, body: {
+    updatedAt: version, expectedPairingId, reason: "Hardware maintenance",
+  } });
+  assert.equal((await unlink(pairing.id)).status, 409);
+  assert.equal((await db.plant.findUnique({ where: { id: replacement.id } })).deviceId, device.id);
+  failAudit = true;
+  assert.equal((await unlink(current.id)).status, 503);
+  assert.equal((await db.plant.findUnique({ where: { id: replacement.id } })).deviceId, device.id);
+  assert.equal((await db.devicePairingHistory.findUnique({ where: { id: current.id } })).unpairedAt, null);
+  failAudit = false;
+  const result = await unlink(current.id);
+  assert.equal(result.status, 200); assert.equal(result.body.data.pairing, null);
+  assert.equal("owner" in result.body.data, false);
+  assert.equal((await db.plant.findUnique({ where: { id: replacement.id } })).deviceId, null);
+  assert.equal(await db.devicePairingHistory.count({ where: { deviceId: device.id } }), 2);
+  assert.ok((await db.devicePairingHistory.findUnique({ where: { id: current.id } })).unpairedAt);
+  assert.ok(await db.aIAnalysis.findUnique({ where: { id: analysis.id } }));
+  assert.equal(await db.auditLog.count({ where: { action: "DEVICE_UNLINKED", targetId: device.id } }), 1);
+});
+
+test("real PostgreSQL: force logout rejects provider access and refresh and revokes legacy sessions and OTP proofs", async () => {
+  const admin = await verified(), target = await verified();
+  const targetUser = await db.user.findUnique({ where: { id: target.id } });
+  const legacy = await db.authSession.create({ data: { userId: target.id, client: "native", expiresAt: new Date(Date.now() + 86400000) } });
+  const pending = await db.adminChallenge.create({ data: {
+    userId: target.id, email: targetUser.email, supabaseUserId: targetUser.supabaseUserId,
+    challengeHash: randomUUID(), expiresAt: new Date(Date.now() + 300000), client: "browser", origin: "https://admin.example.test",
+  } });
+  const result = await request(`/api/admin/users/${target.id}/revoke-sessions`, {
+    token: admin.accessToken, body: { reason: "Suspected lost device" },
+  });
+  assert.equal(result.status, 200); assert.equal(result.body.data.authVersion, 1);
+  assert.equal((await request("/api/admin/devices", { method: "GET", token: target.accessToken })).status, 401);
+  assert.equal((await request("/api/auth/refresh", { body: {}, cookie: target.cookie })).status, 401);
+  assert.ok((await db.authSession.findUnique({ where: { id: legacy.id } })).revokedAt);
+  assert.ok((await db.adminChallenge.findUnique({ where: { id: pending.id } })).consumedAt);
+  assert.equal(await db.adminSessionVerification.count({ where: { userId: target.id } }), 0);
+  assert.equal((await db.user.findUnique({ where: { id: target.id } })).isActive, true);
+  const event = await db.auditLog.findFirst({ where: { action: "USER_SESSIONS_REVOKED", targetId: target.id } });
+  assert.equal(event.actorId, admin.id); assert.equal(event.metadata.reason, "Suspected lost device");
+  assert.equal(event.metadata.providerSessionPolicy, "APPLICATION_CUTOFF");
+});
+
+test("real PostgreSQL: provisioning is versioned, revocation retains device history and settings audit atomically", async () => {
+  const admin = await verified(), owner = await account("USER");
+  const { device, pairing } = await pairedHardware(owner);
+  const provisioned = await request("/api/admin/devices/whitelist", { token: admin.accessToken,
+    body: { macAddress: "lc-a50528", label: "Hall", reason: "Approved hardware" } });
+  assert.equal(provisioned.status, 201);
+  assert.equal(provisioned.body.data.macAddress, "LC-A50528");
+  const provision = provisioned.body.data;
+  const revoke = await request(`/api/admin/devices/whitelist/${provision.id}`, { method: "PATCH", token: admin.accessToken,
+    body: { updatedAt: provision.updatedAt, status: "REVOKED", reason: "Maintenance" } });
+  assert.equal(revoke.status, 200);
+  assert.equal(revoke.body.data.status, "REVOKED");
+  assert.ok(await db.device.findUnique({ where: { id: device.id } }));
+  assert.equal((await db.devicePairingHistory.findUnique({ where: { id: pairing.id } })).unpairedAt, null);
+  const stale = await request(`/api/admin/devices/whitelist/${provision.id}`, { method: "PATCH", token: admin.accessToken,
+    body: { updatedAt: provision.updatedAt, status: "APPROVED", reason: "Old view" } });
+  assert.equal(stale.status, 409);
+  const settings = await request("/api/admin/settings", { method: "GET", token: admin.accessToken });
+  assert.equal(settings.status, 200);
+  failAudit = true;
+  const settingsPath = "/api/admin/settings";
+  const body = { updatedAt: settings.body.data.updatedAt, aiScanningEnabled: false, reason: "Maintenance window" };
+  assert.equal((await request(settingsPath, { method: "PATCH", token: admin.accessToken, body })).status, 503);
+  assert.equal((await request(settingsPath, { method: "GET", token: admin.accessToken })).body.data.aiScanningEnabled, true);
+  failAudit = false;
+  assert.equal((await request(settingsPath, { method: "PATCH", token: admin.accessToken, body })).status, 200);
+  assert.equal((await request(settingsPath, { method: "PATCH", token: admin.accessToken, body })).status, 409);
+  const monitor = await request("/api/admin/integrations", { method: "GET", token: admin.accessToken });
+  assert.equal(monitor.status, 200);
+  assert.ok(monitor.body.data.every(provider => provider.quota.remaining === null && provider.lastObservedAt === null));
 });

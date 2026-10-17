@@ -104,7 +104,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStatus('anonymous')
         if (error instanceof ApiError && error.code === 'ADMIN_VERIFICATION_REQUIRED') {
           setSessionError('Please sign in again and verify your administrator code.')
-        } else if (hadSession || ['/dashboard', '/users', '/devices', '/audit', '/forbidden'].includes(window.location.pathname.replace(/\/+$/, ''))) {
+        } else if (hadSession || ['/dashboard', '/users', '/devices', '/diagnostics', '/provisioning', '/settings', '/integrations', '/audit', '/forbidden'].includes(window.location.pathname.replace(/\/+$/, ''))) {
           setSessionError(sessionExpiredMessage)
         } else if (!(error instanceof ApiError && error.status === 401)) {
           setSessionError('Unable to restore your session. Please sign in again.')

@@ -15,9 +15,15 @@ export async function deployIntegrationPostgres(runPrisma) {
     // neither edits application migrations nor lets db push omit native checks.
     const securityMigrations = (await readdir(join(prismaDirectory, "migrations")))
       .filter(name => name.endsWith("_admin_security_foundation"));
-    const preSecurity = securityMigrations.length ? current
+    const featureMigrations = (await readdir(join(prismaDirectory, "migrations")))
+      .filter(name => name.endsWith("_admin_features_v2"));
+    const preFeatures = featureMigrations.length ? current
+      .replace(/\nenum DeviceProvisionStatus \{[\s\S]*?\n\}\n/g, "\n")
+      .replace(/\nmodel (?:DeviceProvision|PlatformSettings) \{[\s\S]*?\n\}\n/g, "\n")
+      .replace(/^\s*\w+\s+(?:DeviceProvision|PlatformSettings)(?:\[\]|\?)[^\n]*\r?\n/gm, "") : current;
+    const preSecurity = securityMigrations.length ? preFeatures
       .replace(/\nmodel (?:AdminChallenge|AdminSessionVerification|AuditLog) \{[\s\S]*?\n\}\n/g, "\n")
-      .replace(/^\s*(?:adminChallenges|adminVerifications|auditLogs|authVersion|authInvalidBefore)\s+[^\n]*\r?\n/gm, "") : current;
+      .replace(/^\s*(?:adminChallenges|adminVerifications|auditLogs|authVersion|authInvalidBefore)\s+[^\n]*\r?\n/gm, "") : preFeatures;
     const baseline = preSecurity
       .replace(/^\s*pairingHistory\s+DevicePairingHistory\[\]\r?\n/gm, "")
       .replace(/\nmodel DevicePairingHistory \{[\s\S]*?\n\}\n/, "\n");
@@ -31,6 +37,8 @@ export async function deployIntegrationPostgres(runPrisma) {
     const phaseA = "20261014000000_plant_scoped_telemetry";
     await cp(join(prismaDirectory, "migrations", phaseA), join(temporary, "migrations", phaseA), {recursive:true});
     for (const migration of securityMigrations)
+      await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
+    for (const migration of featureMigrations)
       await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
     await cp(join(prismaDirectory, "migrations/migration_lock.toml"), join(temporary, "migrations/migration_lock.toml"));
     await writeFile(schema, current);

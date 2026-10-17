@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { ChevronRight, CircleUserRound, Cpu, LayoutDashboard, Leaf, LogOut, Moon, ScrollText, ShieldCheck, Sun, Users, type LucideIcon } from 'lucide-react'
+import { Activity, ChevronRight, CircleUserRound, Cpu, LayoutDashboard, Leaf, LogOut, Moon, PlugZap, ScrollText, Settings, ShieldCheck, Sun, Users, type LucideIcon } from 'lucide-react'
 import { roleLabels, useSession } from '../context/session'
 import { useTheme } from '../context/theme'
 import { initials } from '../lib/format'
@@ -10,10 +10,14 @@ const navigation: { to: string; label: string; icon: LucideIcon; permission?: Pe
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { to: '/users', label: 'Users', icon: Users, permission: 'users.read' },
   { to: '/devices', label: 'Devices', icon: Cpu, permission: 'devices.read' },
+  { to: '/diagnostics', label: 'Diagnostics', icon: Activity, permission: 'devices.read' },
+  { to: '/provisioning', label: 'Provisioning', icon: ShieldCheck, permission: 'devices.provision' },
+  { to: '/integrations', label: 'AI & API Monitor', icon: PlugZap, permission: 'integrations.read' },
+  { to: '/settings', label: 'Settings', icon: Settings, permission: 'settings.read' },
   { to: '/audit', label: 'Audit logs', icon: ScrollText, permission: 'audit.read' },
 ]
 
-const pageTitles: Record<string, string> = { '/dashboard': 'Overview', '/users': 'User Management', '/devices': 'Device Inventory', '/audit': 'Audit Logs', '/forbidden': 'Access Restricted' }
+const pageTitles: Record<string, string> = { '/dashboard': 'Overview', '/users': 'User Management', '/devices': 'Device Inventory', '/diagnostics': 'Diagnostics', '/provisioning': 'Provisioning', '/integrations': 'AI & API Monitor', '/settings': 'System Settings', '/audit': 'Audit Logs', '/forbidden': 'Access Restricted' }
 
 export function AdminLayout() {
   const { user, logout, status } = useSession()

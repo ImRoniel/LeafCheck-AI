@@ -113,7 +113,7 @@ db.$queryRaw = async strings => {
   if (failPgProbe) throw new Error("PRIVATE_POSTGRES_URL");
   return [{ ready: 1 }];
 };
-for (const model of ["user", "plant", "device", "careTask", "aIAnalysis", "authSession", "adminSessionVerification", "auditLog"]) {
+for (const model of ["user", "plant", "device", "deviceProvision", "careTask", "aIAnalysis", "authSession", "adminSessionVerification", "auditLog"]) {
   db[model] = {};
   for (const method of ["findMany", "findUnique", "count"]) {
     db[model][method] = async query => {
@@ -187,7 +187,7 @@ before(async () => {
 });
 
 beforeEach(() => {
-  records = { user: [user(actorId, { role: "ADMIN" })], plant: [], device: [], careTask: [], aIAnalysis: [], sensorReading: [], auditLog: [],
+  records = { user: [user(actorId, { role: "ADMIN" })], plant: [], device: [], deviceProvision: [], careTask: [], aIAnalysis: [], sensorReading: [], auditLog: [],
     adminSessionVerification: [{ id: randomUUID(), userId: actorId, supabaseSessionId: sessionId, verifiedAt: earlier, expiresAt: later, authVersion: 0 }],
     authSession: [{ id: sessionId, userId: actorId, client: "native", createdAt: now, expiresAt: later, revokedAt: null, tokenHash: "SECRET_TOKEN_HASH" }] };
   calls = []; failPg = false; failedReadings = new Set(); readingConcurrency = 0; maxReadingConcurrency = 0; inTransaction = false;
@@ -513,24 +513,25 @@ test("device freshness handles stale, future, missing and partial failures with 
   assert.equal(calls.filter(call => call.model === "sensorReading").length, 2);
 });
 
-test("whitelist reports registered-MAC policy, excludes demo and validates legacy identifiers", async () => {
+test("whitelist lists preauthorized hardware separately from claimed devices without owner metadata", async () => {
   records.user.push(user(targetId, { isActive: false }));
-  for (const [index, macAddress] of ["LC-A50528", "AA:BB:CC:DD:EE:FF", "AA-BB-CC-DD-EE-00", "invalid-legacy", `DEMO:${id(10)}`].entries()) {
-    records.device.push(device(id(100 + index), macAddress));
-  }
+  records.device.push(device(id(100), "LC-A50528"), device(id(101), `DEMO:${id(10)}`));
+  records.deviceProvision.push(
+    { id: id(200), macAddress: "LC-A50528", label: "Living room", status: "APPROVED", claimedDeviceId: id(100), createdAt: earlier, updatedAt: now },
+    { id: id(201), macAddress: "AA:BB:CC:DD:EE:FF", label: null, status: "APPROVED", claimedDeviceId: null, createdAt: earlier, updatedAt: now },
+    { id: id(202), macAddress: "LC-000001", label: "Retired", status: "REVOKED", claimedDeviceId: null, createdAt: earlier, updatedAt: now },
+  );
   const result = await get("/devices/whitelist");
-  assert.equal(result.status, 200); assert.equal(result.body.pagination.total, 4);
-  assert.equal(result.body.meta.policy, "REGISTERED_DEVICE"); assert.equal(result.body.meta.independentWhitelist, false);
+  assert.equal(result.status, 200); assert.equal(result.body.pagination.total, 3);
+  assert.deepEqual(new Set(result.body.data.map(row => row.state)), new Set(["APPROVED_CLAIMED", "APPROVED_UNCLAIMED", "REVOKED"]));
   for (const item of result.body.data) {
-    assert.equal(item.ownerIsActive, false); assert.equal(item.proofOfPossessionVerified, false);
-    assert.equal(item.authorizationBasis, "REGISTERED_DEVICE");
-    assert.equal(item.ingestionAllowed, item.macAddress !== "invalid-legacy");
-    assert.equal(item.ownerId, targetId); assert.equal(item.registeredAt, earlier.toISOString());
+    assert.equal(item.ownerId, undefined); assert.equal(item.ownerIsActive, undefined);
+    assert.equal(item.user, undefined); assert.equal(item.createdAt, earlier.toISOString());
   }
   assert.equal(calls.some(call => call.model === "sensorReading"), false);
-  const filtered = await get(`/devices/whitelist?userId=${targetId}&q=lc-&pageSize=1`);
+  const filtered = await get("/devices/whitelist?status=APPROVED&q=lc-&pageSize=1");
   assert.equal(filtered.body.pagination.total, 1); assert.equal(filtered.body.data[0].macAddress, "LC-A50528");
-  checkPrivacy(result.body); checkTransactions();
+  checkPrivacy(result.body);
 });
 
 test("admins list restricts roles and counts only unrevoked, unexpired sessions", async () => {

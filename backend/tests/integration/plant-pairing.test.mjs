@@ -10,6 +10,8 @@ const client = new PrismaClient({datasources:{db:{url:url.href}}, log:[]});
 mock.module(new URL("../../src/lib/prisma-pg.js",import.meta.url).href,{namedExports:{prismaPg:client}});
 const {pairPlantDevice} = await import("../../src/lib/plant-pairing.ts");
 const userId = randomUUID(), foreignId = randomUUID();
+// The ingestion suite shares this disposable database and runs concurrently.
+const historyScope = { device: { userId } };
 let a,b,device;
 before(async () => {
   await client.user.createMany({data:[{id:userId,email:`${userId}@test.invalid`,password:"unused"},{id:foreignId,email:`${foreignId}@test.invalid`,password:"unused"}]});
@@ -54,7 +56,7 @@ test("actual PostgreSQL concurrent pairings to distinct targets retain one holde
 });
 test("actual PostgreSQL failure after unpair rolls back the previous association", async () => {
   await pairPlantDevice(b.id,userId,device.id);
-  const history = await client.devicePairingHistory.findMany({orderBy:{id:"asc"}});
+  const history = await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}});
   const failing = {$transaction(operation,options) {return client.$transaction(tx => operation(new Proxy(tx,{get(target,key) {
     if(key !== "plant") return Reflect.get(target,key);
     return new Proxy(target.plant,{get(delegate,method) {
@@ -66,7 +68,7 @@ test("actual PostgreSQL failure after unpair rolls back the previous association
   await assert.rejects(pairPlantDevice(a.id,userId,device.id,failing),/injected assignment failure/);
   assert.equal((await client.plant.findUnique({where:{id:b.id}})).deviceId,device.id);
   assert.equal((await client.plant.findUnique({where:{id:a.id}})).deviceId,null);
-  assert.deepEqual(await client.devicePairingHistory.findMany({orderBy:{id:"asc"}}),history);
+  assert.deepEqual(await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}}),history);
 });
 test("actual PostgreSQL ownership failures do not mutate associations; unpair repeats", async () => {
   await assert.rejects(pairPlantDevice(a.id,foreignId,device.id),{code:"NOT_FOUND"});
@@ -81,21 +83,21 @@ test("actual PostgreSQL ownership failures do not mutate associations; unpair re
 test("actual re-pair and repeated unpair are no-ops, including updatedAt and session IDs", async () => {
   await pairPlantDevice(a.id,userId,device.id);
   const plant = await client.plant.findUnique({where:{id:a.id}});
-  const history = await client.devicePairingHistory.findMany({orderBy:{id:"asc"}});
+  const history = await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}});
   await pairPlantDevice(a.id,userId,device.id);
   assert.deepEqual(await client.plant.findUnique({where:{id:a.id}}),plant);
-  assert.deepEqual(await client.devicePairingHistory.findMany({orderBy:{id:"asc"}}),history);
+  assert.deepEqual(await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}}),history);
   await pairPlantDevice(a.id,userId,null);
   const unpaired = await client.plant.findUnique({where:{id:a.id}});
-  const closed = await client.devicePairingHistory.findMany({orderBy:{id:"asc"}});
+  const closed = await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}});
   await pairPlantDevice(a.id,userId,null);
   assert.deepEqual(await client.plant.findUnique({where:{id:a.id}}),unpaired);
-  assert.deepEqual(await client.devicePairingHistory.findMany({orderBy:{id:"asc"}}),closed);
+  assert.deepEqual(await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}}),closed);
 });
 
 test("failure after inserting a replacement session rolls back pointer updates and every history write", async () => {
   await pairPlantDevice(b.id,userId,device.id);
-  const before = {plants:await client.plant.findMany({orderBy:{id:"asc"}}),history:await client.devicePairingHistory.findMany({orderBy:{id:"asc"}})};
+  const before = {plants:await client.plant.findMany({where:{userId},orderBy:{id:"asc"}}),history:await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}})};
   const failing = {$transaction(operation,options) {return client.$transaction(tx => operation(new Proxy(tx,{get(target,key) {
     if (key !== "devicePairingHistory") return Reflect.get(target,key);
     return new Proxy(target.devicePairingHistory,{get(delegate,method) {
@@ -105,5 +107,5 @@ test("failure after inserting a replacement session rolls back pointer updates a
     }});
   }})),options);}};
   await assert.rejects(pairPlantDevice(a.id,userId,device.id,failing),/injected history failure/);
-  assert.deepEqual({plants:await client.plant.findMany({orderBy:{id:"asc"}}),history:await client.devicePairingHistory.findMany({orderBy:{id:"asc"}})},before);
+  assert.deepEqual({plants:await client.plant.findMany({where:{userId},orderBy:{id:"asc"}}),history:await client.devicePairingHistory.findMany({where:historyScope,orderBy:{id:"asc"}})},before);
 });

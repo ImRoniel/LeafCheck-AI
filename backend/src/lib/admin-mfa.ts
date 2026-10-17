@@ -27,7 +27,7 @@ function hashChallenge(value: unknown): string {
 function eligible(challenge: AdminChallenge, user: User, context: ChallengeContext): boolean {
   return challenge.consumedAt === null && challenge.expiresAt > new Date() &&
     challenge.client === context.client && challenge.origin === context.origin &&
-    user.isActive && user.role === "ADMIN" && user.email === challenge.email &&
+    user.isActive && (user.role === "ADMIN" || user.role === "LEAD_DEV") && user.email === challenge.email &&
     user.supabaseUserId === challenge.supabaseUserId && user.authVersion === challenge.authVersion;
 }
 
@@ -41,7 +41,7 @@ export async function beginAdminChallenge(user: User, context: ChallengeContext)
   const challengeToken = randomBytes(32).toString("base64url");
   const challenge = await securityTransaction(async tx => {
     const current = await tx.user.findUnique({ where: { id: user.id } });
-    if (!current?.isActive || current.role !== "ADMIN" || !current.supabaseUserId ||
+    if (!current?.isActive || (current.role !== "ADMIN" && current.role !== "LEAD_DEV") || !current.supabaseUserId ||
         current.authVersion !== user.authVersion || current.email !== user.email ||
         current.supabaseUserId !== user.supabaseUserId) throw invalidChallenge();
     const recent = await tx.adminChallenge.findFirst({ where: { userId: user.id }, orderBy: { lastSentAt: "desc" } });

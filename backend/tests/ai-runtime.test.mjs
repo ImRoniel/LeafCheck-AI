@@ -8,6 +8,9 @@ let baseUrl;
 let generationError;
 const keys = [];
 before(async () => {
+  mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
+    namedExports: { prismaPg: { platformSettings: { findUnique: async () => null } } },
+  });
   mock.module(new URL("../src/lib/auth.js", import.meta.url).href, {
     namedExports: {
       requireAuth: (_req, res, next) => {

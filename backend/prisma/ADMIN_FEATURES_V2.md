@@ -1,0 +1,60 @@
+# Admin features v2 deployment
+
+Apply the additive PostgreSQL migration before starting the backend with registry enforcement:
+
+```sh
+npx prisma migrate deploy --schema=prisma/schema.postgres.prisma
+npm run db:generate:pg
+npm run backfill:device-provisions
+npm run backfill:device-provisions -- --apply
+```
+
+The backfill first reports existing physical devices, then approves and links them when `--apply` is provided. Existing revoked provisions remain revoked. Rerunning leaves completed registrations and their audit events unchanged. It never modifies MAC identifiers, telemetry, ownership, or pairing history. Non-normalized identifiers and conflicting links fail for review.
+
+The October 17 development database had pre-existing migration drift and a historical migration missing locally. The requested `prisma migrate dev --name admin_features_v2 --schema=prisma/schema.postgres.prisma` stopped with reset instructions. No reset was performed. Prisma generated `20261017100000_admin_features_v2` from the previous and current schemas; reviewed `migrate deploy` applied only that pending additive migration. The existing physical device was then backfilled through Prisma before enforcing the registry.
+
+Hardware approval authorizes claims and ingestion; MAC identifiers still do not authenticate physical senders. Per-device credentials require the later firmware milestone. The integration monitor returns configuration and explicitly unavailable quota/health observations without making provider calls.
+
+## Role and session policy
+
+LEAD_DEV can inspect devices and their latest five stored readings, rename devices,
+and unlink a device from its current plant. Operational responses omit owner
+identities. ADMIN also controls users, session revocation, hardware provisioning,
+platform settings, integrations, and global audit history.
+
+Both staff roles complete password and email OTP at sign-in. Existing LEAD_DEV
+sessions may read operational data without an OTP proof, but every administrative
+write checks a current proof. Writes recheck the actor inside their transaction.
+Access tokens remain in memory; browser refresh tokens retain the existing cookie
+storage. PostgreSQL contains administrative state; MongoDB retains telemetry.
+
+
+## Runtime behavior
+
+- Rename requires the device's `updatedAt`. Unlink additionally requires the
+  expected current pairing ID and closes that interval atomically with clearing
+  the plant association. Stale requests return 409. Neither action deletes
+  readings or reports.
+- Force logout advances the application's auth version and session cutoff,
+  revokes legacy sessions, and invalidates pending challenges and OTP proofs.
+  Existing provider JWTs and refresh attempts fail at the application boundary.
+  Provider-owned authentication tables remain read-only; the account stays active.
+- New physical claims and telemetry uploads require APPROVED hardware. Revocation
+  preserves ownership and historical data. MAC authorization alone does not
+  authenticate physical hardware; per-device credentials require a later firmware
+  milestone.
+- AI scanning and device claims default to enabled. Settings are read from
+  PostgreSQL for each incoming operation. Disabling AI scanning guards both
+  `/api/scan` and `/api/ai/analyze` before image processing or provider calls.
+  Saved reports remain readable. Settings changes require a version and reason.
+- Refresh readings fetches stored measurements and displays their actual
+  timestamps. It does not send a command to hardware. Physical soil measurements
+  are raw ADC; simulated devices and unavailable values are labeled explicitly.
+- The integrations page is a safe configuration inventory. Health and account
+  quotas are unverified/unavailable; it makes no provider requests and displays
+  no invented remaining quota or observed usage. Provider instrumentation and
+  authoritative quota retrieval are future work.
+
+Administrative mutations record actor, target, reason, and relevant before/after
+values in the same PostgreSQL transaction as the change. Audit failure rolls back
+the mutation.

@@ -90,7 +90,9 @@ try {
     ? ["tests/integration/plant-telemetry.test.mjs"]
     : ["tests/integration/plant-pairing.test.mjs", "tests/integration/ingestion-context.test.mjs"];
   console.log("Disposable PostgreSQL/MongoDB ready; running telemetry integration checks.");
-  const result = spawnSync(process.execPath, ["--import", "tsx/esm", "--experimental-test-module-mocks", "--test", ...files], { cwd, env, encoding: "utf8", timeout: 600_000 });
+  // Suites share tiny tables: run files sequentially to avoid unrelated SSI
+  // predicate conflicts. Concurrency cases within each suite still run in parallel.
+  const result = spawnSync(process.execPath, ["--import", "tsx/esm", "--experimental-test-module-mocks", "--test", "--test-concurrency=1", ...files], { cwd, env, encoding: "utf8", timeout: 600_000 });
   // Redact the test-only credential even if an upstream diagnostic contains it.
   const redact = (text) => (text ?? "").replaceAll(url, "[test database]").replaceAll(password, "[redacted]");
   process.stdout.write(redact(result.stdout));

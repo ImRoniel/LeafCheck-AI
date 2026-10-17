@@ -128,7 +128,7 @@ authRouter.post(
     const data = credentials(req.body, false);
     if (authProvider() === "supabase") {
       const result = await loginProvider(data.email, data.password);
-      if (result.user.role === "ADMIN") {
+      if (result.user.role === "ADMIN" || result.user.role === "LEAD_DEV") {
         res.clearCookie(cookieName, cookieOptions);
         await revokeProviderSession(result.tokens.accessToken, "local");
         res.status(202).json(await beginAdminChallenge(result.user, challengeContext(req, res)));

@@ -28,6 +28,10 @@ let rows = [],
   generator;
 let queue = Promise.resolve();
 const pg = {
+  deviceProvision: { findUnique: async ({where}) => {
+    const device = [...devices.values()].find(row => row.macAddress === where.macAddress && !row.macAddress.startsWith("DEMO:"));
+    return device ? {id:device.id,status:"APPROVED",claimedDeviceId:device.id} : null;
+  } },
   authSession: {
     findUnique: async ({ where }) => ({
       id: where.id,
@@ -386,8 +390,8 @@ test("hardware ingestion accepts sensor boundaries and rejects invalid input bef
     assert.equal(response.status, 400);
   }
   const unknown = await request("/api/telemetry", null, "POST", { ...valid, deviceId: "LC-FFFFFF" });
-  assert.equal(unknown.status, 404);
-  assert.deepEqual(await unknown.json(), { error: "Device not found. Claim this Device ID in the app before sending telemetry." });
+  assert.equal(unknown.status, 403);
+  assert.equal((await unknown.json()).code, "HARDWARE_NOT_APPROVED");
   assert.equal(writes, count);
   assert.equal(rows.length, samples);
   failMongo = true;

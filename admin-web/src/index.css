@@ -136,4 +136,9 @@
     max-height: calc(100dvh - 3rem);
     overflow-y: auto;
   }
+
+  .modal-panel {
+    @apply m-0 ml-auto h-dvh w-full max-w-3xl rounded-none border-y-0 border-r-0;
+    max-height: 100dvh;
+  }
 }

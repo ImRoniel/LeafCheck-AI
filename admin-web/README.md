@@ -37,18 +37,23 @@ npm run preview --workspace=admin-web
 | Route | Page |
 | --- | --- |
 | `/login` | Email/password sign-in |
-| `/login/otp` | Eight-digit SuperAdmin email verification |
+| `/login/otp` | Eight-digit staff email verification |
 | `/dashboard` | Four live metrics and Recent Activity for SuperAdmins |
-| `/users` | SuperAdmin create/edit/delete, ban/unban, and email reveal |
-| `/devices` | Device inventory for both staff roles |
+| `/users` | SuperAdmin create/edit/delete, ban/unban, force logout, and email reveal |
+| `/devices` | Device inventory and operational management for both staff roles |
+| `/diagnostics` | Last five stored readings, accessible to both staff roles |
+| `/provisioning` | SuperAdmin hardware approval registry |
+| `/settings` | SuperAdmin scanning and device-claim controls |
+| `/integrations` | SuperAdmin safe provider configuration and quota availability |
 | `/audit` | SuperAdmin audit table |
 | `/forbidden` | Explains a staff role restriction |
 
 The root and unmatched paths redirect to `/login` when signed out and `/dashboard`
-when authenticated. `RequireAuth` protects all four dashboard routes, including
-audit logs, and waits for session restoration before rendering. Users and audit
-also require their matching permissions. A `LEAD_DEV` direct visit to either route
-redirects to `/forbidden` without fetching its data. Its sidebar hides both links.
+when authenticated. `RequireAuth` protects dashboard routes and waits for session
+restoration before rendering. Each feature route requires its matching permission.
+A `LEAD_DEV` direct visit to Users, Provisioning, Settings, Integrations, or Audit
+redirects to `/forbidden` without fetching its data. Its sidebar shows Overview,
+Devices, and Diagnostics.
 The topbar displays the current email and labels `ADMIN` as SuperAdmin and
 `LEAD_DEV` as System Administrator.
 
@@ -63,6 +68,24 @@ available on hover. Outcomes come from metadata or known action names, with unkn
 actions marked Recorded. Tables include loading,
 empty, error/retry and pagination states. The UI prevents banning your own account;
 the backend remains authoritative for every permission and mutation.
+
+Devices open an accessible slide-over details panel. Rename submits a changed name,
+the device's `updatedAt`, and an audit reason. Unlink requires confirmation and a
+reason, and submits both `updatedAt` and the expected pairing identifier. Stale
+versions require refreshing and reviewing before retry. ADMIN sees owner details;
+LEAD_DEV receives operational fields. Diagnostics display actual measurement times,
+temperature, humidity, raw soil ADC, lux, and simulated-device indicators. Missing
+values display Unavailable. Refresh fetches stored readings and does not ask the
+hardware to take a measurement. `/diagnostics?device=<id>` opens that device directly.
+
+Force Logout confirms a reason before revoking a user's application sessions. It
+does not disable the account or claim to delete provider session records. Hardware
+provisioning supports pre-registration and versioned approval/revocation with audit
+reasons. Settings require confirmation and a reason; saves include only changed
+flags and the singleton version. Disabling a service explicitly warns that it
+affects all clients. Staff password and email OTP remains required; universal-user
+OTP is shown as planned. Provider cards show configured/unverified status and
+unavailable quotas instead of inventing provider capacity or issuing analysis calls.
 
 The Overview requests `/admin/stats` for total users, active physical devices,
 registered plants, and saved AI analyses. Active means the latest sensor reading
@@ -99,6 +122,9 @@ table refreshes to reflect the backend state and the dialog permits a retry.
 Escape, Close, and Cancel remain available during a save/delete and abort its
 request. Cancellation or a network timeout does not prove that a write was rolled
 back: the UI prompts the administrator to refresh and review before retrying.
+The new device, provisioning, settings, and force-logout confirmation dialogs keep
+the dialog open while a mutation is pending. Unmounting cancels its request; an
+ambiguous network result requires reviewing the server state before retrying.
 
 The interface uses Lucide icons and shared theme-aware surfaces, badges, inputs,
 and table styles. The theme toggle defaults to the system preference and stores
@@ -114,8 +140,8 @@ and return focus to their trigger when it remains present.
 
 - Login posts credentials to `/api/auth/login` and validates the response. A
   `USER` account is immediately logged out and receives
-  `Unauthorized: Admin access required`. LEAD_DEV receives its normal session.
-  ADMIN's `202 otp_required` response stores only the challenge in memory, sets
+  `Unauthorized: Admin access required`. ADMIN and LEAD_DEV both receive a
+  `202 otp_required` response, which stores only the challenge in memory, sets
   `status` to `otp_required` and routes to `/login/otp`; no access token or user is
   accepted before verification. `login()` returns its resulting status.
 - OTP verification posts `{challengeToken,code}` to `/api/auth/verify-admin-otp`
@@ -145,9 +171,12 @@ expired cookie to delete it. Existing persistent cookies are replaced on the nex
 successful login or refresh; log out and sign in after updating the backend to
 verify the new cookie in browser tools.
 
-Reloading the app restores only a session with a current server-side OTP proof.
+Reloading the app restores staff sessions subject to server-side OTP enforcement.
 Refresh checks the exact Supabase session's `AdminSessionVerification` before
-returning credentials, and every `/api/admin/*` request checks it again. Refresh
+returning credentials for either staff role. Every ADMIN `/api/admin/*` request
+checks it again. Existing LEAD_DEV access tokens can still read operational data
+without a proof; writes and refresh require the exact session's proof and return
+`ADMIN_VERIFICATION_REQUIRED` when absent. Refresh
 does not extend or recreate the eight-hour proof. Restarting the dev servers is
 not a browser logout. Browsers with session restore can also retain session
 cookies across browser restarts, so this cookie setting cannot guarantee a new
@@ -232,6 +261,6 @@ created or modified by the checker.
 
 ## Backend admin security integration
 
-SuperAdmin signs in with password plus the backend's eight-digit email challenge.
-System Administrator (`LEAD_DEV`) login completes with 200 and has device read
-access only. See [the backend contracts](../backend/ADMIN_SECURITY.md).
+Both SuperAdmin and System Administrator sign in with a password plus the backend's
+eight-digit email challenge. LEAD_DEV can read and manage operational devices;
+platform controls remain ADMIN-only. See [the backend contracts](../backend/ADMIN_SECURITY.md).

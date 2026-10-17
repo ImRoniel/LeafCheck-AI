@@ -1,11 +1,13 @@
 import type { Role } from "../generated/postgres-client/index.js";
 import { asyncRoute, HttpError } from "./http.js";
 
-export type Permission = "users.read" | "users.manage" | "devices.read" | "devices.manage" | "audit.read";
+export type Permission = "users.read" | "users.manage" | "devices.read" | "devices.manage" | "devices.provision"
+  | "sessions.revoke" | "settings.read" | "settings.manage" | "integrations.read" | "audit.read";
 
 export const permissions: Readonly<Record<Role, readonly Permission[]>> = {
-  ADMIN: ["users.read", "users.manage", "devices.read", "devices.manage", "audit.read"],
-  LEAD_DEV: ["devices.read"],
+  ADMIN: ["users.read", "users.manage", "devices.read", "devices.manage", "devices.provision", "sessions.revoke",
+    "settings.read", "settings.manage", "integrations.read", "audit.read"],
+  LEAD_DEV: ["devices.read", "devices.manage"],
   USER: [],
 };
 

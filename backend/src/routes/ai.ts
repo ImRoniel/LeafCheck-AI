@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
+import { requireAiScanning } from "../lib/platform-policy.js";
 import { geminiError, geminiModel } from "../lib/gemini.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { ownedPlant } from "../lib/ownership.js";
@@ -10,6 +11,7 @@ export const aiRouter = Router();
 aiRouter.use(requireAuth);
 aiRouter.post(
   "/analyze",
+  requireAiScanning,
   asyncRoute(async (req, res, next) => {
     const data = bodyObject(req.body, [
       "imageBase64",

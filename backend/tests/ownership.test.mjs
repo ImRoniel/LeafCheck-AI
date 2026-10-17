@@ -32,6 +32,8 @@ before(async () => {
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {
     namedExports: {
       prismaPg: {
+        platformSettings: { findUnique: async () => null },
+        deviceProvision: { findUnique: async () => ({ status: "APPROVED" }) },
         $transaction: async function (operation,options) {
           assert.equal(options.isolationLevel,"Serializable");
           return operation(this);

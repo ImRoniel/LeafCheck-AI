@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 process.env.VITE_API_URL = '/api'
-let vite, api, auth, admin, permissions, format, forms, auditFilters, unsubscribe
+let vite, api, auth, admin, permissions, format, forms, auditFilters, operations, unsubscribe
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json' },
 })
@@ -21,6 +21,7 @@ before(async () => {
   format = await vite.ssrLoadModule('/src/lib/format.ts')
   forms = await vite.ssrLoadModule('/src/lib/user-form.ts')
   auditFilters = await vite.ssrLoadModule('/src/lib/audit-filters.ts')
+  operations = await vite.ssrLoadModule('/src/lib/operations.ts')
 })
 afterEach(() => {
   unsubscribe?.()
@@ -280,11 +281,32 @@ test('challenge parsing requires a valid token and expiry and enforces at least 
   }
 })
 
-test('frontend permissions limit LEAD_DEV to devices and allow ADMIN user management and audit', () => {
-  for (const permission of ['users.read', 'users.manage', 'devices.read', 'devices.manage', 'audit.read']) {
+test('frontend permissions grant operational writes to LEAD_DEV and reserve platform controls for ADMIN', () => {
+  for (const permission of ['users.read', 'users.manage', 'devices.read', 'devices.manage', 'devices.provision', 'sessions.revoke', 'settings.read', 'settings.manage', 'integrations.read', 'audit.read']) {
     assert.equal(permissions.hasPermission('ADMIN', permission), true)
-    assert.equal(permissions.hasPermission('LEAD_DEV', permission), permission === 'devices.read')
+    assert.equal(permissions.hasPermission('LEAD_DEV', permission), ['devices.read', 'devices.manage'].includes(permission))
   }
+})
+
+test('diagnostics parsing preserves missing sensor values, raw ADC and simulated readings', () => {
+  const reading = { id: 'r1', timestamp: '2026-10-17T00:00:00.000Z', temperatureCelsius: 26.1,
+    humidityPercentage: 62, soilMoistureRaw: 2180, lightLux: null, simulated: true }
+  assert.deepEqual(operations.readTelemetryReadings({ data: [reading] }), [reading])
+  assert.equal(operations.readTelemetryReadings({ data: [{ ...reading, soilMoistureRaw: undefined }] })[0].soilMoistureRaw, null)
+  assert.throws(() => operations.readTelemetryReadings({ data: [{ ...reading, humidityPercentage: '62' }] }), /unexpected response/)
+  assert.throws(() => operations.readTelemetryReadings({ data: Array(6).fill(reading) }), /unexpected response/)
+  assert.throws(() => operations.readTelemetryReadings({ data: [{ ...reading, timestamp: 'invalid' }] }), /unexpected response/)
+})
+
+test('versioned operational details and settings reject invalid concurrency timestamps', () => {
+  const device = { id: 'd1', name: 'Sensor', macAddress: 'AA:BB:CC:DD:EE:FF', plants: [], connectionStatus: 'ONLINE', updatedAt: '2026-10-17T00:00:00.000Z', pairing: null }
+  assert.equal(operations.readDeviceDetails({ data: device }).updatedAt, device.updatedAt)
+  assert.equal(operations.readDeviceDetails({ data: device }).owner, null)
+  assert.equal(operations.readDeviceDetails({ data: { ...device, source: 'DEMO', connectionStatus: 'UNKNOWN' } }).simulated, true)
+  assert.throws(() => operations.readDeviceDetails({ data: { ...device, updatedAt: 'bad' } }), /unexpected response/)
+  const settings = { id: 'platform', aiScanningEnabled: true, deviceClaimsEnabled: false, updatedAt: device.updatedAt, updatedBy: null }
+  assert.deepEqual(operations.readPlatformSettings({ data: settings }), settings)
+  assert.throws(() => operations.readPlatformSettings({ data: { ...settings, aiScanningEnabled: 'true' } }), /unexpected response/)
 })
 
 test('table parsers accept masked user emails and operational devices without retaining owner data', () => {
@@ -302,7 +324,8 @@ test('table parsers accept masked user emails and operational devices without re
 test('audit outcomes distinguish failed, requested, cancelled, successful and unclassified events', () => {
   const row = { id: 'a1', actorId: null, targetId: null, createdAt: new Date().toISOString(), metadata: null }
   for (const [action, outcome] of [['ADMIN_OTP_FAILED', 'Failed'], ['USER_DELETE_REQUESTED', 'Requested'],
-    ['ADMIN_OTP_CANCELLED', 'Cancelled'], ['USER_UPDATED', 'Succeeded'], ['CUSTOM_ACTION', 'Recorded']]) {
+    ['ADMIN_OTP_CANCELLED', 'Cancelled'], ['USER_UPDATED', 'Succeeded'], ['DEVICE_RENAMED', 'Succeeded'], ['DEVICE_UNLINKED', 'Succeeded'],
+    ['USER_SESSIONS_REVOKED', 'Succeeded'], ['HARDWARE_PROVISIONED', 'Succeeded'], ['HARDWARE_BACKFILLED', 'Succeeded'], ['CUSTOM_ACTION', 'Recorded']]) {
     assert.equal(admin.auditOutcome({ ...row, action }), outcome)
   }
   assert.equal(admin.auditOutcome({ ...row, action: 'CUSTOM_ACTION', metadata: { outcome: 'Pending' } }), 'Pending')

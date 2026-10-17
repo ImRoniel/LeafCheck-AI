@@ -37,9 +37,11 @@ async function app(t, options = {}) {
   const requests = []
   const actor = options.actor ?? admin
   const state = { signedIn: options.restored ?? false, challenges: 0,
+    provisions: [], settings: { id: 'platform', aiScanningEnabled: true, deviceClaimsEnabled: true, updatedAt: userVersion, updatedBy: null },
     users: (options.users ?? [{ id: admin.id, name: admin.name, email: admin.email, emailMasked: 'a***@example.test', role: 'ADMIN', isActive: true },
       { id: member.id, name: member.name, email: member.email, emailMasked: 'm***@example.test', role: 'USER', isActive: true }]).map(row => ({ updatedAt: userVersion, ...row })) }
-  const device = { ...sensor, lastReadingAt: new Date(Date.now() - 120_000).toISOString(), readingError: false }
+  const device = { ...sensor, updatedAt: userVersion, lastReadingAt: new Date(Date.now() - 120_000).toISOString(), readingError: false,
+    pairing: { id: 'pairing-1', plantId: 'plant-1', plantName: 'Monstera', pairedAt: userVersion } }
   let pending
   page.on('pageerror', error => errors.push(error.message))
   await page.clock.install()
@@ -61,7 +63,7 @@ async function app(t, options = {}) {
         ? reply({ accessToken: 'verified-memory-jwt' }) : reply({ error: 'No session' }, 401))
       if (path === '/users/me') return await route.fulfill(reply(actor))
       if (path === '/auth/login') {
-        if (actor.role !== 'ADMIN') {
+        if (actor.role === 'USER') {
           state.signedIn = true
           return await route.fulfill(reply({ accessToken: 'verified-memory-jwt', user: actor }))
         }
@@ -104,6 +106,11 @@ async function app(t, options = {}) {
         state.users.unshift(user)
         return await route.fulfill(reply({ data: user }, 201))
       }
+      if (path.endsWith('/revoke-sessions') && entry.method === 'POST') {
+        assert.equal(actor.role, 'ADMIN')
+        assert.ok(entry.body.reason.trim().length >= 3)
+        return await route.fulfill(reply({ data: { revoked: true } }))
+      }
       if (path.startsWith('/admin/users/') && entry.method === 'PATCH') {
         const user = state.users.find(row => row.id === path.split('/').at(-1))
         assert.ok(user)
@@ -127,6 +134,56 @@ async function app(t, options = {}) {
         return await route.fulfill(reply(list(rows, pageNumber, users.length)))
       }
       if (path === '/admin/devices') return await route.fulfill(reply(list([device])))
+      if (path === '/admin/devices/sensor-1/readings') return await route.fulfill(reply({ data: [
+        { id: 'reading-1', timestamp: device.lastReadingAt, temperatureCelsius: 26.1, humidityPercentage: 62, soilMoistureRaw: 2180, lightLux: 740, simulated: false },
+        { id: 'reading-2', timestamp: userVersion, temperatureCelsius: null, humidityPercentage: null, soilMoistureRaw: null, lightLux: null, simulated: false },
+      ] }))
+      if (path === '/admin/devices/sensor-1' && entry.method === 'GET') return await route.fulfill(reply({ data: { ...device,
+        ...(actor.role === 'ADMIN' ? { owner: { id: member.id, name: member.name, email: member.email } } : {}) } }))
+      if (path === '/admin/devices/sensor-1' && entry.method === 'PATCH') {
+        if (entry.body.updatedAt !== device.updatedAt) return await route.fulfill(reply({ code: 'CONFLICT', error: 'Stale device' }, 409))
+        device.name = entry.body.name
+        device.updatedAt = new Date(Date.parse(device.updatedAt) + 1).toISOString()
+        return await route.fulfill(reply({ data: device }))
+      }
+      if (path === '/admin/devices/sensor-1/unlink') {
+        assert.equal(entry.body.expectedPairingId, device.pairing?.id)
+        assert.equal(entry.body.updatedAt, device.updatedAt)
+        device.pairing = null
+        device.plants = []
+        device.updatedAt = new Date(Date.parse(device.updatedAt) + 1).toISOString()
+        return await route.fulfill(reply({ data: device }))
+      }
+      if (path === '/admin/devices/whitelist' && entry.method === 'GET') {
+        assert.equal(actor.role, 'ADMIN')
+        return await route.fulfill(reply(list(state.provisions)))
+      }
+      if (path === '/admin/devices/whitelist' && entry.method === 'POST') {
+        const provision = { id: 'provision-1', macAddress: entry.body.macAddress, label: entry.body.label ?? null, status: 'APPROVED', claimedDeviceId: null, updatedAt: userVersion, createdAt: userVersion }
+        state.provisions.push(provision)
+        return await route.fulfill(reply({ data: provision }, 201))
+      }
+      if (path === '/admin/devices/whitelist/provision-1' && entry.method === 'PATCH') {
+        const provision = state.provisions[0]
+        assert.equal(entry.body.updatedAt, provision.updatedAt)
+        for (const field of ['label', 'status']) if (field in entry.body) provision[field] = entry.body[field]
+        provision.updatedAt = new Date(Date.parse(provision.updatedAt) + 1).toISOString()
+        return await route.fulfill(reply({ data: provision }))
+      }
+      if (path === '/admin/settings') {
+        assert.equal(actor.role, 'ADMIN')
+        if (entry.method === 'PATCH') {
+          assert.equal(entry.body.updatedAt, state.settings.updatedAt)
+          for (const field of ['aiScanningEnabled', 'deviceClaimsEnabled']) if (field in entry.body) state.settings[field] = entry.body[field]
+          state.settings.updatedAt = new Date(Date.parse(state.settings.updatedAt) + 1).toISOString()
+          state.settings.updatedBy = { id: admin.id, name: admin.name, email: admin.email }
+        }
+        return await route.fulfill(reply({ data: state.settings }))
+      }
+      if (path === '/admin/integrations') {
+        assert.equal(actor.role, 'ADMIN')
+        return await route.fulfill(reply({ data: ['gemini', 'plantnet', 'perenual'].map(provider => ({ provider, name: provider === 'gemini' ? 'Gemini' : provider === 'plantnet' ? 'Pl@ntNet' : 'Perenual', configured: provider !== 'perenual', status: provider !== 'perenual' ? 'UNVERIFIED' : 'NOT_CONFIGURED', message: 'Configuration alone does not verify health.', quota: { source: 'unavailable', remaining: null, limit: null, resetAt: null }, lastObservedAt: null, observedRequests: null })), meta: { asOf: new Date().toISOString() } }))
+      }
       if (path === '/admin/audit') {
         assert.equal(actor.role, 'ADMIN', 'LEAD_DEV must never request audit logs')
         const logs = options.auditEntries ?? [
@@ -327,15 +384,18 @@ test('a fresh root visit has a clean login form while expired restoration on a p
   await expired.page.getByRole('alert').filter({ hasText: 'Your session has expired. Please log in again.' }).waitFor()
 })
 
-test('LEAD_DEV signs in immediately, sees operational devices and cannot fetch users or audit via direct URLs', async t => {
+test('LEAD_DEV verifies OTP, sees operations and cannot fetch platform pages through direct URLs', async t => {
   const { page, requests } = await app(t, { actor: operator })
   await signIn(page)
+  await page.waitForURL('**/login/otp')
+  await page.getByLabel('Verification code').fill('00001234')
+  await page.getByRole('button', { name: 'Verify Code', exact: true }).click()
   await page.waitForURL('**/dashboard')
   await page.getByRole('article', { name: 'Plants registered', exact: true }).getByText('23', { exact: true }).waitFor()
   assert.equal(await memoryToken(page), 'verified-memory-jwt')
   assert.equal(await page.getByRole('link', { name: 'Users', exact: true }).count(), 0)
   assert.equal(await page.getByRole('link', { name: 'Audit logs', exact: true }).count(), 0)
-  for (const path of ['/users', '/audit']) {
+  for (const path of ['/users', '/audit', '/provisioning', '/settings', '/integrations']) {
     await page.goto(`${origin}${path}`)
     await page.waitForURL('**/forbidden')
     await page.getByRole('heading', { name: 'SuperAdmin access required' }).waitFor()
@@ -344,7 +404,9 @@ test('LEAD_DEV signs in immediately, sees operational devices and cannot fetch u
   await page.getByRole('cell', { name: 'AA:BB:CC:DD:EE:FF', exact: true }).waitFor()
   assert.equal(await page.getByRole('cell', { name: 'Monstera', exact: true }).count(), 1)
   assert.equal(await page.getByRole('cell', { name: 'Online', exact: true }).count(), 1)
-  assert.equal(requests.filter(request => ['/admin/users', '/admin/audit', '/auth/verify-admin-otp'].includes(request.path)).length, 0)
+  assert.equal(requests.filter(request => ['/admin/users', '/admin/audit', '/admin/devices/whitelist', '/admin/settings', '/admin/integrations'].includes(request.path)).length, 0)
+  assert.equal(requests.filter(request => request.path === '/auth/verify-admin-otp').length, 1)
+  assert.equal(await page.getByRole('link', { name: 'Diagnostics', exact: true }).count(), 1)
   assert.ok(requests.some(request => request.path === '/admin/stats'))
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
@@ -359,6 +421,121 @@ test('USER accounts are logged out and never receive admin page data', async t =
   assert.equal(await memoryToken(page), null)
   assert.equal(requests.filter(request => request.path === '/auth/logout').length, 1)
   assert.equal(requests.filter(request => request.path.startsWith('/admin/')).length, 0)
+})
+
+test('LEAD_DEV inspects raw readings, renames with a version and unlinks the expected pairing with a reason', async t => {
+  const { page, requests } = await app(t, { actor: operator, restored: true })
+  await page.goto(`${origin}/devices`)
+  await page.getByRole('button', { name: 'Manage Office sensor', exact: true }).click()
+  const panel = page.getByRole('dialog', { name: 'Device details', exact: true })
+  await panel.getByRole('heading', { name: 'Office sensor', exact: true }).waitFor()
+  await panel.getByRole('cell', { name: '2,180', exact: true }).waitFor()
+  assert.equal(await panel.getByRole('cell', { name: 'Unavailable', exact: true }).count(), 4)
+  assert.equal(await panel.getByText(member.email, { exact: true }).count(), 0)
+  assert.equal(await panel.locator('time').first().getAttribute('dateTime') !== null, true)
+  assert.equal(await panel.getByText('Refresh fetches stored readings.', { exact: false }).count(), 1)
+  await panel.getByRole('button', { name: 'Rename', exact: true }).click()
+  const rename = page.getByRole('dialog', { name: 'Rename device', exact: true })
+  await rename.getByLabel('Device name').fill('Living room sensor')
+  assert.equal(await rename.getByRole('button', { name: 'Save name', exact: true }).isDisabled(), true)
+  await rename.getByLabel('Reason', { exact: true }).fill('Match installation location')
+  await rename.getByRole('button', { name: 'Save name', exact: true }).click()
+  await panel.getByRole('heading', { name: 'Living room sensor', exact: true }).waitFor()
+  assert.deepEqual(requests.find(request => request.method === 'PATCH' && request.path === '/admin/devices/sensor-1').body,
+    { name: 'Living room sensor', updatedAt: userVersion, reason: 'Match installation location' })
+  await panel.getByRole('button', { name: 'Unlink from Monstera', exact: true }).click()
+  const unlink = page.getByRole('dialog', { name: 'Unlink device from plant?', exact: true })
+  await unlink.getByLabel('Reason', { exact: true }).fill('Move sensor to another plant')
+  await unlink.getByRole('button', { name: 'Unlink device', exact: true }).click()
+  await panel.getByRole('button', { name: 'Unlink from Plant', exact: true }).waitFor()
+  assert.equal(await panel.getByRole('button', { name: 'Unlink from Plant', exact: true }).isDisabled(), true)
+  assert.deepEqual(requests.find(request => request.path === '/admin/devices/sensor-1/unlink').body,
+    { updatedAt: '2026-10-17T00:00:00.001Z', expectedPairingId: 'pairing-1', reason: 'Move sensor to another plant' })
+  const reads = requests.filter(request => request.path === '/admin/devices/sensor-1/readings').length
+  const refreshed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/admin/devices/sensor-1/readings')
+  await panel.getByRole('button', { name: 'Refresh readings', exact: true }).click()
+  await refreshed
+  assert.equal(requests.filter(request => request.path === '/admin/devices/sensor-1/readings').length, reads + 1)
+  assert.equal(requests.filter(request => request.path.includes('/commands')).length, 0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  await screenshot(page, 'device-details-mobile')
+})
+
+test('stale device edits require refreshing before retry and diagnostics respects deep links', async t => {
+  const { page, requests } = await app(t, { actor: operator, restored: true, handle: entry =>
+    entry.method === 'PATCH' && entry.path === '/admin/devices/sensor-1' ? reply({ error: 'Stale device', code: 'CONFLICT' }, 409) : null })
+  await page.goto(`${origin}/diagnostics?device=sensor-1`)
+  const panel = page.getByRole('dialog', { name: 'Device details', exact: true })
+  await panel.getByRole('button', { name: 'Rename', exact: true }).click()
+  const rename = page.getByRole('dialog', { name: 'Rename device', exact: true })
+  await rename.getByLabel('Device name').fill('Renamed sensor')
+  await rename.getByLabel('Reason', { exact: true }).fill('Correct device name')
+  await rename.getByRole('button', { name: 'Save name', exact: true }).click()
+  await rename.getByRole('alert').filter({ hasText: 'This record changed after you opened it.' }).waitFor()
+  assert.equal(await rename.getByRole('button', { name: 'Save name', exact: true }).isDisabled(), true)
+  assert.equal(requests.filter(request => request.method === 'PATCH').length, 1)
+  await rename.getByRole('button', { name: 'Refresh and review', exact: true }).click()
+  await rename.waitFor({ state: 'hidden' })
+})
+
+test('SuperAdmin force logout requires confirmation and an audit reason', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(`${origin}/users`)
+  await page.getByRole('button', { name: 'Force Logout Member', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Force logout?', exact: true })
+  assert.equal(requests.filter(request => request.path.endsWith('/revoke-sessions')).length, 0)
+  assert.equal(await dialog.getByRole('button', { name: 'Force Logout', exact: true }).isDisabled(), true)
+  await dialog.getByLabel('Reason', { exact: true }).fill('Lost signed-in phone')
+  await dialog.getByRole('button', { name: 'Force Logout', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Application sessions revoked for Member.' }).waitFor()
+  assert.deepEqual(requests.find(request => request.path.endsWith('/revoke-sessions')).body, { reason: 'Lost signed-in phone' })
+})
+
+test('SuperAdmin registers unclaimed hardware and revokes approval with version and audit reason', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(`${origin}/provisioning`)
+  await page.getByRole('button', { name: 'Register hardware', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: 'Register approved hardware', exact: true })
+  await dialog.getByLabel('MAC address', { exact: true }).fill('AA:BB:CC:DD:EE:FF')
+  await dialog.getByLabel('Label (optional)', { exact: true }).fill('New production sensor')
+  await dialog.getByLabel('Reason', { exact: true }).fill('Prepare approved installation')
+  await dialog.getByRole('button', { name: 'Register hardware', exact: true }).click()
+  await page.getByRole('cell', { name: 'Approved / Unclaimed', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Manage approval for AA:BB:CC:DD:EE:FF', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'Manage hardware approval', exact: true })
+  assert.equal(await dialog.getByLabel('MAC address', { exact: true }).getAttribute('readonly'), '')
+  await dialog.getByLabel('Approval', { exact: true }).selectOption('REVOKED')
+  await dialog.getByLabel('Reason', { exact: true }).fill('Retire physical sensor')
+  await dialog.getByRole('button', { name: 'Save approval', exact: true }).click()
+  await page.getByRole('cell', { name: 'Revoked', exact: true }).waitFor()
+  assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { status: 'REVOKED', updatedAt: userVersion, reason: 'Retire physical sensor' })
+})
+
+test('platform settings require explicit confirmation and send only changed fields with the version', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(`${origin}/settings`)
+  await page.getByRole('switch', { name: 'Enable AI scanning', exact: true }).uncheck()
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Disable platform services?', exact: true })
+  await dialog.waitFor()
+  assert.equal(requests.filter(request => request.method === 'PATCH').length, 0)
+  await dialog.getByLabel('Reason', { exact: true }).fill('Pause scanning for maintenance')
+  await dialog.getByRole('button', { name: 'Apply settings', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Platform settings updated.' }).waitFor()
+  assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { aiScanningEnabled: false, updatedAt: userVersion, reason: 'Pause scanning for maintenance' })
+  await page.getByText(admin.email, { exact: false }).last().waitFor()
+  assert.equal(await page.getByRole('switch', { name: 'Enable AI scanning', exact: true }).isChecked(), false)
+})
+
+test('provider monitor shows unverified configuration and unavailable quota without paid requests', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(`${origin}/integrations`)
+  await page.getByRole('heading', { name: 'Gemini', exact: true }).waitFor()
+  assert.equal(await page.getByText('Unverified', { exact: true }).count(), 2)
+  assert.equal(await page.getByText('Not configured', { exact: true }).count(), 1)
+  assert.equal(await page.getByText('No verified source', { exact: true }).count(), 3)
+  assert.equal(requests.filter(request => /scan|analyze|quota/.test(request.path)).length, 0)
 })
 
 test('users table supports paginated search, creation, ban/unban and prevents self-ban', async t => {

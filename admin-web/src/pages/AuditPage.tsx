@@ -9,7 +9,7 @@ import { readAuditRow } from '../lib/admin'
 import { auditFilterQuery, emptyAuditFilters, type AuditFilters } from '../lib/audit-filters'
 import { formatAuditAction } from '../lib/format'
 
-const actions = ['ADMIN_LOGIN_VERIFIED', 'ADMIN_OTP_FAILED', 'ADMIN_OTP_RESENT', 'ADMIN_OTP_CANCELLED', 'USER_CREATED', 'USER_UPDATED', 'USER_DELETE_REQUESTED', 'USER_DELETED']
+const actions = ['ADMIN_LOGIN_VERIFIED', 'ADMIN_OTP_FAILED', 'ADMIN_OTP_RESENT', 'ADMIN_OTP_CANCELLED', 'USER_CREATED', 'USER_UPDATED', 'USER_DELETE_REQUESTED', 'USER_DELETED', 'DEVICE_RENAMED', 'DEVICE_UNLINKED', 'USER_SESSIONS_REVOKED', 'HARDWARE_PROVISIONED', 'HARDWARE_UPDATED', 'HARDWARE_BACKFILLED', 'SETTINGS_UPDATED']
 
 export function AuditPage() {
   const [page, setPage] = useState(1)
@@ -44,7 +44,7 @@ export function AuditPage() {
   return (
     <section aria-label="Audit logs">
       <PageHeader title="Audit Logs" icon={ScrollText}
-        description="A clear record of authentication and account changes. Timestamps use your local time zone."
+        description="A record of authentication, account, hardware, and settings changes. Timestamps use your local time zone."
         actions={<button type="button" onClick={reload} disabled={loading || refreshing} className="button-secondary"><RefreshCw size={15} aria-hidden="true" />Refresh</button>} />
       {error && <RequestError message={error} retry={reload} />}
       <div className="surface overflow-hidden">

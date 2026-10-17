@@ -8,13 +8,14 @@
 
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
-import { asyncRoute } from "../lib/http.js";
+import { asyncRoute, HttpError } from "../lib/http.js";
 import { ownedDevice } from "../lib/ownership.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import type { HardwareTelemetryPayload } from "../types/sensor.js";
 import { serializeTelemetry } from "../lib/telemetry-payload.js";
 import { serializableTransaction } from "../lib/serializable.js";
+import { approvedHardware, normalizeHardwareMac } from "../lib/platform-policy.js";
 
 export const telemetryRouter = Router();
 // Only reads require user authentication. Firmware POST uses the hardware MAC address.
@@ -133,8 +134,10 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
   try {
     // Resolve once. A move after this transaction must not reattribute the sample.
     const context = await serializableTransaction(prismaPg, async (tx) => {
+      const macAddress = normalizeHardwareMac(deviceId);
+      await approvedHardware(macAddress, tx);
       const device = await tx.device.findUnique({
-        where: { macAddress: deviceId.toUpperCase() },
+        where: { macAddress },
       });
       if (!device) return null;
       const pairing = await tx.devicePairingHistory.findFirst({
@@ -184,8 +187,12 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     });
 
     res.status(201).json(reading);
-  } catch (error) {
-    console.error("[Telemetry] POST ingest error:", error);
+  } catch (error: unknown) {
+    if (error instanceof HttpError && error.code === "HARDWARE_NOT_APPROVED") {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    console.error("[Telemetry] POST ingest failed.");
     res.status(500).json({ error: "Failed to store telemetry reading." });
   }
 });

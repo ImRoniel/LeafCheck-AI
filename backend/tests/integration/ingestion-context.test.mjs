@@ -62,6 +62,7 @@ before(async () => {
 beforeEach(async () => {
   insertGate = null; failMongoBatch = false;
   device = await postgres.device.create({data:{userId,name:"Movable sensor",macAddress:`LC-${randomBytes(3).toString("hex").toUpperCase()}`}});
+  await postgres.deviceProvision.create({data:{macAddress:device.macAddress,claimedDeviceId:device.id,status:"APPROVED"}});
   a = await postgres.plant.create({data:{userId,name:"Plant1",species:"Fern"}});
   b = await postgres.plant.create({data:{userId,name:"Plant2",species:"Fern"}});
 });
