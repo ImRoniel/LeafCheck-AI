@@ -101,7 +101,9 @@ try {
   await mkdir(join(temporaryDirectory, "migrations"));
   await cp(join(cwd, "prisma/migrations/migration_lock.toml"), join(temporaryDirectory, "migrations/migration_lock.toml"), { recursive: true });
   for (const entry of await readdir(join(cwd, "prisma/migrations"), { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name < phaseMigration) {
+    // Hold back only the migration under test. Current Prisma projections need
+    // the unrelated identity/security columns even in this pre-telemetry fixture.
+    if (entry.isDirectory() && entry.name !== phaseMigration) {
       await cp(join(cwd, "prisma/migrations", entry.name), join(temporaryDirectory, "migrations", entry.name), { recursive: true });
     }
   }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { after, before, mock, test } from "node:test";
 
+process.env.AUTH_PROVIDER = "legacy";
 process.env.AUTH_JWT_SECRET = randomBytes(48).toString("base64url");
 process.env.AUTH_JWT_ISSUER = "demo-tests";
 process.env.AUTH_JWT_AUDIENCE = "demo-tests";
@@ -31,7 +32,7 @@ const pg = {
     findUnique: async ({ where }) => ({
       id: where.id,
       userId: where.id,
-      user: { id: where.id, isActive: true },
+      user: { id: where.id, role: "USER", isActive: true },
       expiresAt: new Date(Date.now() + 60000),
     }),
   },

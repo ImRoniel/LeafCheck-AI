@@ -9,6 +9,7 @@
     "dev:watch": "node --watch --import tsx/esm src/server.ts",
     "build": "npm run db:generate:all && tsc && node scripts/package-prisma-client.mjs",
     "test": "node --import tsx/esm --experimental-test-module-mocks --test tests/*.test.mjs",
+    "test:admin-security": "node scripts/test-admin-security.mjs",
     "test:plant-pairing": "node scripts/test-plant-pairing.mjs",
     "test:plant-telemetry": "node scripts/test-plant-pairing.mjs --plant-telemetry",
     "backfill:pairing-sessions": "node --import tsx/esm scripts/backfill-open-pairing-sessions.mjs",

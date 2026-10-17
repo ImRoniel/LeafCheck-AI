@@ -16,6 +16,10 @@ import { authProvider, requireSupabase } from "../lib/auth-provider.js";
 import { forgotPassword, invalidOtp, loginProvider, refreshProvider, registerProvider, requestLoginOtp, resendOtp, resetPassword, verifyOtp, type OtpPurpose } from "../lib/supabase-auth.js";
 import type { EmailOtpType } from "../lib/supabase-client.js";
 import { revokeProviderSession } from "../lib/supabase-session.js";
+import { beginAdminChallenge, verifyAdminOtp, resendAdminOtp, cancelAdminOtp, type ChallengeContext } from "../lib/admin-mfa.js";
+import { verificationRequired } from "../lib/admin-verification.js";
+import { credentials } from "../lib/auth-input.js";
+export { validateName } from "../lib/auth-input.js";
 
 export const authRouter = Router();
 const cookieName = "__Host-leafcheck-refresh";
@@ -25,7 +29,11 @@ const cookieOptions = {
   sameSite: "strict" as const,
   path: "/",
 };
-const browserSupabasePaths = new Set(["/login", "/refresh", "/logout", "/logout-all"]);
+const browserSupabasePaths = new Set(["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel"]);
+
+function challengeContext(req: Request, res: Response): ChallengeContext {
+  return { client: res.locals.client, origin: req.get("origin") ?? null, ipAddress: req.ip };
+}
 
 // Native clients explicitly opt into JSON; any browser signal forces cookie mode.
 export function clientMode(req: Request): "browser" | "native" {
@@ -60,42 +68,6 @@ authRouter.use(
     next();
   }),
 );
-function credentials(body: unknown, register: boolean) {
-  const data = bodyObject(
-    body,
-    register ? ["email", "password", "name"] : ["email", "password"],
-  );
-  if (
-    typeof data.email !== "string" ||
-    data.email.length > 254 ||
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim()) ||
-    typeof data.password !== "string" ||
-    [...data.password].length < 8 ||
-    [...data.password].length > 128
-  ) {
-    throw new HttpError(
-      400,
-      "INVALID_INPUT",
-      "Valid email and a password of 8–128 characters are required.",
-    );
-  }
-  return {
-    email: data.email.trim().toLowerCase(),
-    password: data.password,
-    ...(register ? { name: validateName(data.name) } : {}),
-  };
-}
-export function validateName(name: unknown): string | null {
-  if (name === undefined || name === null) return null;
-  if (typeof name !== "string" || name.trim().length < 1 || name.length > 100) {
-    throw new HttpError(
-      400,
-      "INVALID_INPUT",
-      "Name must contain 1–100 characters.",
-    );
-  }
-  return name.trim();
-}
 function sendTokens(
   res: Response,
   tokens: Awaited<ReturnType<typeof createSession>>,
@@ -158,6 +130,12 @@ authRouter.post(
     const data = credentials(req.body, false);
     if (authProvider() === "supabase") {
       const result = await loginProvider(data.email, data.password);
+      if (result.user.role === "ADMIN") {
+        res.clearCookie(cookieName, cookieOptions);
+        await revokeProviderSession(result.tokens.accessToken, "local");
+        res.status(202).json(await beginAdminChallenge(result.user, challengeContext(req, res)));
+        return;
+      }
       sendTokens(res, result.tokens, 200, safeUser(result.user));
       return;
     }
@@ -172,6 +150,8 @@ authRouter.post(
         "INVALID_CREDENTIALS",
         "Invalid email or password.",
       );
+    // Legacy credentials cannot satisfy the mandatory provider OTP policy.
+    if (user.role === "ADMIN") throw verificationRequired();
     sendTokens(
       res,
       await createSession(user.id, res.locals.client),
@@ -199,8 +179,14 @@ authRouter.post(
         "INVALID_SESSION",
         "Invalid or expired session.",
       );
-    sendTokens(res, authProvider() === "supabase"
-      ? await refreshProvider(token) : await rotateSession(token, res.locals.client));
+    try {
+      sendTokens(res, authProvider() === "supabase"
+        ? await refreshProvider(token) : await rotateSession(token, res.locals.client));
+    } catch (error) {
+      if (browser && error instanceof HttpError && (error.status === 401 || error.code === "ADMIN_VERIFICATION_REQUIRED"))
+        res.clearCookie(cookieName, cookieOptions);
+      throw error;
+    }
   }),
 );
 for (const path of ["/logout", "/logout-all"]) {
@@ -209,7 +195,13 @@ for (const path of ["/logout", "/logout-all"]) {
     requireAuth,
     asyncRoute(async (req, res) => {
       bodyObject(req.body ?? {}, []);
+      // Clear browser credentials even when upstream revocation is unavailable.
+      res.clearCookie(cookieName, cookieOptions);
       if (authProvider() === "supabase") {
+        const userId: string = res.locals.auth.user.id;
+        await prismaPg.adminSessionVerification.deleteMany({ where: path === "/logout" ? {
+          userId, supabaseSessionId: res.locals.auth.sessionId,
+        } : { userId } });
         await revokeProviderSession(req.get("authorization")!.slice(7), path === "/logout" ? "local" : "global");
       } else {
         await prismaPg.authSession.updateMany({
@@ -220,11 +212,28 @@ for (const path of ["/logout", "/logout-all"]) {
           data: { revokedAt: new Date() },
         });
       }
-      res.clearCookie(cookieName, cookieOptions);
       res.status(204).end();
     }),
   );
 }
+
+authRouter.post("/verify-admin-otp", asyncRoute(async (req, res) => {
+  requireSupabase();
+  const data = bodyObject(req.body, ["challengeToken", "code"]);
+  const result = await verifyAdminOtp(data.challengeToken, data.code, challengeContext(req, res));
+  sendTokens(res, result.tokens, 200, safeUser(result.user));
+}));
+authRouter.post("/admin-otp/resend", asyncRoute(async (req, res) => {
+  requireSupabase();
+  const data = bodyObject(req.body, ["challengeToken"]);
+  res.status(202).json(await resendAdminOtp(data.challengeToken, challengeContext(req, res)));
+}));
+authRouter.post("/admin-otp/cancel", asyncRoute(async (req, res) => {
+  requireSupabase();
+  const data = bodyObject(req.body, ["challengeToken"]);
+  await cancelAdminOtp(data.challengeToken, challengeContext(req, res));
+  res.status(204).end();
+}));
 
 authRouter.get("/capabilities", asyncRoute((_req, res) => {
   const enabled = authProvider() === "supabase";

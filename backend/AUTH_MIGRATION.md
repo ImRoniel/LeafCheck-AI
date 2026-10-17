@@ -1,5 +1,11 @@
 # Supabase auth: additive mobile implementation
 
+Current administrator behavior and migration prerequisites are documented in
+[Admin backend security foundation](ADMIN_SECURITY.md).
+That foundation requires its additive migration before deploying the new code,
+introduces mandatory ADMIN email step-up, and blocks legacy ADMIN sessions.
+The original implementation notes below describe the earlier mobile migration.
+
 This change adds email-code registration, optional email-code login and password
 recovery behind `AUTH_PROVIDER=supabase`. The deployed setting remains `legacy`.
 No account import, identity linking, session cleanup or production cutover is part

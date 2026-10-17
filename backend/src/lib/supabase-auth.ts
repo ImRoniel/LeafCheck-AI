@@ -1,8 +1,9 @@
 import { HttpError } from "./http.js";
 import { prismaPg } from "./prisma-pg.js";
 import { applicationUser, mappedEmail } from "./supabase-identity.js";
-import { authenticatedProviderSession, providerSession, revokeProviderSession } from "./supabase-session.js";
+import { assertProviderSessionCurrent, authenticatedProviderSession, providerSession, revokeProviderSession } from "./supabase-session.js";
 import { object, ProviderError, supabaseAdmin, supabasePublic, type EmailOtpType } from "./supabase-client.js";
+import { assertAdminVerification, invalidateAdminCredentials, securityTransaction, verificationRequired } from "./admin-verification.js";
 
 export type OtpPurpose = "registration" | "login";
 export const invalidOtp = () => new HttpError(400, "INVALID_CODE", "Invalid or expired code. Request a new one.");
@@ -33,7 +34,9 @@ async function complete(tokens: Awaited<ReturnType<typeof supabasePublic.refresh
     const identity = provision ? await supabasePublic.user(tokens.accessToken) : live.identity;
     if (identity.id !== live.identity.id || identity.email !== live.identity.email)
       throw new HttpError(401, "INVALID_SESSION", "Invalid or expired session.");
-    return { tokens, user: await applicationUser(identity, provision) };
+    const user = await applicationUser(identity, provision);
+    assertProviderSessionCurrent(user, live.createdAt);
+    return { tokens, user, sessionId: live.sessionId };
   } catch (error) {
     await supabaseAdmin.logout(tokens.accessToken, "local").catch(() => {});
     throw error;
@@ -51,7 +54,12 @@ export async function loginProvider(email: string, password: string) {
 }
 export async function refreshProvider(token: string) {
   if (!token || token.length > 4096) throw new HttpError(401, "INVALID_SESSION", "Invalid or expired session.");
-  try { return (await complete(await supabasePublic.refresh(token))).tokens; }
+  try {
+    const result = await complete(await supabasePublic.refresh(token));
+    try { await assertAdminVerification(result.user, result.sessionId); }
+    catch (error) { await supabaseAdmin.logout(result.tokens.accessToken, "local").catch(() => {}); throw error; }
+    return result.tokens;
+  }
   catch (error) {
     if (error instanceof ProviderError && error.status === 400)
       throw new HttpError(401, "INVALID_SESSION", "Invalid or expired session.");
@@ -71,7 +79,12 @@ export async function resendOtp(email: string, type: EmailOtpType) {
 }
 export async function verifyOtp(email: string, code: string, type: EmailOtpType) {
   if (type !== "signup" && !await mappedEmail(email)) throw invalidOtp();
-  return complete(await verifyEmailCode(email, code, type), type === "signup");
+  const result = await complete(await verifyEmailCode(email, code, type), type === "signup");
+  if (result.user.role === "ADMIN") {
+    await supabaseAdmin.logout(result.tokens.accessToken, "local");
+    throw verificationRequired();
+  }
+  return result;
 }
 export async function forgotPassword(email: string) {
   if (await mappedEmail(email)) await supabasePublic.recover(email);
@@ -85,6 +98,10 @@ export async function resetPassword(email: string, code: string, password: strin
     const session = await authenticatedProviderSession(tokens.accessToken);
     if (session.user.id !== expected.id) throw new HttpError(400, "INVALID_CODE", "The code is invalid or expired.");
     await supabasePublic.updatePassword(tokens.accessToken, password);
+    await securityTransaction(async tx => {
+      await tx.user.update({ where: { id: session.user.id }, data: { authVersion: { increment: 1 }, authInvalidBefore: new Date() } });
+      await invalidateAdminCredentials(tx, session.user.id);
+    });
     // Never expose recovery credentials or leave a password-reset session alive.
     await revokeProviderSession(tokens.accessToken, "global");
   } catch (error) {

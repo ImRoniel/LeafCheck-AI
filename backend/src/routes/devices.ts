@@ -3,6 +3,7 @@ import { Router } from "express";
 import { serializeDevice } from "../lib/device.js";
 import type { Device } from "../generated/postgres-client/index.js";
 import { requireAuth } from "../lib/auth.js";
+import { requireDeviceWrite } from "../lib/permissions.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { prisma } from "../lib/prisma.js";
 import { serializeTelemetry } from "../lib/telemetry-payload.js";
@@ -58,7 +59,7 @@ devicesRouter.get("/overview", asyncRoute(async (_req, res) => {
   res.json(entries);
 }));
 
-devicesRouter.post("/claim", asyncRoute(async (req, res) => {
+devicesRouter.post("/claim", requireDeviceWrite, asyncRoute(async (req, res) => {
   const body = bodyObject(req.body, ["macAddress", "name"]);
   if (typeof body.macAddress !== "string" ||
       !/^(?:LC-[0-9a-f]{6}|[0-9a-f]{2}(?::[0-9a-f]{2}){5}|[0-9a-f]{2}(?:-[0-9a-f]{2}){5})$/i.test(body.macAddress)) {

@@ -4,10 +4,11 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { after, before, mock, test } from "node:test";
 import express from "express";
+import { adminSessionFixture } from "./helpers/admin-session-fixture.mjs";
 
 const origin = "http://localhost:5174";
 Object.assign(process.env, {
-  NODE_ENV: "development", AUTH_PROVIDER: "legacy", PORT: "0",
+  NODE_ENV: "development", AUTH_PROVIDER: "supabase", PORT: "0",
   AUTH_JWT_SECRET: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM",
   AUTH_JWT_ISSUER: "proxy-test", AUTH_JWT_AUDIENCE: "proxy-test",
   AUTH_ALLOWED_ORIGINS: ` ${origin} `, VITE_API_URL: "/api",
@@ -22,6 +23,11 @@ let inventoryReads = 0;
 const seen = [];
 const network = globalThis.fetch;
 const db = {
+  adminSessionVerification: { findUnique: async ({ where }) => {
+    const user = actors.get(where.supabaseSessionId);
+    return user?.role === "ADMIN" ? { userId: user.id, verifiedAt: new Date(Date.now() - 1000),
+      expiresAt: new Date(Date.now() + 60_000), authVersion: 0 } : null;
+  } },
   authSession: { findUnique: async ({ where }) => {
     const user = actors.get(where.id);
     return user ? { id: where.id, userId: user.id, user, revokedAt: null,
@@ -37,6 +43,8 @@ const db = {
 };
 
 before(async () => {
+  mock.module(new URL("../src/lib/supabase-session.js", import.meta.url).href, { namedExports:
+    adminSessionFixture(id => db.authSession.findUnique({ where: { id } })) });
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, { namedExports: { prismaPg: db } });
   mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: {} } });
   mock.module(new URL("../src/lib/provider-startup.js", import.meta.url).href, { namedExports: {} });
@@ -114,7 +122,7 @@ test("apiFetch reaches /api/admin/users through the actual Vite proxy with heade
   // Node has no page origin, so resolve browser-relative fetch URLs against Vite.
   const bridgedFetch = mock.method(globalThis, "fetch", (input, options) => network(new URL(input, proxyUrl), options));
   try {
-    for (const role of ["ADMIN", "LEAD_DEV"]) {
+    for (const role of ["ADMIN"]) {
       api.setAccessToken(await tokenFor(role));
       const response = await api.apiFetch("/admin/users", {
         headers: { Origin: origin, Cookie: "__Host-proxy-probe=original", "X-Client-Platform": "web" },
@@ -131,6 +139,9 @@ test("apiFetch reaches /api/admin/users through the actual Vite proxy with heade
       assert.equal(forwarded.headers["x-csrf-protection"], "1");
       assert.ok(forwarded.headers.authorization.startsWith("Bearer "));
     }
+    api.setAccessToken(await tokenFor("LEAD_DEV"));
+    await assert.rejects(() => api.apiFetch("/admin/users", { headers: { Origin: origin } }), error =>
+      error.status === 403 && error.code === "FORBIDDEN");
     const probe = await api.apiFetch("/auth/proxy-probe", { method: "POST",
       headers: { Origin: origin, Cookie: "__Host-proxy-probe=original" },
     });

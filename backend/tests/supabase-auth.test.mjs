@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 import { exportJWK, generateKeyPair, jwtVerify, SignJWT } from "jose";
 import "tsx/cjs";
+import { memoryModel } from "./helpers/security-store.mjs";
 
 process.env.AUTH_PROVIDER = "supabase";
 process.env.AUTH_JWT_SECRET = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM";
@@ -17,24 +18,34 @@ process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
 const issuer = `${process.env.SUPABASE_URL}/auth/v1`;
 const signingKey = new TextEncoder().encode("a-different-provider-signing-secret-for-tests");
 const users = new Map(), identities = new Map(), sessions = new Map(), refreshTokens = new Map(), codes = new Map();
+const challenges = new Map(), verifications = new Map(), auditLogs = new Map(), devices = new Map();
 const preservedId = "2da2cd1a-e594-43cc-a165-552342882246";
 let server, base, network, sequence = 10000000, upstreamCalls = [], asymmetric, publicJwk;
 let algorithm = "HS256", refuseRevocation = false, autoConfirm = false;
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
 const db = {
-  user: {
-    findUnique: async ({ where }) => [...users.values()].find(user =>
-      where.id ? user.id === where.id : where.email ? user.email === where.email : user.supabaseUserId === where.supabaseUserId) ?? null,
-    create: async ({ data }) => {
-      if ([...users.values()].some(user => user.email === data.email || user.supabaseUserId === data.supabaseUserId)) throw { code: "P2002" };
-      const user = { ...data, id: randomUUID(), isActive: true, createdAt: new Date(), updatedAt: new Date() };
-      users.set(user.id, user);
-      return user;
-    },
-  },
+  user: memoryModel(users, { unique: ["email", "supabaseUserId"], defaults: () => ({ name: null, role: "USER", isActive: true,
+    authVersion: 0, authInvalidBefore: null, createdAt: new Date(), updatedAt: new Date() }) }),
+  adminChallenge: memoryModel(challenges, { unique: ["challengeHash"], resolveUser: id => users.get(id), defaults: () => ({
+    attempts: 0, maxAttempts: 5, consumedAt: null, createdAt: new Date(), lastSentAt: new Date(),
+  }) }),
+  adminSessionVerification: memoryModel(verifications, { unique: ["supabaseSessionId"], defaults: () => ({ verifiedAt: new Date(), authVersion: 0 }) }),
+  auditLog: memoryModel(auditLogs, { defaults: () => ({ createdAt: new Date(), targetId: null, ipAddress: null }) }),
+  device: memoryModel(devices, { resolveUser: id => users.get(id) }),
   // Provider auth must not write either legacy table.
   authSession: { create() { throw new Error("Legacy session write forbidden"); }, updateMany() { throw new Error("Legacy revocation forbidden"); } },
   refreshToken: { create() { throw new Error("Legacy token write forbidden"); }, deleteMany() { throw new Error("Legacy token deletion forbidden"); } },
+};
+let transactionFlight = Promise.resolve();
+db.$transaction = callback => {
+  const operation = transactionFlight.then(async () => {
+    const tables = [users, challenges, verifications, auditLogs];
+    const copies = tables.map(table => structuredClone([...table.entries()]));
+    try { return await callback(db); }
+    catch (error) { tables.forEach((table, index) => { table.clear(); for (const [key, value] of copies[index]) table.set(key, value); }); throw error; }
+  });
+  transactionFlight = operation.catch(() => {});
+  return operation;
 };
 const authRead = {
   session: async id => sessions.get(id) ?? null,
@@ -66,7 +77,20 @@ async function providerRequest(input, init = {}) {
   const headers = new Headers(init.headers);
   upstreamCalls.push({ path, body, headers });
   if (path === "/.well-known/jwks.json") return json({ keys: [publicJwk] });
-  assert.equal(headers.get("apikey"), path === "/logout" ? "sb_secret_test" : "sb_publishable_test");
+  assert.equal(headers.get("apikey"), path === "/logout" || path.startsWith("/admin/") ? "sb_secret_test" : "sb_publishable_test");
+  if (path === "/admin/users" && init.method === "POST") {
+    assert.equal(headers.get("authorization"), "Bearer sb_secret_test");
+    const identity = { id: randomUUID(), email: body.email, password: body.password, name: body.user_metadata.name,
+      emailConfirmedAt: body.email_confirm ? new Date() : null, bannedUntil: null };
+    identities.set(identity.id, identity);
+    return json(serialized(identity));
+  }
+  if (path.startsWith("/admin/users/") && init.method === "DELETE") {
+    const id = path.slice("/admin/users/".length);
+    identities.delete(id);
+    for (const [sessionId, session] of sessions) if (session.userId === id) sessions.delete(sessionId);
+    return json({});
+  }
   if (path === "/signup") {
     if ([...identities.values()].some(user => user.email === body.email)) return json({});
     const identity = { id: randomUUID(), email: body.email, password: body.password, name: body.data?.name,
@@ -137,9 +161,17 @@ before(async () => {
   const { authRouter } = await import("../src/routes/auth.ts");
   const { requireAuth, requireAdmin, safeUser } = await import("../src/lib/auth.ts");
   const { errorHandler } = await import("../src/lib/http.ts");
+  mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: { sensorReading: { findFirst: async () => null } } } });
+  const { adminRouter, adminErrorHandler } = await import("../src/routes/admin.ts");
+  const { devicesRouter } = await import("../src/routes/devices.ts");
+  const { plantsRouter } = await import("../src/routes/plants.ts");
   const app = express();
   app.use(express.json());
   app.use("/api/auth", authRouter);
+  app.use("/api/admin", adminRouter);
+  app.use("/api/admin", adminErrorHandler);
+  app.use("/api/devices", devicesRouter);
+  app.use("/api/plants", plantsRouter);
   app.get("/api/users/me", requireAuth, (_req, res) => res.json(safeUser(res.locals.auth.user)));
   app.get("/admin", requireAuth, requireAdmin, (_req, res) => res.json({ ok: true }));
   app.use(errorHandler);
@@ -150,6 +182,7 @@ before(async () => {
 beforeEach(() => {
   process.env.AUTH_PROVIDER = "supabase";
   users.clear(); identities.clear(); sessions.clear(); refreshTokens.clear(); codes.clear(); upstreamCalls = [];
+  challenges.clear(); verifications.clear(); auditLogs.clear(); devices.clear();
   algorithm = "HS256"; refuseRevocation = false; autoConfirm = false;
   users.set(preservedId, { id: preservedId, email: "cuaresmaroniel27@gmail.com", password: "preserve-exact-hash",
     role: "USER", isActive: true, name: "Preserved", supabaseUserId: null, emailVerifiedAt: null,
@@ -192,12 +225,12 @@ async function browserRequest(path, { body = {}, token, cookie, headers = {} } =
 test("Supabase browser login and refresh use cookies; both logout scopes clear and revoke them", async () => {
   for (const path of ["/logout", "/logout-all"]) {
     const account = await registered(`${path.slice(1)}@example.test`);
-    users.get(account.user.id).role = "ADMIN";
+    users.get(account.user.id).role = "LEAD_DEV";
     const login = await browserRequest("/login", {
       body: { email: account.user.email, password: "original password" },
     });
     assert.equal(login.status, 200);
-    assert.equal(login.body.user.role, "ADMIN");
+    assert.equal(login.body.user.role, "LEAD_DEV");
     assert.equal(login.body.refreshToken, undefined);
     const cookie = login.headers.get("set-cookie");
     assert.ok(cookie.startsWith("__Host-leafcheck-refresh="));
@@ -228,7 +261,7 @@ test("Supabase browser login and refresh use cookies; both logout scopes clear a
 });
 
 test("Supabase browser actions enforce origin/CSRF and keep registration, OTP and recovery native-only", async () => {
-  for (const path of ["/login", "/refresh", "/logout", "/logout-all"]) {
+  for (const path of ["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel"]) {
     for (const headers of [{ Origin: null }, { Origin: "https://evil.test", "X-Auth-Client": "native" },
       { "X-CSRF-Protection": null }, { "X-CSRF-Protection": "0" }]) {
       const result = await browserRequest(path, { headers });
@@ -242,6 +275,256 @@ test("Supabase browser actions enforce origin/CSRF and keep registration, OTP an
     assert.equal(result.body.code, "NATIVE_REQUIRED");
   }
   assert.equal(upstreamCalls.length, 0);
+});
+
+async function staffAccount(role = "ADMIN") {
+  const account = await registered(`${role.toLowerCase()}-${randomUUID()}@example.test`);
+  users.get(account.user.id).role = role;
+  return account;
+}
+async function verifiedAdministrator() {
+  const account = await staffAccount();
+  const challenge = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
+  assert.equal(challenge.status, 202);
+  const verified = await browserRequest("/verify-admin-otp", { body: {
+    challengeToken: challenge.body.challengeToken, code: codes.get(`${account.user.email}:magiclink`),
+  } });
+  assert.equal(verified.status, 200);
+  return { ...account, ...verified.body, cookie: verified.headers.get("set-cookie").split(";")[0], challenge: challenge.body };
+}
+async function adminRequest(path, token, method = "GET", body) {
+  const response = await fetch(`${base}/api/admin${path}`, { method,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  return { status: response.status, body: response.status === 204 ? null : await response.json(), headers: response.headers };
+}
+
+test("LEAD_DEV password login returns a JWT immediately but all user and audit operations are forbidden", async () => {
+  const account = await staffAccount("LEAD_DEV");
+  const login = await request("/login", { email: account.user.email, password: "original password" });
+  assert.equal(login.status, 200);
+  assert.equal(typeof login.body.accessToken, "string");
+  assert.equal(challenges.size, 0);
+  assert.equal((await adminRequest("/devices", login.body.accessToken)).status, 200);
+  for (const [path, method, body] of [["/users", "GET"], ["/admins", "GET"], ["/audit", "GET"],
+    ["/devices/whitelist", "GET"], [`/users/${account.user.id}`, "GET"], ["/users", "POST", {}],
+    [`/users/${account.user.id}`, "PATCH", { role: "ADMIN" }], [`/users/${account.user.id}`, "DELETE"]]) {
+    const result = await adminRequest(path, login.body.accessToken, method, body);
+    assert.equal(result.status, 403, `${method} ${path}`);
+    assert.equal(result.body.code, "FORBIDDEN");
+  }
+  for (const [path, method, body] of [["/api/devices/claim", "POST", { macAddress: "LC-A50528" }],
+    [`/api/plants/${randomUUID()}/pair-device`, "PATCH", { deviceId: randomUUID() }],
+    [`/api/plants/${randomUUID()}/seed-telemetry`, "POST", {}]]) {
+    const denied = await request(path, body, login.body.accessToken, method);
+    assert.equal(denied.status, 403); assert.equal(denied.body.code, "FORBIDDEN");
+  }
+});
+
+test("ADMIN password login returns a hashed five-minute OTP challenge and no usable browser credentials", async () => {
+  const account = await staffAccount();
+  const result = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
+  assert.equal(result.status, 202);
+  assert.equal(result.body.status, "otp_required");
+  assert.equal(result.body.accessToken, undefined);
+  assert.equal(result.body.refreshToken, undefined);
+  assert.ok(!result.body.maskedEmail.includes(account.user.email));
+  assert.match(result.headers.get("set-cookie"), /__Host-leafcheck-refresh=;/);
+  const pending = [...challenges.values()][0];
+  assert.notEqual(pending.challengeHash, result.body.challengeToken);
+  assert.match(pending.challengeHash, /^[a-f0-9]{64}$/);
+  assert.equal(pending.attempts, 0); assert.equal(pending.maxAttempts, 5);
+  assert.ok(pending.expiresAt - pending.createdAt <= 300_000);
+  assert.equal(verifications.size, 0);
+  assert.equal(sessions.size, 1, "the provisional password session was revoked");
+});
+
+test("a valid unverified ADMIN JWT is rejected across the entire admin router", async () => {
+  const account = await staffAccount();
+  for (const [path, method, body] of [["/users", "GET"], ["/devices", "GET"], ["/audit", "GET"],
+    ["/admins", "GET"], ["/devices/whitelist", "GET"], ["/users", "POST", {}],
+    [`/users/${account.user.id}`, "PATCH", {}], [`/users/${account.user.id}`, "DELETE"], ["/unknown", "GET"]]) {
+    const result = await adminRequest(path, account.accessToken, method, body);
+    assert.equal(result.status, 403, `${method} ${path}`);
+    assert.equal(result.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  }
+});
+
+test("ADMIN OTP verification issues JWT and secure refresh cookie, consumes once, and records an audit", async () => {
+  const admin = await verifiedAdministrator();
+  assert.equal((await adminRequest("/users", admin.accessToken)).status, 200);
+  const claims = (await jwtVerify(admin.accessToken, signingKey)).payload;
+  const proof = [...verifications.values()][0];
+  assert.equal(proof.supabaseSessionId, claims.session_id);
+  assert.equal(proof.userId, admin.user.id);
+  assert.ok(proof.expiresAt - proof.verifiedAt <= 8 * 3_600_000);
+  assert.ok([...challenges.values()][0].consumedAt instanceof Date);
+  const audit = [...auditLogs.values()].find(row => row.action === "ADMIN_LOGIN_VERIFIED");
+  assert.equal(audit.actorId, admin.user.id);
+  assert.equal(audit.metadata.method, "password_and_email_otp");
+  const replay = await browserRequest("/verify-admin-otp", { body: { challengeToken: admin.challenge.challengeToken, code: "12345678" } });
+  assert.equal(replay.status, 400);
+  assert.equal(verifications.size, 1);
+  assert.equal((await adminRequest("/users", admin.accessToken)).status, 200);
+});
+
+test("LEAD_DEV device responses omit every owner identity field while verified ADMIN receives owner details", async () => {
+  const lead = await staffAccount("LEAD_DEV");
+  devices.set(randomUUID(), { id: randomUUID(), userId: preservedId, name: "Indoor sensor", macAddress: "LC-A50528",
+    plants: [], status: "OFFLINE", createdAt: new Date(), updatedAt: new Date() });
+  const result = await adminRequest("/devices", lead.accessToken);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.data.length, 1);
+  assert.equal("owner" in result.body.data[0], false);
+  const serialized = JSON.stringify(result.body);
+  assert.ok(!serialized.includes(users.get(preservedId).email));
+  assert.ok(!serialized.includes("emailMasked"));
+  assert.ok(!serialized.includes("isActive"));
+  const deniedFilter = await adminRequest(`/devices?userId=${preservedId}`, lead.accessToken);
+  assert.equal(deniedFilter.status, 403);
+  const admin = await verifiedAdministrator();
+  const full = await adminRequest("/devices", admin.accessToken);
+  assert.equal(full.body.data[0].owner.email, users.get(preservedId).email);
+});
+
+test("ADMIN refresh requires the same verified session and clears unverified browser cookies", async () => {
+  const account = await staffAccount();
+  const denied = await browserRequest("/refresh", { cookie: `__Host-leafcheck-refresh=${account.refreshToken}` });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  assert.match(denied.headers.get("set-cookie"), /__Host-leafcheck-refresh=;/);
+  const admin = await verifiedAdministrator();
+  const refreshed = await browserRequest("/refresh", { cookie: admin.cookie });
+  assert.equal(refreshed.status, 200);
+  assert.equal((await adminRequest("/users", refreshed.body.accessToken)).status, 200);
+  [...verifications.values()][0].expiresAt = new Date(Date.now() - 1);
+  const expired = await adminRequest("/users", refreshed.body.accessToken);
+  assert.equal(expired.status, 403); assert.equal(expired.body.code, "ADMIN_VERIFICATION_REQUIRED");
+});
+
+test("proofs cannot be transferred between accounts, session IDs, or account security versions", async () => {
+  const admin = await verifiedAdministrator();
+  const proof = [...verifications.values()][0];
+  for (const change of [{ userId: preservedId }, { supabaseSessionId: randomUUID() }, { authVersion: 99 }, { verifiedAt: new Date(Date.now() + 60_000) }]) {
+    const previous = { ...proof };
+    Object.assign(proof, change);
+    assert.equal((await adminRequest("/users", admin.accessToken)).status, 403);
+    Object.assign(proof, previous);
+  }
+});
+
+test("OTP guesses are limited to five provider attempts and challenges are origin/client bound", async () => {
+  const account = await staffAccount();
+  const login = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
+  const challengeToken = login.body.challengeToken;
+  assert.equal((await request("/verify-admin-otp", { challengeToken, code: "00000000" })).status, 400);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const wrong = await browserRequest("/verify-admin-otp", { body: { challengeToken, code: "00000000" } });
+    assert.equal(wrong.status, 400); assert.equal(wrong.body.code, "INVALID_CODE");
+  }
+  const exhausted = await browserRequest("/verify-admin-otp", { body: { challengeToken, code: codes.get(`${account.user.email}:magiclink`) } });
+  assert.equal(exhausted.body.code, "INVALID_CHALLENGE");
+  assert.equal(upstreamCalls.filter(call => call.path === "/verify" && call.body.type === "magiclink").length, 5);
+  assert.equal([...challenges.values()][0].attempts, 5);
+});
+
+test("resend increments the shared attempt budget without extending expiry; cancellation is idempotent", async () => {
+  const account = await staffAccount();
+  const login = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
+  const challengeToken = login.body.challengeToken;
+  const pending = [...challenges.values()][0];
+  const expiry = pending.expiresAt.getTime();
+  assert.equal((await browserRequest("/admin-otp/resend", { body: { challengeToken } })).status, 429);
+  pending.lastSentAt = new Date(Date.now() - 60_001);
+  assert.equal((await browserRequest("/admin-otp/resend", { body: { challengeToken } })).status, 202);
+  assert.equal(pending.attempts, 1); assert.equal(pending.expiresAt.getTime(), expiry);
+  for (let repeat = 0; repeat < 2; repeat++)
+    assert.equal((await browserRequest("/admin-otp/cancel", { body: { challengeToken } })).status, 204);
+  assert.equal((await browserRequest("/verify-admin-otp", { body: { challengeToken, code: codes.get(`${account.user.email}:magiclink`) } })).status, 400);
+});
+
+test("expired challenges and changed roles fail closed before a privileged session can be issued", async () => {
+  for (const mutate of [record => { record.expiresAt = new Date(Date.now() - 1); }, record => { users.get(record.userId).role = "LEAD_DEV"; }]) {
+    const account = await staffAccount();
+    const login = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
+    mutate([...challenges.values()].find(record => record.userId === account.user.id));
+    const result = await browserRequest("/verify-admin-otp", { body: { challengeToken: login.body.challengeToken, code: codes.get(`${account.user.email}:magiclink`) } });
+    assert.equal(result.status, 400); assert.equal(verifications.size, 0);
+  }
+});
+
+test("concurrent OTP submissions can authorize only one session", async () => {
+  const account = await staffAccount();
+  const login = await browserRequest("/login", { body: { email: account.user.email, password: "original password" } });
+  const body = { challengeToken: login.body.challengeToken, code: codes.get(`${account.user.email}:magiclink`) };
+  const results = await Promise.all([browserRequest("/verify-admin-otp", { body }), browserRequest("/verify-admin-otp", { body })]);
+  assert.deepEqual(results.map(result => result.status).sort(), [200, 400]);
+  assert.equal(verifications.size, 1);
+});
+
+test("the generic native OTP and legacy login paths cannot grant a password-only ADMIN session", async () => {
+  const account = await staffAccount();
+  await request("/otp/request", { email: account.user.email });
+  const bypass = await request("/otp/verify", { email: account.user.email, code: codes.get(`${account.user.email}:magiclink`), type: "magiclink" });
+  assert.equal(bypass.status, 403); assert.equal(bypass.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  const hash = await (await import("../src/lib/password.ts")).hashPassword("original password");
+  users.get(account.user.id).password = hash;
+  process.env.AUTH_PROVIDER = "legacy";
+  const legacy = await request("/login", { email: account.user.email, password: "original password" });
+  assert.equal(legacy.status, 403); assert.equal(legacy.body.accessToken, undefined);
+});
+
+test("SuperAdmin creates linked accounts, edits roles and bans users with matching audit events", async () => {
+  const admin = await verifiedAdministrator();
+  const created = await adminRequest("/users", admin.accessToken, "POST", { email: "manual@example.test", password: "manual password", name: "Manual", role: "USER" });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+  assert.equal(created.body.data.password, undefined);
+  assert.ok(users.get(id).supabaseUserId);
+  const login = await request("/login", { email: "manual@example.test", password: "manual password" });
+  assert.equal(login.status, 200);
+  const edited = await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { role: "LEAD_DEV", name: "Operator" });
+  assert.equal(edited.status, 200); assert.equal(edited.body.data.role, "LEAD_DEV");
+  assert.equal((await request("/api/users/me", undefined, login.body.accessToken, "GET")).status, 401);
+  assert.equal((await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { isActive: false })).status, 200);
+  assert.equal((await request("/login", { email: "manual@example.test", password: "manual password" })).status, 401);
+  assert.equal((await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { isActive: true })).status, 200);
+  assert.equal((await request("/refresh", { refreshToken: login.body.refreshToken })).status, 401);
+  const actions = [...auditLogs.values()].filter(row => row.targetId === id).map(row => row.action);
+  assert.deepEqual(actions, ["USER_CREATED", "USER_UPDATED", "USER_UPDATED", "USER_UPDATED"]);
+  const serialized = JSON.stringify([...auditLogs.values()]);
+  for (const secret of ["manual password", admin.accessToken, admin.challenge.challengeToken]) assert.ok(!serialized.includes(secret));
+});
+
+test("user mutations reject self-ban, self-delete, last-admin demotion, invalid roles and unknown fields", async () => {
+  const admin = await verifiedAdministrator();
+  const path = `/users/${admin.user.id}`;
+  assert.equal((await adminRequest(path, admin.accessToken, "PATCH", { isActive: false })).body.code, "SELF_BAN_FORBIDDEN");
+  assert.equal((await adminRequest(path, admin.accessToken, "DELETE")).body.code, "SELF_DELETE_FORBIDDEN");
+  assert.equal((await adminRequest(path, admin.accessToken, "PATCH", { role: "LEAD_DEV" })).body.code, "LAST_ADMIN");
+  for (const body of [{}, { role: "SUPERADMIN" }, { isActive: "false" }, { password: "injected" }])
+    assert.equal((await adminRequest(path, admin.accessToken, "PATCH", body)).status, 400);
+});
+
+test("user deletion removes provider and application identities and logs completion", async () => {
+  const admin = await verifiedAdministrator();
+  const target = await registered("delete@example.test");
+  const providerId = users.get(target.user.id).supabaseUserId;
+  assert.equal((await adminRequest(`/users/${target.user.id}`, admin.accessToken, "DELETE")).status, 204);
+  assert.equal(users.has(target.user.id), false); assert.equal(identities.has(providerId), false);
+  assert.equal((await request("/api/users/me", undefined, target.accessToken, "GET")).status, 401);
+  assert.ok([...auditLogs.values()].some(row => row.action === "USER_DELETED" && row.targetId === target.user.id));
+});
+
+test("audit endpoint is paginated, filterable, and read only", async () => {
+  const admin = await verifiedAdministrator();
+  const result = await adminRequest(`/audit?action=ADMIN_LOGIN_VERIFIED&actorId=${admin.user.id}&pageSize=1`, admin.accessToken);
+  assert.equal(result.status, 200); assert.equal(result.body.pagination.total, 1);
+  assert.equal(result.body.data[0].actorId, admin.user.id);
+  assert.equal((await adminRequest("/audit?from=invalid", admin.accessToken)).status, 400);
+  assert.equal((await adminRequest("/audit?unknown=true", admin.accessToken)).status, 400);
+  assert.equal((await adminRequest("/audit", admin.accessToken, "DELETE")).status, 404);
 });
 
 test("legacy switch gates every new mutation and does not contact Supabase", async () => {

@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
+import { requireDeviceWrite } from "../lib/permissions.js";
 import { demoDeviceId, seedDemoTelemetry } from "../lib/demo-telemetry.js";
 import { serializeDevice } from "../lib/device.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
@@ -13,6 +14,10 @@ import { additionalHistorySources, historyOrder, latestPlantContext, parsePlantH
 
 export const plantsRouter = Router();
 plantsRouter.use(requireAuth);
+plantsRouter.use((req, res, next) => {
+  if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) return requireDeviceWrite(req, res, next);
+  next();
+});
 
 function plantFields(value: unknown, partial = false) {
   const body = bodyObject(value, [

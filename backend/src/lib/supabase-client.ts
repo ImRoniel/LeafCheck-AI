@@ -14,7 +14,8 @@ export interface ProviderTokens {
 }
 export type EmailOtpType = "signup" | "magiclink" | "recovery";
 export class ProviderError extends HttpError {
-  constructor(status: number) {
+  constructor(public readonly providerStatus: number) {
+    const status = providerStatus;
     super(status === 429 ? 429 : status >= 500 ? 503 : 400,
       status === 429 ? "RATE_LIMITED" : "PROVIDER_REJECTED",
       status === 429 ? "Please wait before requesting another code." : status >= 500 ? "Email authentication is temporarily unavailable." : "The code or credentials are invalid or expired.");
@@ -54,7 +55,7 @@ async function request(path: string, method: string, body?: unknown, accessToken
       method, signal: AbortSignal.timeout(15000),
       headers: {
         apikey: admin ? config.secretKey : config.publishableKey,
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(accessToken || admin ? { Authorization: `Bearer ${accessToken ?? config.secretKey}` } : {}),
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -84,6 +85,9 @@ export const supabasePublic = {
   updatePassword: (token: string, password: string) => request("/user", "PUT", { password }, token),
 };
 export const supabaseAdmin = {
+  createUser: (email: string, password: string, name: string | null) =>
+    request("/admin/users", "POST", { email, password, email_confirm: true, user_metadata: { name } }, undefined, true).then(providerUser),
+  deleteUser: (id: string) => request(`/admin/users/${encodeURIComponent(id)}`, "DELETE", undefined, undefined, true),
   // Supabase authenticates logout with the user's JWT; the secret key stays server-side.
   logout: (token: string, scope: "local" | "global") =>
     request(`/logout?scope=${scope}`, "POST", undefined, token, true),

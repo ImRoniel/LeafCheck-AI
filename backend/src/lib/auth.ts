@@ -7,10 +7,10 @@ import { prismaPg } from "./prisma-pg.js";
 import { authProvider } from "./auth-provider.js";
 import { authenticatedProviderSession } from "./supabase-session.js";
 
-// Explicit legacy projection also permits deploying before the additive migration.
+// Credential projection excludes provider identity fields and public responses.
 export const legacyUserSelect = {
   id: true, email: true, name: true, password: true, isActive: true,
-  role: true, createdAt: true, updatedAt: true,
+  role: true, authInvalidBefore: true, createdAt: true, updatedAt: true,
 } as const;
 type ApplicationUser = Pick<User, keyof typeof legacyUserSelect>;
 
@@ -75,9 +75,12 @@ export async function rotateSession(token: string, client: string) {
       session.client !== client ||
       session.revokedAt ||
       session.expiresAt <= new Date() ||
-      !session.user.isActive
+      !session.user.isActive ||
+      (session.user.authInvalidBefore && (!session.createdAt || session.createdAt <= session.user.authInvalidBefore))
     )
       return null;
+    // A pre-existing legacy ADMIN session cannot bypass the provider OTP policy.
+    if (session.user.role === "ADMIN") return null;
     const consumed = await tx.refreshToken.updateMany({
       where: { id: record.id, consumedAt: null },
       data: { consumedAt: new Date() },
@@ -138,7 +141,8 @@ export const requireAuth = asyncRoute(async (req, res, next) => {
     session.userId !== claims.sub ||
     session.revokedAt ||
     session.expiresAt <= new Date() ||
-    !session.user.isActive
+    !session.user.isActive ||
+    (session.user.authInvalidBefore && (!session.createdAt || session.createdAt <= session.user.authInvalidBefore))
   )
     throw invalidSession();
   res.locals.auth = { user: session.user, sessionId: session.id };

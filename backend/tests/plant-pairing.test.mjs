@@ -67,7 +67,7 @@ const client = {
 before(async () => {
   mock.module(new URL("../src/lib/auth.js", import.meta.url).href, {namedExports:{requireAuth(req,res,next) {
     const id = req.get("authorization"); if (!id) return res.status(401).json({code:"UNAUTHORIZED"});
-    res.locals.auth = {user:{id}}; next();
+    res.locals.auth = {user:{id,role:"USER"}}; next();
   }}});
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, {namedExports:{prismaPg:client}});
   mock.module(new URL("../src/lib/demo-telemetry.js", import.meta.url).href, {namedExports:{demoDeviceId: id => `demo-${id}`, seedDemoTelemetry: async () => {throw new Error("unexpected demo call");}}});

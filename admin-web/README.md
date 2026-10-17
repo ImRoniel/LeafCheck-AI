@@ -108,3 +108,11 @@ or a live auth provider.
 web host to proxy `/api/*` to the backend before its SPA fallback. The Vite proxy
 is development-only. Serve `index.html` for other non-file paths so direct visits
 to routes such as `/users` work with `BrowserRouter`.
+
+## Backend admin security integration
+
+The backend now returns `202 otp_required` for SuperAdmin password login and requires
+`POST /api/auth/verify-admin-otp` before issuing browser credentials. The current
+React login/session implementation needs the OTP UI integration as its next step.
+System Administrator (`LEAD_DEV`) login still completes with 200 and has device
+read access only. See [the backend contracts](../backend/ADMIN_SECURITY.md).

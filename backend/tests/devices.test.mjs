@@ -38,10 +38,10 @@ const device = {
   },
 };
 before(async () => {
-  Object.assign(process.env, { AUTH_JWT_SECRET: secret, AUTH_JWT_ISSUER: 'test', AUTH_JWT_AUDIENCE: 'test', AUTH_ALLOWED_ORIGINS: 'https://example.test', PORT: '0' });
+  Object.assign(process.env, { AUTH_PROVIDER: 'legacy', AUTH_JWT_SECRET: secret, AUTH_JWT_ISSUER: 'test', AUTH_JWT_AUDIENCE: 'test', AUTH_ALLOWED_ORIGINS: 'https://example.test', PORT: '0' });
   mock.module(new URL('../src/lib/prisma-pg.js', import.meta.url).href, {namedExports: {prismaPg: {
     device,
-    authSession: {findUnique: async ({where}) => ({id: where.id, userId: where.id, user: {id: where.id, isActive: true}, expiresAt: new Date(Date.now() + 60000), revokedAt: null})},
+    authSession: {findUnique: async ({where}) => ({id: where.id, userId: where.id, user: {id: where.id, role: 'USER', isActive: true}, expiresAt: new Date(Date.now() + 60000), revokedAt: null})},
   }}});
   mock.module(new URL('../src/lib/prisma.js', import.meta.url).href, {namedExports: {prisma: {}}});
   for (const name of ['telemetry','plants','ai','scan','auth','users']) {

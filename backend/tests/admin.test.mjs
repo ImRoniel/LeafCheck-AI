@@ -4,7 +4,9 @@ import { SignJWT } from "jose";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, beforeEach, mock, test } from "node:test";
+import { adminSessionFixture } from "./helpers/admin-session-fixture.mjs";
 
+process.env.AUTH_PROVIDER = "supabase";
 process.env.AUTH_JWT_SECRET = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM";
 process.env.AUTH_JWT_ISSUER = "admin-test";
 process.env.AUTH_JWT_AUDIENCE = "admin-test";
@@ -102,7 +104,7 @@ function project(model, row, select) {
 }
 
 const db = {};
-for (const model of ["user", "plant", "device", "careTask", "aIAnalysis", "authSession"]) {
+for (const model of ["user", "plant", "device", "careTask", "aIAnalysis", "authSession", "adminSessionVerification"]) {
   db[model] = {};
   for (const method of ["findMany", "findUnique", "count"]) {
     db[model][method] = async query => {
@@ -126,6 +128,8 @@ db.$transaction = async (callback, options) => {
 };
 
 before(async () => {
+  mock.module(new URL("../src/lib/supabase-session.js", import.meta.url).href, { namedExports:
+    adminSessionFixture(id => db.authSession.findUnique({ where: { id }, include: { user: true } })) });
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, { namedExports: { prismaPg: db } });
   mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: { sensorReading: {
     findFirst: async query => {
@@ -159,6 +163,7 @@ before(async () => {
 
 beforeEach(() => {
   records = { user: [user(actorId, { role: "ADMIN" })], plant: [], device: [], careTask: [], aIAnalysis: [], sensorReading: [],
+    adminSessionVerification: [{ id: randomUUID(), userId: actorId, supabaseSessionId: sessionId, verifiedAt: earlier, expiresAt: later, authVersion: 0 }],
     authSession: [{ id: sessionId, userId: actorId, client: "native", createdAt: now, expiresAt: later, revokedAt: null, tokenHash: "SECRET_TOKEN_HASH" }] };
   calls = []; failPg = false; failedReadings = new Set(); readingConcurrency = 0; maxReadingConcurrency = 0; inTransaction = false;
 });
@@ -188,11 +193,11 @@ function checkTransactions() {
   assert.ok(calls.some(call => call.model === "transaction"));
   assert.ok(calls.filter(call => call.model === "transaction").every(call => call.options.isolationLevel === "RepeatableRead"));
   assert.ok(calls.filter(call => call.model !== "transaction" && call.model !== "sensorReading"
-    && !(call.model === "authSession" && call.method === "findUnique")).every(call => call.inTransaction));
+    && !(["authSession", "adminSessionVerification"].includes(call.model) && call.method === "findUnique")).every(call => call.inTransaction));
 }
 const paths = ["/users", `/users/${targetId}`, "/devices", "/devices/whitelist", "/admins"];
 
-test("all five endpoints require authentication and a current database ADMIN/LEAD_DEV role", async () => {
+test("admin endpoints require current roles; LEAD_DEV is restricted to operational devices", async () => {
   records.user.push(user(targetId));
   for (const path of paths) checkError(await get(path, null), 401, "INVALID_SESSION");
   assert.equal(calls.length, 0);
@@ -207,6 +212,10 @@ test("all five endpoints require authentication and a current database ADMIN/LEA
     records.user[0].role = role;
     for (const path of paths) {
       const result = await get(path);
+      if (role === "LEAD_DEV" && path !== "/devices") {
+        checkError(result, 403, "FORBIDDEN");
+        continue;
+      }
       assert.equal(result.status, 200);
       assert.equal(result.headers.get("cache-control"), "no-store");
       assert.equal(result.body.meta.schemaVersion, 1);
@@ -341,7 +350,7 @@ test("devices include all owners, multi-plant/unlinked inventory and latest norm
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.meta, { schemaVersion: 1, asOf: now.toISOString(), freshnessWindowSeconds: 1800, futureToleranceSeconds: 60, telemetryDegraded: false });
   const row = result.body.data.find(item => item.id === physical.id);
-  assert.deepEqual(row.owner, { id: targetId, name: null, emailMasked: "o***@example.test", isActive: false });
+  assert.deepEqual(row.owner, { id: targetId, name: null, email: "operator@example.test", emailMasked: "o***@example.test", isActive: false });
   assert.equal(row.plants.length, 2);
   assert.equal(row.storedStatus, "OFFLINE"); assert.equal(row.connectionStatus, "ONLINE");
   assert.equal(row.lastReadingAt, now.toISOString()); assert.equal(row.readingAgeSeconds, 0);

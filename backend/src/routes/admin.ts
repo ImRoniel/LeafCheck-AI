@@ -3,7 +3,11 @@ import { Router, type ErrorRequestHandler, type Request, type RequestHandler, ty
 import type { Prisma } from "../generated/postgres-client/index.js";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { diagnosisTelemetrySnapshot, readingIsFresh } from "../lib/diagnosis-telemetry.js";
-import { asyncRoute, HttpError } from "../lib/http.js";
+import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
+import { requirePermission } from "../lib/permissions.js";
+import { requireAdminVerification } from "../lib/admin-verification.js";
+import { createAdminUser, updateAdminUser, deleteAdminUser, type AdminActor, type UpdateAdminUser } from "../lib/admin-users.js";
+import { credentials, validateName } from "../lib/auth-input.js";
 import { resourceId } from "../lib/ownership.js";
 import { prisma } from "../lib/prisma.js";
 import { prismaPg } from "../lib/prisma-pg.js";
@@ -120,9 +124,48 @@ function userWhere(query: Record<string, string>, q: string | undefined, operato
 }
 
 export const adminRouter = Router();
-adminRouter.use(adminResponseHeaders, requireAuth, requireAdmin);
+adminRouter.use(adminResponseHeaders, requireAuth, requireAdmin, requireAdminVerification);
 
-adminRouter.get("/users", asyncRoute(async (req, res) => {
+const actor = (req: Request, res: Response): AdminActor => ({
+  actorId: res.locals.auth.user.id, sessionId: res.locals.auth.sessionId, ipAddress: req.ip,
+});
+
+function roleValue(value: unknown) {
+  if (value !== "USER" && value !== "ADMIN" && value !== "LEAD_DEV") invalidInput("Invalid user role.");
+  return value;
+}
+
+adminRouter.post("/users", requirePermission("users.manage"), asyncRoute(async (req, res) => {
+  const data = bodyObject(req.body, ["email", "password", "name", "role", "isActive"]);
+  const login = credentials({ email: data.email, password: data.password, name: data.name }, true);
+  if (data.isActive !== undefined && typeof data.isActive !== "boolean") invalidInput("isActive must be a boolean.");
+  const user = await createAdminUser({ ...login, name: login.name ?? null,
+    role: data.role === undefined ? "USER" : roleValue(data.role), isActive: data.isActive ?? true,
+  }, actor(req, res));
+  res.status(201).json({ data: user, meta: meta(res) });
+}));
+
+adminRouter.patch("/users/:id", requirePermission("users.manage"), asyncRoute(async (req, res) => {
+  const id = resourceId(req.params.id);
+  const data = bodyObject(req.body, ["name", "role", "isActive"]);
+  if (Object.keys(data).length === 0) invalidInput("Provide at least one user field.");
+  const change: UpdateAdminUser = {};
+  if ("name" in data) change.name = validateName(data.name);
+  if ("role" in data) change.role = roleValue(data.role);
+  if ("isActive" in data) {
+    if (typeof data.isActive !== "boolean") invalidInput("isActive must be a boolean.");
+    change.isActive = data.isActive;
+  }
+  res.json({ data: await updateAdminUser(id, change, actor(req, res)), meta: meta(res) });
+}));
+
+adminRouter.delete("/users/:id", requirePermission("users.manage"), asyncRoute(async (req, res) => {
+  bodyObject(req.body ?? {}, []);
+  await deleteAdminUser(resourceId(req.params.id), actor(req, res));
+  res.status(204).end();
+}));
+
+adminRouter.get("/users", requirePermission("users.read"), asyncRoute(async (req, res) => {
   const query = queryParams(req, ["page", "pageSize", "q", "role", "isActive", "sort", "order"]);
   const page = pageQuery(query);
   const where = userWhere(query, page.q);
@@ -141,7 +184,7 @@ adminRouter.get("/users", asyncRoute(async (req, res) => {
   })), page, total);
 }));
 
-adminRouter.get("/users/:id", asyncRoute(async (req, res) => {
+adminRouter.get("/users/:id", requirePermission("users.read"), asyncRoute(async (req, res) => {
   queryParams(req, []);
   const id = resourceId(req.params.id);
   const asOf = context(res).asOf;
@@ -198,7 +241,7 @@ adminRouter.get("/users/:id", asyncRoute(async (req, res) => {
   res.json({ data, meta: meta(res) });
 }));
 
-adminRouter.get("/devices/whitelist", asyncRoute(async (req, res) => {
+adminRouter.get("/devices/whitelist", requirePermission("devices.manage"), asyncRoute(async (req, res) => {
   const query = queryParams(req, ["page", "pageSize", "q", "userId"]);
   const page = pageQuery(query);
   const where: Prisma.DeviceWhereInput = {
@@ -220,8 +263,10 @@ adminRouter.get("/devices/whitelist", asyncRoute(async (req, res) => {
   })), page, total, { policy: "REGISTERED_DEVICE", independentWhitelist: false });
 }));
 
-adminRouter.get("/devices", asyncRoute(async (req, res) => {
+adminRouter.get("/devices", requirePermission("devices.read"), asyncRoute(async (req, res) => {
   const query = queryParams(req, ["page", "pageSize", "q", "userId", "linked", "source", "sort", "order"]);
+  const operational = res.locals.auth.user.role === "LEAD_DEV";
+  if (operational && query.userId !== undefined) throw new HttpError(403, "FORBIDDEN", "Filtering by owner is not permitted for this role.");
   const page = pageQuery(query);
   const linked = booleanValue(query.linked);
   const source = enumValue(query.source, ["PHYSICAL", "DEMO"]);
@@ -237,7 +282,7 @@ adminRouter.get("/devices", asyncRoute(async (req, res) => {
   const [devices, total] = await prismaPg.$transaction(async tx => Promise.all([
     tx.device.findMany({ where, skip: page.skip, take: page.pageSize, orderBy: [{ [sort]: order }, { id: "asc" }], select: {
       id: true, name: true, macAddress: true, status: true, createdAt: true, updatedAt: true,
-      user: { select: { id: true, name: true, email: true, isActive: true } },
+      user: { select: operational ? { id: true } : { id: true, name: true, email: true, isActive: true } },
       plants: { orderBy: { id: "asc" }, select: { id: true, name: true, healthStatus: true } },
     } }),
     tx.device.count({ where }),
@@ -248,7 +293,8 @@ adminRouter.get("/devices", asyncRoute(async (req, res) => {
     const demo = device.macAddress.startsWith("DEMO:");
     const inventory = {
       id: device.id, name: device.name, macAddress: device.macAddress,
-      owner: { id: device.user.id, name: device.user.name, emailMasked: maskedEmail(device.user.email), isActive: device.user.isActive },
+      ...(operational ? {} : { owner: { id: device.user.id, name: device.user.name,
+        email: device.user.email, emailMasked: maskedEmail(device.user.email), isActive: device.user.isActive } }),
       plants: device.plants, source: demo ? "DEMO" : "PHYSICAL", storedStatus: device.status,
       createdAt: device.createdAt, updatedAt: device.updatedAt,
     };
@@ -280,7 +326,7 @@ adminRouter.get("/devices", asyncRoute(async (req, res) => {
   listResponse(res, data, page, total, { freshnessWindowSeconds, futureToleranceSeconds, telemetryDegraded: data.some(device => device.readingError) });
 }));
 
-adminRouter.get("/admins", asyncRoute(async (req, res) => {
+adminRouter.get("/admins", requirePermission("users.read"), asyncRoute(async (req, res) => {
   const query = queryParams(req, ["page", "pageSize", "q", "role", "isActive"]);
   const page = pageQuery(query);
   const where = userWhere(query, page.q, true);
@@ -293,6 +339,31 @@ adminRouter.get("/admins", asyncRoute(async (req, res) => {
   listResponse(res, users.map(({ email, _count, ...user }) => ({
     ...user, emailMasked: maskedEmail(email), activeSessionCount: _count.sessions,
   })), page, total);
+}));
+
+adminRouter.get("/audit", requirePermission("audit.read"), asyncRoute(async (req, res) => {
+  const query = queryParams(req, ["page", "pageSize", "action", "actorId", "targetId", "from", "to"]);
+  const page = pageQuery(query);
+  const date = (value: string | undefined) => {
+    if (value === undefined) return undefined;
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(Date.parse(value))) invalidInput("Invalid audit date.");
+    return new Date(value);
+  };
+  const from = date(query.from), to = date(query.to);
+  if (from && to && from > to) invalidInput("Audit date range is reversed.");
+  if (query.action !== undefined && !/^[A-Z][A-Z_]{0,79}$/.test(query.action)) invalidInput("Invalid audit action.");
+  if (query.targetId !== undefined && (query.targetId.length < 1 || query.targetId.length > 200)) invalidInput("Invalid audit target.");
+  const where: Prisma.AuditLogWhereInput = {
+    action: query.action, actorId: query.actorId === undefined ? undefined : resourceId(query.actorId),
+    targetId: query.targetId,
+    ...(from || to ? { createdAt: { gte: from, lte: to } } : {}),
+  };
+  const [logs, total] = await prismaPg.$transaction(async tx => Promise.all([
+    tx.auditLog.findMany({ where, skip: page.skip, take: page.pageSize, orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      select: { id: true, actorId: true, action: true, targetId: true, metadata: true, ipAddress: true, createdAt: true } }),
+    tx.auditLog.count({ where }),
+  ]), transactionOptions);
+  listResponse(res, logs, page, total);
 }));
 
 adminRouter.use((_req, _res, next) => next(new HttpError(404, "NOT_FOUND", "Route not found.")));

@@ -15,7 +15,7 @@ before(async () => {
       requireAuth(req, res, next) {
         const id = req.get("authorization");
         if (!id) return res.status(401).json({ error: "Unauthorized" });
-        res.locals.auth = { user: { id } };
+        res.locals.auth = { user: { id, role: "USER" } };
         next();
       },
     },

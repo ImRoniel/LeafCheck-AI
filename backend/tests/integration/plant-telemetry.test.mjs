@@ -29,7 +29,7 @@ mock.module(new URL("../../src/lib/prisma-pg.js",import.meta.url).href,{namedExp
 mock.module(new URL("../../src/lib/prisma.js",import.meta.url).href,{namedExports:{prisma:measuredMongo}});
 mock.module(new URL("../../src/lib/auth.js",import.meta.url).href,{namedExports:{requireAuth(req,res,next) {
   const owner = req.get("authorization"); if (!owner) return res.sendStatus(401);
-  res.locals.auth={user:{id:owner}}; next();
+  res.locals.auth={user:{id:owner,role:"USER"}}; next();
 }}});
 const {plantsRouter} = await import("../../src/routes/plants.ts");
 const {telemetryRouter} = await import("../../src/routes/telemetry.ts");

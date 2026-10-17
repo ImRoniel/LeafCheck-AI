@@ -58,13 +58,20 @@ export async function providerSession(token: string) {
       (identity.bannedUntil && identity.bannedUntil > now)) throw invalid();
   return {
     sessionId: id,
+    createdAt: session.createdAt,
     identity: { id: userId, email: identity.email.toLowerCase(), emailConfirmedAt: identity.emailConfirmedAt, name: null } satisfies ProviderUser,
   };
 }
 
 export async function authenticatedProviderSession(token: string) {
   const session = await providerSession(token);
-  return { user: await applicationUser(session.identity), sessionId: session.sessionId, providerUserId: session.identity.id };
+  const user = await applicationUser(session.identity);
+  assertProviderSessionCurrent(user, session.createdAt);
+  return { user, sessionId: session.sessionId, providerUserId: session.identity.id };
+}
+
+export function assertProviderSessionCurrent(user: { authInvalidBefore?: Date | null }, createdAt: Date) {
+  if (user.authInvalidBefore && createdAt <= user.authInvalidBefore) throw invalid();
 }
 
 export async function revokeProviderSession(token: string, scope: "local" | "global") {

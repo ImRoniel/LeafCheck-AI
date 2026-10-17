@@ -189,6 +189,16 @@ test("registration normalizes email, hashes exact password, rejects privileged f
     400,
   );
 });
+
+test("legacy ADMIN password and refresh cannot issue a session without the provider OTP flow", async () => {
+  const account = await register("legacy-admin@example.test");
+  users.get(account.body.user.id).role = "ADMIN";
+  const login = await request("/auth/login", { email: "legacy-admin@example.test", password });
+  assert.equal(login.status, 403); assert.equal(login.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  assert.equal(login.body.accessToken, undefined);
+  const refresh = await request("/auth/refresh", { refreshToken: account.body.refreshToken });
+  assert.equal(refresh.status, 401); assert.equal(refresh.body.accessToken, undefined);
+});
 test("registration and login accept 8–128 characters and reject out-of-range passwords", async () => {
   for (const length of [8, 128]) {
     const body = {
