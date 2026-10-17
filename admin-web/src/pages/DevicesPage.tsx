@@ -4,6 +4,7 @@ import { RequestError, TableMessage, TablePagination } from '../components/Admin
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge, type BadgeTone } from '../components/StatusBadge'
 import { useAdminList } from '../hooks/useAdminList'
+import { useAutoRefresh } from '../hooks/useAutoRefresh'
 import { useNow } from '../hooks/useNow'
 import { readDeviceRow } from '../lib/admin'
 import { formatLastSeen, formatTimestamp } from '../lib/format'
@@ -18,18 +19,20 @@ export function DevicesPage() {
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const now = useNow()
-  const { result, loading, error, reload } = useAdminList('/admin/devices', readDeviceRow, page, query)
+  const { result, loading, refreshing, error, updatedAt, reload } = useAdminList('/admin/devices', readDeviceRow, page, query, { onPageChange: setPage })
+  useAutoRefresh(reload)
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setPage(1)
     setQuery(search.trim())
+    if (page === 1 && search.trim() === query) reload()
   }
 
   return (
     <section aria-label="Device inventory">
       <PageHeader title="Device Inventory" icon={Cpu} description="Monitor connected hardware, plant assignments, and the latest sensor contact."
-        actions={<button type="button" onClick={reload} disabled={loading} className="button-secondary"><RefreshCw size={15} aria-hidden="true" />Refresh</button>} />
+        actions={<button type="button" onClick={reload} disabled={loading || refreshing} className="button-secondary"><RefreshCw size={15} aria-hidden="true" />Refresh</button>} />
       {error && <RequestError message={error} retry={reload} />}
       {result?.telemetryDegraded && <p role="status" className="notice-warning mb-5">Some sensor readings are temporarily unavailable. Device status may be unknown.</p>}
       <div className="surface overflow-hidden">
@@ -42,7 +45,7 @@ export function DevicesPage() {
           </form>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-3xl" aria-busy={loading}>
+          <table className="w-full min-w-3xl" aria-busy={loading || refreshing}>
             <caption className="sr-only">Device inventory and connection status</caption>
             <thead className="border-b border-edge bg-panel-muted"><tr>{['MAC', 'Name', 'Linked Plant', 'Status', 'Last Seen'].map(label => <th key={label} scope="col" className="table-head">{label}</th>)}</tr></thead>
             <tbody>
@@ -58,9 +61,10 @@ export function DevicesPage() {
             </tbody>
           </table>
         </div>
-        <TablePagination pagination={result?.pagination} loading={loading} onPage={setPage} />
+        <TablePagination pagination={result?.pagination} loading={loading || refreshing} onPage={setPage} />
       </div>
-      <p className="mt-3 text-xs text-subtle">Last Seen updates automatically. Refresh to fetch new sensor readings. <span className="sm:hidden">Swipe the table to view all columns.</span></p>
+      <p className="mt-3 text-xs text-subtle">Readings and status refresh every 60 seconds while this tab is visible, and when you return to it. <span className="sm:hidden">Swipe the table to view all columns.</span></p>
+      {updatedAt && <p className="mt-2 text-xs text-subtle">{refreshing ? 'Refreshing readings...' : error ? 'Last successful refresh: ' : 'Last refreshed: '}{!refreshing && formatTimestamp(updatedAt)}</p>}
     </section>
   )
 }

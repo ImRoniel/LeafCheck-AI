@@ -17,7 +17,7 @@ const actorId = id(1), targetId = id(2), sessionId = randomUUID();
 const now = new Date("2026-10-12T09:00:00.000Z");
 const earlier = new Date(now.getTime() - 86_400_000);
 const later = new Date(now.getTime() + 86_400_000);
-let records, calls, failPg, failedReadings, readingConcurrency, maxReadingConcurrency, inTransaction;
+let records, calls, failPg, failedReadings, readingConcurrency, maxReadingConcurrency, inTransaction, failPgProbe, failMongoProbe;
 let server, base, token;
 
 const user = (userId, extra = {}) => ({ id: userId, email: "operator@example.test", name: "Operator",
@@ -107,6 +107,12 @@ function project(model, row, select) {
 }
 
 const db = {};
+db.$queryRaw = async strings => {
+  calls.push({ model: "health", service: "postgres" });
+  assert.equal(strings.join(""), "SELECT 1 AS ready");
+  if (failPgProbe) throw new Error("PRIVATE_POSTGRES_URL");
+  return [{ ready: 1 }];
+};
 for (const model of ["user", "plant", "device", "careTask", "aIAnalysis", "authSession", "adminSessionVerification", "auditLog"]) {
   db[model] = {};
   for (const method of ["findMany", "findUnique", "count"]) {
@@ -134,7 +140,13 @@ before(async () => {
   mock.module(new URL("../src/lib/supabase-session.js", import.meta.url).href, { namedExports:
     adminSessionFixture(id => db.authSession.findUnique({ where: { id }, include: { user: true } })) });
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, { namedExports: { prismaPg: db } });
-  mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: { sensorReading: {
+  mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: {
+    $runCommandRaw: async command => {
+      calls.push({ model: "health", service: "mongo" });
+      assert.deepEqual(command, { ping: 1 });
+      if (failMongoProbe) throw new Error("PRIVATE_MONGODB_URL");
+      return { ok: 1 };
+    }, sensorReading: {
     findFirst: async query => {
       calls.push({ model: "sensorReading", query });
       maxReadingConcurrency = Math.max(maxReadingConcurrency, ++readingConcurrency);
@@ -179,6 +191,7 @@ beforeEach(() => {
     adminSessionVerification: [{ id: randomUUID(), userId: actorId, supabaseSessionId: sessionId, verifiedAt: earlier, expiresAt: later, authVersion: 0 }],
     authSession: [{ id: sessionId, userId: actorId, client: "native", createdAt: now, expiresAt: later, revokedAt: null, tokenHash: "SECRET_TOKEN_HASH" }] };
   calls = []; failPg = false; failedReadings = new Set(); readingConcurrency = 0; maxReadingConcurrency = 0; inTransaction = false;
+  failPgProbe = false; failMongoProbe = false;
 });
 after(async () => { await new Promise(resolve => server.close(resolve)); mock.restoreAll(); });
 
@@ -208,7 +221,7 @@ function checkTransactions() {
   assert.ok(calls.filter(call => call.model !== "transaction" && call.model !== "sensorReading"
     && !(["authSession", "adminSessionVerification"].includes(call.model) && call.method === "findUnique")).every(call => call.inTransaction));
 }
-const paths = ["/users", `/users/${targetId}`, "/devices", "/devices/whitelist", "/admins", "/audit", "/stats"];
+const paths = ["/users", `/users/${targetId}`, "/devices", "/devices/whitelist", "/admins", "/audit", "/stats", "/health"];
 
 test("admin endpoints require current roles; LEAD_DEV is restricted to operational devices", async () => {
   records.user.push(user(targetId));
@@ -225,13 +238,14 @@ test("admin endpoints require current roles; LEAD_DEV is restricted to operation
     records.user[0].role = role;
     for (const path of paths) {
       const result = await get(path);
-      if (role === "LEAD_DEV" && path !== "/devices" && path !== "/stats") {
+      if (role === "LEAD_DEV" && path !== "/devices" && path !== "/stats" && path !== "/health") {
         checkError(result, 403, "FORBIDDEN");
         continue;
       }
       assert.equal(result.status, 200);
       assert.equal(result.headers.get("cache-control"), "no-store");
-      assert.equal(result.body.meta.schemaVersion, 1);
+      if (path === "/health") assert.deepEqual(result.body, { postgres: "ok", mongo: "ok", api: "ok" });
+      else assert.equal(result.body.meta.schemaVersion, 1);
       checkPrivacy(result.body);
     }
   }
@@ -248,6 +262,14 @@ test("inactive, revoked, expired and invalid sessions are 401 with request IDs",
   records.authSession[0].revokedAt = null; records.authSession[0].expiresAt = now;
   checkError(await get("/users"), 401, "INVALID_SESSION");
   checkError(await get("/users", "invalid.token"), 401, "INVALID_SESSION");
+});
+
+test("health reports independent database readiness without exposing diagnostics", async () => {
+  failMongoProbe = true;
+  assert.deepEqual((await get("/health")).body, { postgres: "ok", mongo: "down", api: "ok" });
+  failPgProbe = true;
+  assert.deepEqual((await get("/health")).body, { postgres: "down", mongo: "down", api: "ok" });
+  checkError(await get("/health?details=true"), 400, "INVALID_INPUT");
 });
 
 test("users mask emails, return filtered counts and paginate/search with stable ordering", async () => {
@@ -296,7 +318,8 @@ test("stats count domain records and only registered physical devices with a fre
     reading(records.device[4].macAddress, { timestamp: now }));
   const result = await get("/stats");
   assert.equal(result.status, 200);
-  assert.deepEqual(result.body.data, { totalUsers: 2, totalPlants: 2, totalAiScans: 2, totalActiveDevices: 3 });
+  assert.deepEqual(result.body.data, { totalUsers: 2, totalPlants: 2, totalAiScans: 2, totalActiveDevices: 3,
+    activeDevices: 3, totalDevices: 7, totalPhysicalDevices: 6 });
   assert.equal(result.body.meta.telemetryDegraded, false);
   assert.equal(result.body.meta.freshnessWindowSeconds, 1800);
   assert.equal(result.body.meta.asOf, now.toISOString());
@@ -319,6 +342,8 @@ test("stats return unknown connectivity on telemetry failure, truthful zero when
   const unavailable = await get("/stats");
   assert.equal(unavailable.status, 200);
   assert.equal(unavailable.body.data.totalActiveDevices, null);
+  assert.equal(unavailable.body.data.activeDevices, null);
+  assert.equal(unavailable.body.data.totalDevices, 501);
   assert.equal(unavailable.body.meta.telemetryDegraded, true);
   assert.equal(unavailable.body.data.totalUsers, 1);
   assert.ok(!JSON.stringify(unavailable.body).includes("PRIVATE_DB"));
@@ -526,7 +551,13 @@ test("PostgreSQL failures are sanitized 503 and deferred/write routes remain abs
   for (const failure of [true, "inventory"]) {
     failPg = failure;
     for (const path of paths) {
-      const result = await get(path); checkError(result, 503, "ADMIN_DATA_UNAVAILABLE"); checkPrivacy(result.body);
+      const result = await get(path);
+      // A failed inventory transaction does not imply SELECT 1 readiness failed.
+      if (path === "/health" && failure === "inventory") {
+        assert.equal(result.status, 200);
+        assert.equal(result.body.postgres, "ok");
+      } else checkError(result, 503, "ADMIN_DATA_UNAVAILABLE");
+      checkPrivacy(result.body);
     }
   }
   failPg = false;

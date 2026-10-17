@@ -10,6 +10,7 @@ let vite, browser, origin
 const admin = { id: 'admin-1', email: 'admin@example.test', name: 'Platform Admin', role: 'ADMIN' }
 const operator = { id: 'operator-1', email: 'operator@example.test', name: 'Operations', role: 'LEAD_DEV' }
 const member = { id: 'member-1', email: 'member@example.test', name: 'Member', role: 'USER' }
+const userVersion = '2026-10-17T00:00:00.000Z'
 const sensor = { id: 'sensor-1', macAddress: 'AA:BB:CC:DD:EE:FF', name: 'Office sensor',
   plants: [{ id: 'plant-1', name: 'Monstera' }], connectionStatus: 'ONLINE' }
 const reply = (body, status = 200, headers = {}) => ({ status, body: JSON.stringify(body), contentType: 'application/json', headers })
@@ -29,15 +30,15 @@ before(async () => {
 after(async () => { await browser?.close(); await vite?.close() })
 
 async function app(t, options = {}) {
-  const context = await browser.newContext()
+  const context = await browser.newContext({ timezoneId: options.timezoneId ?? 'UTC' })
   const page = await context.newPage()
   page.setDefaultTimeout(7000)
   const errors = []
   const requests = []
   const actor = options.actor ?? admin
   const state = { signedIn: options.restored ?? false, challenges: 0,
-    users: options.users ?? [{ id: admin.id, name: admin.name, email: admin.email, emailMasked: 'a***@example.test', role: 'ADMIN', isActive: true },
-      { id: member.id, name: member.name, email: member.email, emailMasked: 'm***@example.test', role: 'USER', isActive: true }] }
+    users: (options.users ?? [{ id: admin.id, name: admin.name, email: admin.email, emailMasked: 'a***@example.test', role: 'ADMIN', isActive: true },
+      { id: member.id, name: member.name, email: member.email, emailMasked: 'm***@example.test', role: 'USER', isActive: true }]).map(row => ({ updatedAt: userVersion, ...row })) }
   const device = { ...sensor, lastReadingAt: new Date(Date.now() - 120_000).toISOString(), readingError: false }
   let pending
   page.on('pageerror', error => errors.push(error.message))
@@ -93,19 +94,22 @@ async function app(t, options = {}) {
         assert.equal(entry.headers.authorization, 'Bearer verified-memory-jwt')
       }
       if (path === '/admin/stats') return await route.fulfill(reply({
-        data: { totalUsers: state.users.length, totalActiveDevices: 1, totalPlants: 23, totalAiScans: 48 },
+        data: { totalUsers: state.users.length, totalDevices: 2, totalPhysicalDevices: 1, activeDevices: 1, totalActiveDevices: 1, totalPlants: 23, totalAiScans: 48 },
         meta: { asOf: new Date().toISOString(), telemetryDegraded: false, freshnessWindowSeconds: 1800 },
       }))
+      if (path === '/admin/health') return await route.fulfill(reply({ api: 'ok', postgres: 'ok', mongo: 'ok' }))
       if (path === '/admin/users' && entry.method === 'POST') {
         const user = { id: 'created-user', name: entry.body.name ?? null, email: entry.body.email, emailMasked: 'n***@example.test',
-          role: entry.body.role, isActive: true }
+          role: entry.body.role, isActive: entry.body.isActive ?? true, updatedAt: userVersion }
         state.users.unshift(user)
         return await route.fulfill(reply({ data: user }, 201))
       }
       if (path.startsWith('/admin/users/') && entry.method === 'PATCH') {
         const user = state.users.find(row => row.id === path.split('/').at(-1))
         assert.ok(user)
+        if (entry.body.updatedAt !== user.updatedAt) return await route.fulfill(reply({ code: 'CONFLICT', error: 'This user was modified by another administrator. Please refresh.' }, 409))
         for (const key of ['name', 'role', 'isActive']) if (key in entry.body) user[key] = entry.body[key]
+        user.updatedAt = new Date(Date.parse(user.updatedAt) + 1).toISOString()
         return await route.fulfill(reply({ data: user }))
       }
       if (path.startsWith('/admin/users/') && entry.method === 'DELETE') {
@@ -132,7 +136,12 @@ async function app(t, options = {}) {
         ]
         const pageSize = Number(entry.query.get('pageSize') ?? 25)
         const pageNumber = Number(entry.query.get('page') ?? 1)
-        return await route.fulfill(reply(list(logs.slice((pageNumber - 1) * pageSize, pageNumber * pageSize), pageNumber, logs.length, {}, pageSize)))
+        const filtered = logs.filter(log => (!entry.query.get('action') || log.action === entry.query.get('action')) &&
+          (!entry.query.get('actorId') || log.actorId === entry.query.get('actorId')) &&
+          (!entry.query.get('targetId') || log.targetId === entry.query.get('targetId')) &&
+          (!entry.query.get('from') || Date.parse(log.createdAt) >= Date.parse(entry.query.get('from'))) &&
+          (!entry.query.get('to') || Date.parse(log.createdAt) <= Date.parse(entry.query.get('to'))))
+        return await route.fulfill(reply(list(filtered.slice((pageNumber - 1) * pageSize, pageNumber * pageSize), pageNumber, filtered.length, {}, pageSize)))
       }
       throw new Error(`Unexpected API request: ${entry.method} ${path}`)
     } catch (error) {
@@ -158,6 +167,27 @@ async function signIn(page, duplicate = false) {
 
 async function memoryToken(page) {
   return page.evaluate(async () => (await import('/src/lib/api.ts')).getAccessToken())
+}
+
+async function stallWrite(page, method, simulateDeadline = false) {
+  await page.evaluate(({ method, simulateDeadline }) => {
+    const network = window.fetch.bind(window)
+    if (simulateDeadline) AbortSignal.timeout = milliseconds => {
+      const controller = new AbortController()
+      setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), milliseconds)
+      return controller.signal
+    }
+    window.fetch = (input, init) => {
+      if (String(input).includes('/api/admin/users') && init?.method === method) {
+        window.testWritePending = true
+        return new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => {
+          window.testWriteAborted = true
+          reject(init.signal.reason)
+        }, { once: true }))
+      }
+      return network(input, init)
+    }
+  }, { method, simulateDeadline })
 }
 
 async function screenshot(page, name) {
@@ -285,6 +315,18 @@ test('OTP resend 429 shows the specific cooldown and cancellation failures still
   assert.equal(await memoryToken(page), null)
 })
 
+test('a fresh root visit has a clean login form while expired restoration on a protected page explains the redirect', async t => {
+  const fresh = await app(t)
+  await fresh.page.goto(origin + '/')
+  await fresh.page.waitForURL('**/login')
+  await fresh.page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
+  assert.equal(await fresh.page.getByRole('alert').count(), 0)
+  const expired = await app(t)
+  await expired.page.goto(origin + '/users')
+  await expired.page.waitForURL('**/login')
+  await expired.page.getByRole('alert').filter({ hasText: 'Your session has expired. Please log in again.' }).waitFor()
+})
+
 test('LEAD_DEV signs in immediately, sees operational devices and cannot fetch users or audit via direct URLs', async t => {
   const { page, requests } = await app(t, { actor: operator })
   await signIn(page)
@@ -338,8 +380,11 @@ test('users table supports paginated search, creation, ban/unban and prevents se
   await page.getByRole('button', { name: 'Unban Person 1', exact: true }).waitFor()
   await page.getByRole('button', { name: 'Unban Person 1', exact: true }).click()
   await page.getByRole('button', { name: 'Ban Person 1', exact: true }).waitFor()
-  assert.deepEqual(requests.filter(request => request.method === 'PATCH').map(request => request.body), [{ isActive: false }, { isActive: true }])
+  assert.deepEqual(requests.filter(request => request.method === 'PATCH').map(request => request.body), [
+    { isActive: false, updatedAt: userVersion }, { isActive: true, updatedAt: new Date(Date.parse(userVersion) + 1).toISOString() },
+  ])
   await page.getByRole('button', { name: 'Create User', exact: true }).click()
+  assert.equal(await page.getByRole('switch', { name: 'Account Active', exact: true }).isChecked(), true)
   await page.getByLabel('Name (optional)', { exact: true }).fill('New Operator')
   await page.getByLabel('Email', { exact: true }).fill('new@example.test')
   await page.getByLabel('Initial password', { exact: true }).fill('strong-password-1')
@@ -347,8 +392,100 @@ test('users table supports paginated search, creation, ban/unban and prevents se
   await page.getByRole('button', { name: 'Create account', exact: true }).click()
   await page.getByRole('cell', { name: 'New Operator', exact: true }).waitFor()
   assert.deepEqual(requests.find(request => request.method === 'POST' && request.path === '/admin/users').body,
-    { name: 'New Operator', email: 'new@example.test', password: 'strong-password-1', role: 'LEAD_DEV' })
+    { name: 'New Operator', email: 'new@example.test', password: 'strong-password-1', role: 'LEAD_DEV', isActive: true })
   assert.equal(await page.getByRole('cell', { name: 'n***@example.test', exact: true }).count(), 1)
+})
+
+test('Create User can start a banned account and reopening the form resets Account Active to true', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Create User', exact: true }).click()
+  await page.getByRole('switch', { name: 'Account Active', exact: true }).uncheck()
+  await page.getByLabel('Name (optional)', { exact: true }).fill('Initially banned')
+  await page.getByLabel('Email', { exact: true }).fill('banned@example.test')
+  await page.getByLabel('Initial password', { exact: true }).fill('unique-password-1')
+  await page.getByRole('button', { name: 'Create account', exact: true }).click()
+  const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Initially banned', exact: true }) })
+  await row.getByRole('cell', { name: 'Banned', exact: true }).waitFor()
+  assert.equal(await row.getByRole('button', { name: 'Unban Initially banned', exact: true }).count(), 1)
+  assert.equal(requests.find(entry => entry.method === 'POST' && entry.path === '/admin/users').body.isActive, false)
+  await page.getByRole('button', { name: 'Create User', exact: true }).click()
+  assert.equal(await page.getByRole('switch', { name: 'Account Active', exact: true }).isChecked(), true)
+})
+
+test('session restoration denied for missing admin verification returns to login without fetching admin data', async t => {
+  const { page, requests } = await app(t, { restored: true, handle: async entry => {
+    if (entry.path === '/auth/refresh') return reply({ code: 'ADMIN_VERIFICATION_REQUIRED', error: 'Complete administrator verification.' }, 403)
+  } })
+  await page.goto(origin + '/dashboard')
+  await page.waitForURL('**/login')
+  await page.getByRole('alert').filter({ hasText: 'Please sign in again and verify your administrator code.' }).waitFor()
+  assert.equal(await memoryToken(page), null)
+  assert.equal(requests.filter(entry => entry.path === '/users/me' || entry.path.startsWith('/admin/')).length, 0)
+})
+
+test('Users refreshes identical searches and recovers when another administrator removes the last page', async t => {
+  const users = Array.from({ length: 26 }, (_, index) => ({ id: 'person-' + index, name: 'Person ' + index,
+    emailMasked: 'p***@example.test', role: 'USER', isActive: true }))
+  const { page, requests, state } = await app(t, { restored: true, users })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByRole('cell', { name: 'Person 25', exact: true }).waitFor()
+  state.users = state.users.slice(0, 25)
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await page.getByText('Page 1 of 1', { exact: true }).waitFor()
+  await page.getByRole('cell', { name: 'Person 0', exact: true }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/admin/users').at(-1).query.get('page'), '1')
+  const before = requests.filter(entry => entry.path === '/admin/users').length
+  state.users[0].name = 'Updated elsewhere'
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await page.getByRole('cell', { name: 'Updated elsewhere', exact: true }).waitFor()
+  assert.ok(requests.filter(entry => entry.path === '/admin/users').length > before)
+})
+
+test('Create User shows invalid email and short password errors under their fields without a request', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Create User', exact: true }).click()
+  await page.getByLabel('Email', { exact: true }).fill('invalid')
+  await page.getByLabel('Initial password', { exact: true }).fill('short')
+  await page.getByRole('button', { name: 'Create account', exact: true }).click()
+  await page.locator('#account-email-error').waitFor()
+  await page.locator('#account-password-error').waitFor()
+  assert.equal(await page.getByLabel('Email', { exact: true }).getAttribute('aria-invalid'), 'true')
+  assert.equal(requests.filter(entry => entry.path === '/admin/users' && entry.method === 'POST').length, 0)
+  await page.getByLabel('Email', { exact: true }).fill('valid@example.test')
+  assert.equal(await page.locator('#account-email-error').count(), 0)
+})
+
+test('provider weak-password errors appear beneath Password and preserve entered values', async t => {
+  const { page } = await app(t, { restored: true, handle: async entry => {
+    if (entry.path === '/admin/users' && entry.method === 'POST') return reply({ error: 'Password too weak.', code: 'WEAK_PASSWORD',
+      fieldErrors: { password: 'Password too weak. Choose a longer, unique password.' } }, 400)
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Create User', exact: true }).click()
+  await page.getByLabel('Email', { exact: true }).fill('new@example.test')
+  await page.getByLabel('Initial password', { exact: true }).fill('aaaaaaaa')
+  await page.getByRole('button', { name: 'Create account', exact: true }).click()
+  await page.locator('#account-password-error').filter({ hasText: 'Password too weak.' }).waitFor()
+  assert.equal(await page.getByLabel('Initial password', { exact: true }).inputValue(), 'aaaaaaaa')
+  assert.equal(await page.getByLabel('Email', { exact: true }).inputValue(), 'new@example.test')
+  assert.equal(await page.getByRole('dialog').locator('.notice-error').count(), 0)
+  await page.getByLabel('Initial password', { exact: true }).fill('longer-unique-password')
+  assert.equal(await page.locator('#account-password-error').count(), 0)
+})
+
+test('edit validation maps backend name errors to Name and keeps the dialog open', async t => {
+  const { page } = await app(t, { restored: true, handle: async entry => {
+    if (entry.method === 'PATCH') return reply({ error: 'Invalid name.', code: 'INVALID_INPUT', fieldErrors: { name: 'Please choose another name.' } }, 400)
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await page.getByLabel('Name', { exact: true }).fill('Changed name')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.locator('#account-name-error').filter({ hasText: 'Please choose another name.' }).waitFor()
+  assert.equal(await page.getByRole('dialog', { name: 'Edit user', exact: true }).count(), 1)
 })
 
 test('audit table renders actor emails and distinguishes success, failure and requested actions', async t => {
@@ -415,13 +552,126 @@ test('Overview shows real metric cards and only the five most recent audit entri
 
 test('unavailable telemetry does not turn active-device metrics into a false zero', async t => {
   const { page } = await app(t, { restored: true, handle: async entry => {
-    if (entry.path === '/admin/stats') return reply({ data: { totalUsers: 18, totalActiveDevices: null, totalPlants: 23, totalAiScans: 48 },
+    if (entry.path === '/admin/stats') return reply({ data: { totalUsers: 18, totalDevices: 2, totalPhysicalDevices: 2, activeDevices: null, totalActiveDevices: null, totalPlants: 23, totalAiScans: 48 },
       meta: { asOf: new Date().toISOString(), telemetryDegraded: true } })
   } })
   await page.goto(origin + '/dashboard')
   await page.getByRole('article', { name: 'Active devices', exact: true }).getByText('Unavailable', { exact: true }).waitFor()
   assert.equal(await page.getByRole('article', { name: 'Total users', exact: true }).getByText('18', { exact: true }).count(), 1)
   await page.getByRole('status').filter({ hasText: 'Live device connectivity is temporarily unavailable.' }).waitFor()
+})
+
+test('zero online devices still show the registered inventory total', async t => {
+  const { page } = await app(t, { restored: true, handle: async entry => {
+    if (entry.path === '/admin/stats') return reply({ data: { totalUsers: 2, totalDevices: 2, totalPhysicalDevices: 1,
+      activeDevices: 0, totalActiveDevices: 0, totalPlants: 2, totalAiScans: 5 }, meta: { asOf: new Date().toISOString(), telemetryDegraded: false } })
+  } })
+  await page.goto(origin + '/dashboard')
+  const card = page.getByRole('article', { name: 'Active devices', exact: true })
+  await card.getByText('0 online / 2 total', { exact: true }).waitFor()
+  await card.getByText(/1 simulated included in total/).waitFor()
+})
+
+test('device polling updates status each minute, pauses while hidden, and refreshes on return', async t => {
+  let late = false
+  const { page, requests } = await app(t, { restored: true, actor: operator, handle: async entry => {
+    if (entry.path === '/admin/devices') return reply(list([{ ...sensor, connectionStatus: late ? 'OFFLINE' : 'ONLINE',
+      lastReadingAt: new Date(Date.now() - (late ? 31 * 60_000 : 120_000)).toISOString() }]))
+  } })
+  await page.goto(origin + '/devices')
+  await page.getByRole('cell', { name: 'Online', exact: true }).waitFor()
+  const initial = requests.filter(entry => entry.path === '/admin/devices').length
+  late = true
+  await page.clock.fastForward(60_001)
+  await page.getByRole('cell', { name: 'Offline', exact: true }).waitFor()
+  assert.ok(requests.filter(entry => entry.path === '/admin/devices').length > initial)
+  await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }))
+  const hidden = requests.filter(entry => entry.path === '/admin/devices').length
+  await page.clock.fastForward(60_001)
+  assert.equal(requests.filter(entry => entry.path === '/admin/devices').length, hidden)
+  late = false
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await page.getByRole('cell', { name: 'Online', exact: true }).waitFor()
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
+  await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor()
+  const left = requests.filter(entry => entry.path === '/admin/devices').length
+  await page.clock.fastForward(60_001)
+  assert.equal(requests.filter(entry => entry.path === '/admin/devices').length, left)
+})
+
+test('system health distinguishes a telemetry outage, recovery, and unknown databases when the API fails', async t => {
+  let status = 'degraded'
+  const { page } = await app(t, { restored: true, actor: operator, handle: async entry => {
+    if (entry.path === '/admin/health') return status === 'offline' ? reply({ error: 'Service unavailable' }, 503)
+      : reply({ api: 'ok', postgres: 'ok', mongo: status === 'degraded' ? 'down' : 'ok' })
+  } })
+  await page.goto(origin + '/dashboard')
+  const health = page.getByRole('article', { name: 'System Health', exact: true })
+  await health.locator('dl > div').filter({ hasText: 'Telemetry (MongoDB)' }).getByText('Unavailable', { exact: true }).waitFor()
+  assert.equal(await health.getByText('Healthy', { exact: true }).count(), 2)
+  status = 'healthy'
+  await page.clock.fastForward(60_001)
+  await health.locator('dl > div').filter({ hasText: 'Telemetry (MongoDB)' }).getByText('Healthy', { exact: true }).waitFor()
+  status = 'offline'
+  await health.getByRole('button', { name: 'Refresh system health', exact: true }).click()
+  await health.getByRole('alert').filter({ hasText: 'System health could not be confirmed.' }).waitFor()
+  await health.locator('dl > div').filter({ hasText: 'API' }).getByText('Unavailable', { exact: true }).waitFor()
+  assert.equal(await health.getByText('Unknown', { exact: true }).count(), 2)
+})
+
+test('audit filters reset pagination, include full local dates, and offer useful empty and clear states', async t => {
+  const auditEntries = Array.from({ length: 30 }, (_, index) => ({ id: 'event-' + index, actorId: admin.id, actorEmail: admin.email,
+    targetId: member.id, targetEmail: member.email, action: index % 2 ? 'USER_UPDATED' : 'USER_DELETED',
+    createdAt: '2026-10-17T04:00:00.000Z', metadata: {} }))
+  const { page, requests } = await app(t, { restored: true, auditEntries, timezoneId: 'Asia/Manila' })
+  await page.goto(origin + '/audit')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByText('Page 2 of 2', { exact: true }).waitFor()
+  await page.getByLabel('Action', { exact: true }).fill('user_updated')
+  await page.getByLabel('From Date', { exact: true }).fill('2026-10-17')
+  await page.getByLabel('To Date', { exact: true }).fill('2026-10-17')
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
+  await page.getByText('1–15 of 15 results', { exact: true }).waitFor()
+  const filtered = requests.filter(entry => entry.path === '/admin/audit').at(-1)
+  assert.equal(filtered.query.get('page'), '1')
+  assert.equal(filtered.query.get('action'), 'USER_UPDATED')
+  assert.equal(filtered.query.get('from'), '2026-10-16T16:00:00.000Z')
+  assert.equal(filtered.query.get('to'), '2026-10-17T15:59:59.999Z')
+  await page.setViewportSize({ width: 390, height: 844 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  await screenshot(page, 'audit-filters-mobile')
+  await page.getByLabel('Action', { exact: true }).fill('ADMIN_LOGIN_VERIFIED')
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'No activity matches these filters.' }).waitFor()
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
+  await page.getByText('1–25 of 30 results', { exact: true }).waitFor()
+  const cleared = requests.filter(entry => entry.path === '/admin/audit').at(-1)
+  for (const key of ['action', 'from', 'to', 'actorId', 'targetId']) assert.equal(cleared.query.has(key), false)
+})
+
+test('invalid audit dates do not make a request and actor/target filters are forwarded after correction', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/audit')
+  await page.getByRole('cell', { name: 'User Updated', exact: true }).waitFor()
+  const before = requests.filter(entry => entry.path === '/admin/audit').length
+  await page.getByLabel('From Date', { exact: true }).fill('2026-10-18')
+  await page.getByLabel('To Date', { exact: true }).fill('2026-10-17')
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'To Date must be on or after From Date.' }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/admin/audit').length, before)
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
+  await page.getByText('Actor and target filters', { exact: true }).click()
+  const actorId = '00000000-0000-4000-8000-000000000001'
+  await page.getByLabel('Actor ID', { exact: true }).fill(actorId)
+  await page.getByLabel('Target ID', { exact: true }).fill('deleted-account')
+  await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'No activity matches these filters.' }).waitFor()
+  const filtered = requests.filter(entry => entry.path === '/admin/audit').at(-1)
+  assert.equal(filtered.query.get('actorId'), actorId)
+  assert.equal(filtered.query.get('targetId'), 'deleted-account')
 })
 
 test('email reveal requests full addresses only when enabled and hides them again', async t => {
@@ -453,7 +703,134 @@ test('edit dialog changes name and role, with Escape restoring focus to its trig
   await page.getByRole('button', { name: 'Save changes', exact: true }).click()
   await page.getByRole('cell', { name: 'Updated Member', exact: true }).waitFor()
   assert.equal(await page.getByRole('cell', { name: 'System Administrator', exact: true }).count(), 1)
-  assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { name: 'Updated Member', role: 'LEAD_DEV' })
+  assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { name: 'Updated Member', role: 'LEAD_DEV', updatedAt: userVersion })
+})
+
+test('name-only edits omit unchanged roles, and unchanged forms make no write', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  assert.equal(requests.filter(request => request.method === 'PATCH').length, 0)
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await page.getByLabel('Name', { exact: true }).fill('Name only')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.getByRole('cell', { name: 'Name only', exact: true }).waitFor()
+  assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { name: 'Name only', updatedAt: userVersion })
+})
+
+test('a stale edit explains the conflict and requires a refresh before another save', async t => {
+  const { page, requests, state } = await app(t, { restored: true, users: [
+    { ...admin, emailMasked: 'a***@example.test', isActive: true },
+    { ...member, role: 'ADMIN', emailMasked: 'm***@example.test', isActive: true },
+  ] })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  const target = state.users.find(row => row.id === member.id)
+  target.role = 'USER'
+  target.updatedAt = new Date(Date.parse(userVersion) + 1).toISOString()
+  await page.getByLabel('Name', { exact: true }).fill('Stale name')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'This user was modified by another administrator. Please refresh.' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Save changes', exact: true }).isDisabled(), true)
+  assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { name: 'Stale name', updatedAt: userVersion })
+  assert.equal(target.role, 'USER')
+  assert.equal(target.name, 'Member')
+  await page.getByRole('button', { name: 'Close and refresh', exact: true }).click()
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  assert.equal(await page.getByLabel('Role', { exact: true }).inputValue(), 'USER')
+})
+
+test('Escape aborts a pending save and leaves a clear recovery message', async t => {
+  const { page } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await stallWrite(page, 'PATCH')
+  await page.getByLabel('Name', { exact: true }).fill('Pending change')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.waitForFunction(() => window.testWritePending)
+  assert.equal(await page.getByRole('button', { name: 'Cancel', exact: true }).isEnabled(), true)
+  assert.equal(await page.getByRole('button', { name: 'Close dialog', exact: true }).isEnabled(), true)
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  await page.waitForFunction(() => window.testWriteAborted)
+  await page.getByRole('alert').filter({ hasText: 'Request cancelled. The server may already have applied the change.' }).waitFor()
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).waitFor({ state: 'visible' })
+})
+
+test('Cancel aborts a pending deletion without claiming the account was deleted', async t => {
+  const { page } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Delete Member', exact: true }).click()
+  await stallWrite(page, 'DELETE')
+  await page.getByLabel('Type DELETE to confirm.').fill('DELETE')
+  await page.getByRole('button', { name: 'Delete user', exact: true }).click()
+  await page.waitForFunction(() => window.testWritePending)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  await page.waitForFunction(() => window.testWriteAborted)
+  await page.getByRole('cell', { name: 'Member', exact: true }).waitFor()
+  assert.equal(await page.getByText('Member deleted successfully.', { exact: true }).count(), 0)
+})
+
+test('a stalled save times out after ten seconds and requires review before retry', async t => {
+  const { page } = await app(t, { restored: true })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await stallWrite(page, 'PATCH', true)
+  await page.getByLabel('Name', { exact: true }).fill('Pending change')
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await page.waitForFunction(() => window.testWritePending)
+  await page.clock.fastForward(9000)
+  assert.equal(await page.getByRole('button', { name: 'Saving...', exact: true }).count(), 1)
+  await page.clock.fastForward(1001)
+  await page.getByRole('alert').filter({ hasText: 'Its result is unknown.' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Save changes', exact: true }).isDisabled(), true)
+  await page.getByRole('button', { name: 'Close and refresh', exact: true }).click()
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  await page.getByRole('cell', { name: 'Member', exact: true }).waitFor()
+})
+
+test('a gateway timeout after creation requires review instead of allowing a duplicate submission', async t => {
+  const { page, requests } = await app(t, { restored: true, handle: async (entry, state) => {
+    if (entry.path === '/admin/users' && entry.method === 'POST') {
+      state.users.push({ id: 'committed-user', name: 'Created before timeout', role: 'USER', isActive: true,
+        emailMasked: 'c***@example.test', updatedAt: userVersion })
+      return reply({ error: 'Gateway timeout' }, 504)
+    }
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Create User', exact: true }).click()
+  await page.getByLabel('Email', { exact: true }).fill('created@example.test')
+  await page.getByLabel('Initial password', { exact: true }).fill('long-unique-password')
+  await page.getByRole('button', { name: 'Create account', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Its result is unknown.' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Create account', exact: true }).isDisabled(), true)
+  await page.getByRole('button', { name: 'Close and refresh', exact: true }).click()
+  await page.getByRole('cell', { name: 'Created before timeout', exact: true }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/admin/users' && entry.method === 'POST').length, 1)
+})
+
+test('failed refresh shows a session-expired alert during logout and on the login screen', async t => {
+  let failRefresh = false, releaseLogout
+  const { page, requests } = await app(t, { restored: true, handle: async entry => {
+    if (entry.method === 'PATCH') return reply({ error: 'Expired', code: 'INVALID_SESSION' }, 401)
+    if (entry.path === '/auth/refresh' && failRefresh) return reply({ error: 'Refresh expired' }, 401)
+    if (entry.path === '/auth/logout') return new Promise(resolve => { releaseLogout = () => resolve({ status: 204 }) })
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Ban Member', exact: true }).waitFor()
+  failRefresh = true
+  await page.getByRole('button', { name: 'Ban Member', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Your session has expired. Please log in again.' }).waitFor()
+  assert.equal(new URL(page.url()).pathname, '/users')
+  releaseLogout()
+  await page.waitForURL('**/login')
+  await page.getByRole('alert').filter({ hasText: 'Your session has expired. Please log in again.' }).waitFor()
+  assert.equal(await memoryToken(page), null)
+  assert.equal(requests.filter(entry => entry.method === 'PATCH').length, 1)
 })
 
 test('delete requires explicit confirmation, removes the user and never offers self-deletion', async t => {

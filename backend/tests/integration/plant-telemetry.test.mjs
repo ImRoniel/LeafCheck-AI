@@ -36,6 +36,7 @@ const {telemetryRouter} = await import("../../src/routes/telemetry.ts");
 const {errorHandler} = await import("../../src/lib/http.ts");
 const {backfillOpenPairingSessions} = await import("../../src/lib/backfill-pairing-sessions.ts");
 const {readAdminStats} = await import("../../src/lib/admin-stats.ts");
+const {readAdminHealth} = await import("../../src/lib/admin-health.ts");
 
 before(async () => {
   await pg.user.create({data:{id:userId,email:`${userId}@test.invalid`,password:"unused"}});
@@ -52,8 +53,13 @@ test("admin stats aggregate actual Mongo timestamps for PostgreSQL-registered ph
   await mongo.sensorReading.create({ data: { deviceId: device.macAddress, temperature: 24, humidity: 55, timestamp: asOf } });
   const fresh = await readAdminStats(asOf);
   assert.equal(fresh.data.totalActiveDevices, baseline.data.totalActiveDevices + 1);
+  assert.equal(fresh.data.activeDevices, fresh.data.totalActiveDevices);
+  assert.equal(fresh.data.totalDevices, baseline.data.totalDevices);
   assert.ok(fresh.data.totalPlants >= 2);
   const demo = await pg.device.create({ data: { userId, name: "Stats demo", macAddress: `DEMO:${randomUUID()}` } });
+  const withDemo = await readAdminStats(asOf);
+  assert.equal(withDemo.data.totalDevices, fresh.data.totalDevices + 1);
+  assert.equal(withDemo.data.totalPhysicalDevices, fresh.data.totalPhysicalDevices);
   await mongo.sensorReading.createMany({ data: [
     { deviceId: demo.id, temperature: 24, humidity: 55, timestamp: asOf },
     { deviceId: `unregistered-${randomUUID()}`, temperature: 24, humidity: 55, timestamp: asOf },
@@ -62,6 +68,9 @@ test("admin stats aggregate actual Mongo timestamps for PostgreSQL-registered ph
   await mongo.sensorReading.create({ data: { deviceId: device.macAddress, temperature: 24, humidity: 55,
     timestamp: new Date(asOf.getTime() + 61_000) } });
   assert.equal((await readAdminStats(asOf)).data.totalActiveDevices, baseline.data.totalActiveDevices);
+});
+test("admin health probes actual PostgreSQL and MongoDB without returning database contents", async () => {
+  assert.deepEqual(await readAdminHealth(), { postgres: "ok", mongo: "ok", api: "ok" });
 });
 beforeEach(async () => {
   queries=[]; transactions=0;

@@ -29,7 +29,7 @@ async function protectLastAdmin(tx: Prisma.TransactionClient, user: { role: Role
 
 export async function createAdminUser(data: CreateAdminUser, actor: AdminActor) {
   if (await prismaPg.user.findUnique({ where: { email: data.email }, select: { id: true } }))
-    throw new HttpError(409, "EMAIL_CONFLICT", "An account with this email already exists.");
+    throw new HttpError(409, "EMAIL_CONFLICT", "An account with this email already exists.", { email: "An account with this email already exists." });
   // Provider accounts never receive a usable fallback legacy password.
   const password = await hashPassword(authProvider() === "supabase" ? randomBytes(48).toString("base64url") : data.password);
   const provider = authProvider() === "supabase" ? await supabaseAdmin.createUser(data.email, data.password, data.name) : null;
@@ -51,23 +51,28 @@ export async function createAdminUser(data: CreateAdminUser, actor: AdminActor) 
       catch { throw new HttpError(503, "PROVISIONING_CLEANUP_REQUIRED", "Account creation failed and provider cleanup could not be confirmed."); }
     }
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002")
-      throw new HttpError(409, "EMAIL_CONFLICT", "An account with this email already exists.");
+      throw new HttpError(409, "EMAIL_CONFLICT", "An account with this email already exists.", { email: "An account with this email already exists." });
     throw error;
   }
 }
 
-export async function updateAdminUser(id: string, change: UpdateAdminUser, actor: AdminActor) {
+export async function updateAdminUser(id: string, change: UpdateAdminUser, actor: AdminActor, expectedUpdatedAt: Date) {
   return securityTransaction(async tx => {
     await authorize(tx, actor);
     const before = await tx.user.findUnique({ where: { id } });
     if (!before) throw new HttpError(404, "NOT_FOUND", "User not found.");
+    if (before.updatedAt.getTime() !== expectedUpdatedAt.getTime())
+      throw new HttpError(409, "CONFLICT", "This user was modified by another administrator. Please refresh.");
     if (id === actor.actorId && change.isActive === false)
       throw new HttpError(409, "SELF_BAN_FORBIDDEN", "You cannot ban your own account.");
     await protectLastAdmin(tx, before, change);
     const securityChanged = (change.role !== undefined && change.role !== before.role) ||
       (change.isActive !== undefined && change.isActive !== before.isActive);
     const user = await tx.user.update({ where: { id }, data: {
-      ...change, ...(securityChanged ? { authVersion: { increment: 1 }, authInvalidBefore: new Date() } : {}),
+      ...change,
+      // Advance even when two successful updates happen within one millisecond.
+      updatedAt: new Date(Math.max(Date.now(), before.updatedAt.getTime() + 1)),
+      ...(securityChanged ? { authVersion: { increment: 1 }, authInvalidBefore: new Date() } : {}),
     }, select: publicSelect });
     if (securityChanged) await invalidateAdminCredentials(tx, id);
     await writeAudit(actor, "USER_UPDATED", id, {

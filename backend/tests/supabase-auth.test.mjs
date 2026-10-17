@@ -233,12 +233,14 @@ test("Supabase browser login and refresh use cookies; both logout scopes clear a
     assert.equal(login.body.user.role, "LEAD_DEV");
     assert.equal(login.body.refreshToken, undefined);
     const cookie = login.headers.get("set-cookie");
+    assert.doesNotMatch(cookie, /(?:^|;)\s*(?:Max-Age|Expires)=/i);
     assert.ok(cookie.startsWith("__Host-leafcheck-refresh="));
     for (const attribute of ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"])
       assert.ok(cookie.includes(attribute));
 
     const refreshed = await browserRequest("/refresh", { cookie: cookie.split(";")[0] });
     assert.equal(refreshed.status, 200);
+    assert.doesNotMatch(refreshed.headers.get("set-cookie"), /(?:^|;)\s*(?:Max-Age|Expires)=/i);
     assert.deepEqual(Object.keys(refreshed.body).sort(), ["accessToken", "expiresIn"]);
     const rotatedCookie = refreshed.headers.get("set-cookie").split(";")[0];
     assert.notEqual(rotatedCookie, cookie.split(";")[0]);
@@ -290,6 +292,7 @@ async function verifiedAdministrator() {
     challengeToken: challenge.body.challengeToken, code: codes.get(`${account.user.email}:magiclink`),
   } });
   assert.equal(verified.status, 200);
+  assert.doesNotMatch(verified.headers.get("set-cookie"), /(?:^|;)\s*(?:Max-Age|Expires)=/i);
   return { ...account, ...verified.body, cookie: verified.headers.get("set-cookie").split(";")[0], challenge: challenge.body };
 }
 async function adminRequest(path, token, method = "GET", body) {
@@ -343,7 +346,7 @@ test("ADMIN password login returns a hashed five-minute OTP challenge and no usa
 test("a valid unverified ADMIN JWT is rejected across the entire admin router", async () => {
   const account = await staffAccount();
   for (const [path, method, body] of [["/users", "GET"], ["/devices", "GET"], ["/audit", "GET"],
-    ["/admins", "GET"], ["/devices/whitelist", "GET"], ["/users", "POST", {}],
+    ["/admins", "GET"], ["/devices/whitelist", "GET"], ["/stats", "GET"], ["/health", "GET"], ["/users", "POST", {}],
     [`/users/${account.user.id}`, "PATCH", {}], [`/users/${account.user.id}`, "DELETE"], ["/unknown", "GET"]]) {
     const result = await adminRequest(path, account.accessToken, method, body);
     assert.equal(result.status, 403, `${method} ${path}`);
@@ -484,12 +487,12 @@ test("SuperAdmin creates linked accounts, edits roles and bans users with matchi
   assert.ok(users.get(id).supabaseUserId);
   const login = await request("/login", { email: "manual@example.test", password: "manual password" });
   assert.equal(login.status, 200);
-  const edited = await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { role: "LEAD_DEV", name: "Operator" });
+  const edited = await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { role: "LEAD_DEV", name: "Operator", updatedAt: created.body.data.updatedAt });
   assert.equal(edited.status, 200); assert.equal(edited.body.data.role, "LEAD_DEV");
   assert.equal((await request("/api/users/me", undefined, login.body.accessToken, "GET")).status, 401);
-  assert.equal((await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { isActive: false })).status, 200);
+  assert.equal((await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { isActive: false, updatedAt: users.get(id).updatedAt.toISOString() })).status, 200);
   assert.equal((await request("/login", { email: "manual@example.test", password: "manual password" })).status, 401);
-  assert.equal((await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { isActive: true })).status, 200);
+  assert.equal((await adminRequest(`/users/${id}`, admin.accessToken, "PATCH", { isActive: true, updatedAt: users.get(id).updatedAt.toISOString() })).status, 200);
   assert.equal((await request("/refresh", { refreshToken: login.body.refreshToken })).status, 401);
   const actions = [...auditLogs.values()].filter(row => row.targetId === id).map(row => row.action);
   assert.deepEqual(actions, ["USER_CREATED", "USER_UPDATED", "USER_UPDATED", "USER_UPDATED"]);
@@ -497,14 +500,45 @@ test("SuperAdmin creates linked accounts, edits roles and bans users with matchi
   for (const secret of ["manual password", admin.accessToken, admin.challenge.challengeToken]) assert.ok(!serialized.includes(secret));
 });
 
+test("SuperAdmin can create a banned account, omitted status defaults active, and system fields cannot be forged", async () => {
+  const admin = await verifiedAdministrator();
+  const create = body => adminRequest("/users", admin.accessToken, "POST", { email: "initially-banned@example.test", password: "manual password", ...body });
+  const banned = await create({ isActive: false });
+  assert.equal(banned.status, 201);
+  assert.equal(banned.body.data.isActive, false);
+  assert.equal(users.get(banned.body.data.id).isActive, false);
+  assert.equal((await request("/login", { email: banned.body.data.email, password: "manual password" })).status, 401);
+  const event = [...auditLogs.values()].find(row => row.action === "USER_CREATED" && row.targetId === banned.body.data.id);
+  assert.equal(event.metadata.isActive, false);
+  const active = await create({ email: "default-active@example.test" });
+  assert.equal(active.status, 201); assert.equal(active.body.data.isActive, true);
+  for (const body of [{ isActive: "false" }, { isActive: 0 }, { isActive: null },
+    { emailVerifiedAt: new Date().toISOString() }, { supabaseUserId: randomUUID() }]) {
+    assert.equal((await create({ email: "invalid-provisioning@example.test", ...body })).status, 400);
+  }
+});
+
+test("admin user validation exposes safe field errors without accepting invalid input", async () => {
+  const admin = await verifiedAdministrator();
+  const invalid = await adminRequest("/users", admin.accessToken, "POST", { email: "invalid", password: "short" });
+  assert.equal(invalid.status, 400);
+  assert.equal(typeof invalid.body.fieldErrors.email, "string");
+  assert.equal(typeof invalid.body.fieldErrors.password, "string");
+  const role = await adminRequest(`/users/${admin.user.id}`, admin.accessToken, "PATCH", {
+    role: "OWNER", updatedAt: users.get(admin.user.id).updatedAt.toISOString(),
+  });
+  assert.equal(role.status, 400); assert.equal(typeof role.body.fieldErrors.role, "string");
+});
+
 test("user mutations reject self-ban, self-delete, last-admin demotion, invalid roles and unknown fields", async () => {
   const admin = await verifiedAdministrator();
   const path = `/users/${admin.user.id}`;
-  assert.equal((await adminRequest(path, admin.accessToken, "PATCH", { isActive: false })).body.code, "SELF_BAN_FORBIDDEN");
+  const updatedAt = users.get(admin.user.id).updatedAt.toISOString();
+  assert.equal((await adminRequest(path, admin.accessToken, "PATCH", { isActive: false, updatedAt })).body.code, "SELF_BAN_FORBIDDEN");
   assert.equal((await adminRequest(path, admin.accessToken, "DELETE")).body.code, "SELF_DELETE_FORBIDDEN");
-  assert.equal((await adminRequest(path, admin.accessToken, "PATCH", { role: "LEAD_DEV" })).body.code, "LAST_ADMIN");
+  assert.equal((await adminRequest(path, admin.accessToken, "PATCH", { role: "LEAD_DEV", updatedAt })).body.code, "LAST_ADMIN");
   for (const body of [{}, { role: "SUPERADMIN" }, { isActive: "false" }, { password: "injected" }])
-    assert.equal((await adminRequest(path, admin.accessToken, "PATCH", body)).status, 400);
+    assert.equal((await adminRequest(path, admin.accessToken, "PATCH", { ...body, updatedAt })).status, 400);
 });
 
 test("user deletion removes provider and application identities and logs completion", async () => {

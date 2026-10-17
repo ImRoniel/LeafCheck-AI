@@ -1,7 +1,9 @@
 # Admin backend security and CRUD foundation
 
 The browser continues to use Express through `/api`. Access tokens stay in memory;
-refresh credentials use the Secure HttpOnly `__Host-leafcheck-refresh` cookie.
+refresh credentials use the Secure HttpOnly SameSite=Strict
+`__Host-leafcheck-refresh` session cookie. Successful issuance and rotation omit
+Max-Age and Expires; logout retains its expired-cookie deletion response.
 `AUTH_PROVIDER=supabase` is required for SuperAdmin authentication. The implemented
 second step is password plus an eight-digit **email OTP**, not Supabase native
 MFA/AAL2. LEAD_DEV retains password authentication and operational device reads.
@@ -21,6 +23,18 @@ LEAD_DEV proceeds to its read-only permission check without OTP. Legacy ADMIN
 password and refresh requests cannot issue credentials. Verification expires
 after eight hours and refresh does not extend it. Access JWTs retain the existing
 15-minute maximum age.
+
+Browser refresh also checks this proof before returning any token. An already
+refreshed, unexpired JWT still receives `403 ADMIN_VERIFICATION_REQUIRED` on every
+admin route if the proof is subsequently removed, expired, or tied to another
+session. Cookie persistence does not replace either verification check.
+
+App reloads and dev-server restarts may restore an existing verified session.
+Session cookies normally last for the browser session, but browsers may restore
+them with their session-restore feature; see [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#expiresdate_optional).
+An unconditional OTP-on-browser-restart policy cannot be guaranteed by cookie
+attributes alone. Existing persistent cookies become session cookies on their
+next successful issuance or refresh; signing out and back in replaces them now.
 
 Device responses for LEAD_DEV omit the whole owner object and owner-based filters
 are forbidden. Claiming devices and mutating plants/pairings/demo telemetry through
@@ -69,10 +83,11 @@ and routes to `/login/otp`. Only successful verification establishes its session
 | --- | --- |
 | GET `/api/admin/users` | Pagination/search/filter envelope; users.read; `revealEmails=true` opts into full emails |
 | POST `/api/admin/users` | `{email,password,name?,role?,isActive?}`; defaults USER/active; 201 `{data,meta}` |
-| PATCH `/api/admin/users/:id` | Nonempty subset of `{name,role,isActive}`; 200 `{data,meta}` |
+| PATCH `/api/admin/users/:id` | `updatedAt` plus a nonempty subset of `{name,role,isActive}`; 200 `{data,meta}` |
 | DELETE `/api/admin/users/:id` | Empty body; 204 |
 | GET `/api/admin/audit` | `{data,pagination,meta}`; audit.read |
 | GET `/api/admin/stats` | Aggregate platform counts; users.read OR devices.read |
+| GET `/api/admin/health` | `{postgres:"ok"\|"down",mongo:"ok"\|"down",api:"ok"}`; users.read OR devices.read |
 
 The audit query supports `page`, `pageSize` (maximum 100), `action`, `actorId`,
 `targetId`, `from` and `to`. Results sort by descending timestamp with an ID tie
@@ -90,7 +105,10 @@ User lists always include `emailMasked`. Full `email` is present only when
 `revealEmails=true`; false or omission retains the masked response. Existing
 SuperAdmin permission/session verification and no-store headers cover both modes.
 
-Stats return `{data:{totalUsers,totalActiveDevices,totalPlants,totalAiScans},meta}`.
+Stats return `{data:{totalUsers,totalDevices,totalPhysicalDevices,activeDevices,totalActiveDevices,totalPlants,totalAiScans},meta}`.
+`activeDevices` is the preferred name; `totalActiveDevices` is retained as a
+compatible alias. `totalDevices` includes all registered devices, including demos;
+`totalPhysicalDevices` excludes demos so the UI can explain the denominator.
 Counts describe currently retained database records, rather than lifetime counters
 after deletion. Both staff roles may read aggregate counts; LEAD_DEV still cannot
 read user records, full addresses, or audit entries. PostgreSQL counts and
@@ -102,15 +120,38 @@ active devices with `meta.telemetryDegraded=true`, retaining other totals. Meta
 includes the observation time and freshness window; the two databases are not one
 atomic snapshot. These additions require no schema changes or migration.
 
+Health uses the PostgreSQL Prisma client's constant `SELECT 1 AS ready` and the
+MongoDB Prisma client's `{ping:1}` command, with independent 2.5-second deadlines.
+It returns only readiness states; errors and connection details are never exposed.
+It shares the admin router's authentication, verification, permissions and no-store
+headers. If PostgreSQL is unavailable for authentication itself, the router denies
+the request before readiness runs; the frontend shows database status Unknown.
+
 Manual creation provisions a confirmed Supabase identity server-side and links
-its immutable provider ID to the new application user. The required legacy
-password column receives a random unusable credential. Failed PostgreSQL creation
+its immutable provider ID to the new application user.
+
+`isActive` accepts only a boolean and defaults to true when omitted. An explicit
+false creates a banned account, records that status in USER_CREATED, and prevents
+application sign-in immediately. Provider IDs and email verification timestamps
+are server-managed and rejected if supplied in the create request.
+
+The required legacy password column receives a random unusable credential. Failed PostgreSQL creation
 triggers provider cleanup; a failed cleanup returns
 `PROVISIONING_CLEANUP_REQUIRED` for operator review. Supabase keys stay server-side.
 
 User updates and their audits commit together. Administrators cannot ban or delete
 themselves, and the last active SuperAdmin cannot be demoted. Authorization is
 checked again inside serializable mutation transactions.
+
+Every PATCH requires the exact ISO `updatedAt` read from the list/detail response.
+The service compares it inside the serializable transaction, before any write or
+audit. Mismatches return `409 CONFLICT` with “This user was modified by another
+administrator. Please refresh.” Successful changes advance the timestamp even
+within one millisecond. No schema migration is required. Clients must submit only
+the fields they intend to change; name-only edits must not resend an old role.
+Input errors may include allowlisted `fieldErrors` for form feedback. Provider
+provisioning maps known weak-password/email codes to safe local messages, rather
+than returning upstream diagnostics; public authentication errors remain generic.
 
 Deletion first disables the account and records `USER_DELETE_REQUESTED`, then
 deletes the provider identity, then deletes application data with a completion

@@ -6,8 +6,8 @@ export const activeDeviceWindowSeconds = 1800;
 
 /** Domain counts are PostgreSQL snapshots; connectivity comes from MongoDB. */
 export async function readAdminStats(asOf: Date) {
-  const [totalUsers, totalPlants, totalAiScans, physicalDevices] = await prismaPg.$transaction(async tx => Promise.all([
-    tx.user.count({}), tx.plant.count({}), tx.aIAnalysis.count({}),
+  const [totalUsers, totalPlants, totalAiScans, totalDevices, physicalDevices] = await prismaPg.$transaction(async tx => Promise.all([
+    tx.user.count({}), tx.plant.count({}), tx.aIAnalysis.count({}), tx.device.count({}),
     tx.device.findMany({ where: { NOT: { macAddress: { startsWith: "DEMO:" } } }, select: { macAddress: true } }),
   ]), { isolationLevel: "RepeatableRead" });
 
@@ -34,7 +34,8 @@ export async function readAdminStats(asOf: Date) {
     telemetryDegraded = true;
   }
   return {
-    data: { totalUsers, totalActiveDevices, totalPlants, totalAiScans },
+    data: { totalUsers, totalDevices, totalPhysicalDevices: physicalDevices.length,
+      activeDevices: totalActiveDevices, totalActiveDevices, totalPlants, totalAiScans },
     meta: { freshnessWindowSeconds: activeDeviceWindowSeconds, telemetryDegraded },
   };
 }

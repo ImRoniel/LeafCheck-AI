@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { RequestError } from '../components/AdminTable'
 import { AuditTable } from '../components/AuditTable'
 import { PageHeader } from '../components/PageHeader'
+import { SystemHealth } from '../components/SystemHealth'
 import { useSession } from '../context/session'
 import { useAdminList } from '../hooks/useAdminList'
 import { useAdminResource } from '../hooks/useAdminResource'
@@ -19,7 +20,9 @@ export function DashboardPage() {
   const activity = useAdminList('/admin/audit', readAuditRow, 1, '', { pageSize: 5, enabled: canReadAudit })
   const metrics = [
     { label: 'Total users', value: stats.result?.totalUsers, icon: Users, note: 'All registered accounts', color: 'bg-info-bg text-info-fg' },
-    { label: 'Active devices', value: stats.result?.totalActiveDevices, icon: Cpu, note: 'Physical · seen in the last 30 minutes', color: 'bg-success-bg text-success-fg' },
+    { label: 'Active devices', value: stats.result?.activeDevices, icon: Cpu,
+      note: 'Online = physical readings within 30 minutes.' + (stats.result ? ` ${numbers.format(stats.result.totalDevices - stats.result.totalPhysicalDevices)} simulated included in total.` : ''),
+      color: 'bg-success-bg text-success-fg' },
     { label: 'Plants registered', value: stats.result?.totalPlants, icon: Sprout, note: 'Across the platform', color: 'bg-success-bg text-success-fg' },
     { label: 'AI scans', value: stats.result?.totalAiScans, icon: ScanLine, note: 'Saved diagnostic reports', color: 'bg-warning-bg text-warning-fg' },
   ]
@@ -30,19 +33,22 @@ export function DashboardPage() {
     <section aria-label="Platform overview">
       <PageHeader title="Overview" icon={LayoutDashboard}
         description={canReadAudit ? 'Your platform at a glance. Monitor growth, connected hardware, and administrative activity.' : 'An operational snapshot of the platform and connected hardware.'}
-        actions={<button type="button" onClick={refresh} disabled={stats.loading || activity.loading} className="button-secondary"><RefreshCw size={15} aria-hidden="true" />Refresh</button>} />
+        actions={<button type="button" onClick={refresh} disabled={stats.loading || stats.refreshing || activity.loading || activity.refreshing} className="button-secondary"><RefreshCw size={15} aria-hidden="true" />Refresh</button>} />
       {stats.error && <RequestError message={stats.error} retry={stats.reload} />}
       {stats.result?.telemetryDegraded && <p role="status" className="notice-warning mb-5">Live device connectivity is temporarily unavailable. Other platform totals remain available.</p>}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy={stats.loading}>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy={stats.loading || stats.refreshing}>
         {metrics.map(({ label, value, icon: Icon, note, color }) => (
           <article key={label} aria-label={label} className="surface p-5">
             <div className="flex items-center justify-between gap-3"><h2 className="text-xs font-medium text-secondary">{label}</h2><span className={'flex size-9 items-center justify-center rounded-xl ' + color}><Icon size={18} aria-hidden="true" /></span></div>
-            <p className="mt-4 text-3xl font-semibold tracking-tight tabular-nums text-foreground">{stats.loading ? <span className="block h-9 w-20 animate-pulse rounded-md bg-edge motion-reduce:animate-none"><span className="sr-only">Loading</span></span> : value === null ? <span className="text-xl">Unavailable</span> : value === undefined ? '—' : numbers.format(value)}</p>
+            <p className="mt-4 text-3xl font-semibold tracking-tight tabular-nums text-foreground">{stats.loading ? <span className="block h-9 w-20 animate-pulse rounded-md bg-edge motion-reduce:animate-none"><span className="sr-only">Loading</span></span> : value === null ? <span className="text-xl">Unavailable</span> : value === undefined ? '—' : label === 'Active devices' && stats.result ? <span className="text-xl">{numbers.format(value)} online / {numbers.format(stats.result.totalDevices)} total</span> : numbers.format(value)}</p>
+            {label === 'Active devices' && value === null && stats.result && <p className="mt-1 text-xs text-secondary">{numbers.format(stats.result.totalDevices)} total registered</p>}
             <p className="mt-2 text-[11px] leading-5 text-subtle">{note}</p>
           </article>
         ))}
       </div>
       {stats.result && <p className="mt-3 text-right text-[11px] text-subtle">Updated {formatTimestamp(stats.result.asOf)}</p>}
+
+      <SystemHealth />
 
       {canReadAudit ? (
         <div className="surface mt-8 overflow-hidden">

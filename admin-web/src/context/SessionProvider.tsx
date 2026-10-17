@@ -6,6 +6,7 @@ import { SessionContext, type AdminUser, type SessionStatus } from './session'
 
 const jsonPost = { method: 'POST', headers: { 'Content-Type': 'application/json' } } as const
 const cancelled = () => new DOMException('The session has changed.', 'AbortError')
+const sessionExpiredMessage = 'Your session has expired. Please log in again.'
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null)
@@ -30,7 +31,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { navigateRef.current = navigate }, [navigate])
 
-  const performLogout = useCallback((allowRefresh: boolean, waitForOtp = true): Promise<void> => {
+  const performLogout = useCallback((allowRefresh: boolean, waitForOtp = true, reason: string | null = null): Promise<void> => {
     if (logoutFlight.current) return logoutFlight.current
     const current = ++operation.current
     const token = getAccessToken()
@@ -38,7 +39,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null)
     updateChallenge(null)
     setStatus('signingOut')
-    setSessionError(null)
+    // Show the reason during sign-out and retain it on the login screen.
+    setSessionError(reason)
     const flight = (async () => {
       try {
         // A verification response can set a cookie; revoke it after it settles.
@@ -54,7 +56,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           await apiFetch('/auth/logout', { ...jsonPost, body: '{}', retryOnUnauthorized: false })
         })
       } catch (error) {
-        if (mounted.current && current === operation.current && !(error instanceof ApiError && error.status === 401)) {
+        if (!reason && mounted.current && current === operation.current && !(error instanceof ApiError && error.status === 401)) {
           setSessionError('Unable to confirm server sign-out. Your local session has been cleared.')
         }
       } finally {
@@ -78,6 +80,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (challengeRef.current) return Promise.resolve()
     if (restoreFlight.current) return restoreFlight.current
     const current = operation.current
+    const hadSession = getAccessToken() !== null
     setStatus('restoring')
     setSessionError(null)
     const flight = (async () => {
@@ -101,6 +104,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStatus('anonymous')
         if (error instanceof ApiError && error.code === 'ADMIN_VERIFICATION_REQUIRED') {
           setSessionError('Please sign in again and verify your administrator code.')
+        } else if (hadSession || ['/dashboard', '/users', '/devices', '/audit', '/forbidden'].includes(window.location.pathname.replace(/\/+$/, ''))) {
+          setSessionError(sessionExpiredMessage)
         } else if (!(error instanceof ApiError && error.status === 401)) {
           setSessionError('Unable to restore your session. Please sign in again.')
         }
@@ -257,13 +262,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mounted.current = true
-    const unsubscribe = onSessionExpired(() => performLogout(false))
+    const unsubscribe = onSessionExpired(() => performLogout(false, true, sessionExpiredMessage))
     void restoreSession()
     return () => { mounted.current = false; unsubscribe() }
   }, [performLogout, restoreSession])
 
   return (
     <SessionContext.Provider value={{ user, status, sessionError, challenge, otpBusy, login, logout, restoreSession, verifyAdminOtp, resendAdminOtp, cancelAdminOtp }}>
+      {sessionError && status === 'signingOut' && <div role="alert" className="notice-error fixed top-4 right-4 left-4 z-50 mx-auto max-w-xl shadow-lg">{sessionError}</div>}
       {children}
     </SessionContext.Provider>
   )

@@ -5,14 +5,14 @@ import { TableMessage } from './AdminTable'
 
 const tones: Record<string, BadgeTone> = { Succeeded: 'success', Failed: 'danger', Requested: 'warning', Cancelled: 'neutral' }
 
-export function AuditTable({ entries, loading, error }: { entries: AuditRow[]; loading: boolean; error?: string | null }) {
+export function AuditTable({ entries, loading, error, emptyMessage = 'No audit entries yet.' }: { entries: AuditRow[]; loading: boolean; error?: string | null; emptyMessage?: string }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-4xl" aria-busy={loading}>
         <caption className="sr-only">Security and user management audit trail</caption>
         <thead className="border-b border-edge bg-panel-muted"><tr>{['Timestamp', 'Actor', 'Action', 'Target', 'Outcome'].map(label => <th key={label} scope="col" className="table-head">{label}</th>)}</tr></thead>
         <tbody>
-          {loading ? <TableMessage columns={5}>Loading activity...</TableMessage> : error ? <TableMessage columns={5}>Activity could not be loaded.</TableMessage> : entries.length === 0 ? <TableMessage columns={5}>No audit entries yet.</TableMessage> : entries.map(log => {
+          {loading ? <TableMessage columns={5}>Loading activity...</TableMessage> : error ? <TableMessage columns={5}>Activity could not be loaded.</TableMessage> : entries.length === 0 ? <TableMessage columns={5}>{emptyMessage}</TableMessage> : entries.map(log => {
             const outcome = auditOutcome(log)
             const actorId = log.actorId ?? (typeof log.metadata?.actorId === 'string' ? log.metadata.actorId : null)
             return (

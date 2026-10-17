@@ -7,7 +7,6 @@ import {
   requireAuth,
   rotateSession,
   safeUser,
-  SESSION_MS,
   verifyPassword,
 } from "../lib/auth.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
@@ -75,10 +74,9 @@ function sendTokens(
   user?: unknown,
 ) {
   if (res.locals.client === "browser") {
-    res.cookie(cookieName, tokens.refreshToken, {
-      ...cookieOptions,
-      maxAge: SESSION_MS,
-    });
+    // Browser-session cookie: issuance and rotation must not set an expiry.
+    // Server-side session expiry and the administrator's OTP proof still apply.
+    res.cookie(cookieName, tokens.refreshToken, cookieOptions);
     res.status(status).json({
       accessToken: tokens.accessToken,
       expiresIn: tokens.expiresIn,

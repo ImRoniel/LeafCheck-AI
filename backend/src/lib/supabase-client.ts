@@ -63,7 +63,25 @@ async function request(path: string, method: string, body?: unknown, accessToken
   } catch {
     throw new HttpError(503, "PROVIDER_UNAVAILABLE", "Email authentication is temporarily unavailable.");
   }
-  if (!response.ok) throw new ProviderError(response.status);
+  if (!response.ok) {
+    // Provisioning errors are visible only to a verified SuperAdmin. Map known
+    // codes to our own messages; never forward provider text or diagnostics.
+    if (admin && path === "/admin/users" && method === "POST" && response.status >= 400 && response.status < 429) {
+      let failure: unknown;
+      try { failure = await response.json(); } catch { /* Keep the safe generic error. */ }
+      const code = object(failure).code ?? object(failure).error_code;
+      if (code === "weak_password") throw new HttpError(400, "WEAK_PASSWORD", "Password too weak.", {
+        password: "Password too weak. Choose a longer, unique password that meets the configured password policy.",
+      });
+      if (code === "email_exists" || code === "user_already_exists") throw new HttpError(409, "EMAIL_CONFLICT", "An account with this email already exists.", {
+        email: "An account with this email already exists.",
+      });
+      if (code === "email_address_invalid") throw new HttpError(400, "INVALID_EMAIL", "This email address is not accepted.", {
+        email: "This email address is not accepted. Use a valid, supported address.",
+      });
+    }
+    throw new ProviderError(response.status);
+  }
   if (response.status === 204) return undefined;
   try { return await response.json(); }
   catch { throw new HttpError(502, "INVALID_PROVIDER_RESPONSE", "Invalid authentication response."); }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, beforeEach, after, mock, test } from "node:test";
 import { spawnSync } from "node:child_process";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 import express from "express";
 import { PrismaClient } from "../../src/generated/postgres-client/index.js";
 
@@ -55,7 +55,9 @@ before(async () => {
     sessions: async id => [...sessions.values()].filter(row => row.userId === id),
     user: async id => identities.get(id) ?? null,
   } } });
-  mock.module(new URL("../../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: { sensorReading: { findFirst: async () => null } } } });
+  mock.module(new URL("../../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: {
+    sensorReading: { findFirst: async () => null, groupBy: async () => [] }, $runCommandRaw: async () => ({ ok: 1 }),
+  } } });
   mock.method(globalThis, "fetch", async (input, init = {}) => {
     const parsed = new URL(input);
     if (parsed.origin !== "https://provider.example.test") return network(input, init);
@@ -128,7 +130,7 @@ const login = user => request("/api/auth/login", { body: { email: user.email, pa
 async function verified() {
   const user = await account(); const challenge = await login(user); assert.equal(challenge.status, 202);
   const result = await request("/api/auth/verify-admin-otp", { body: { challengeToken: challenge.body.challengeToken, code: codes.get(user.email) } });
-  assert.equal(result.status, 200); return { ...result.body, id: user.id, cookie: result.headers.get("set-cookie").split(";")[0] };
+  assert.equal(result.status, 200); return { ...result.body, id: user.id, updatedAt: user.updatedAt.toISOString(), cookie: result.headers.get("set-cookie").split(";")[0] };
 }
 
 test("real PostgreSQL: LEAD_DEV receives a JWT, cannot read users, and receives no owner identity", async () => {
@@ -141,21 +143,85 @@ test("real PostgreSQL: LEAD_DEV receives a JWT, cannot read users, and receives 
   assert.equal(devices.status, 200); assert.equal(devices.body.data.length, 1);
   assert.equal("owner" in devices.body.data[0], false);
   assert.ok(!JSON.stringify(devices.body).includes(owner.email));
+  const health = await request("/api/admin/health", { method: "GET", token: result.body.accessToken });
+  assert.equal(health.status, 200);
+  assert.deepEqual(health.body, { postgres: "ok", mongo: "ok", api: "ok" });
+  assert.equal((await request("/api/admin/stats", { method: "GET", token: result.body.accessToken })).status, 200);
+  for (const [path, method, body] of [
+    ["/api/admin/users?revealEmails=true", "GET"], ["/api/admin/audit", "GET"],
+    [`/api/admin/devices?userId=${owner.id}`, "GET"],
+    ["/api/admin/users", "POST", { email: "forbidden@example.test", password: "integration password", role: "ADMIN" }],
+    [`/api/admin/users/${owner.id}`, "PATCH", { role: "ADMIN", updatedAt: owner.updatedAt.toISOString() }],
+    [`/api/admin/users/${owner.id}`, "DELETE"],
+  ]) {
+    const denied = await request(path, { method, body, token: result.body.accessToken });
+    assert.equal(denied.status, 403, `${method} ${path}`);
+    assert.equal(denied.body.code, "FORBIDDEN");
+  }
+  assert.equal((await db.user.findUnique({ where: { id: owner.id } })).role, "USER");
 });
 
 test("real PostgreSQL: ADMIN needs OTP, unverified JWT is denied, and verified refresh retains authorization", async () => {
   const user = await account(); const raw = await issue(identities.get(user.supabaseUserId));
   const denied = await request("/api/admin/users", { method: "GET", token: raw.access_token });
   assert.equal(denied.status, 403); assert.equal(denied.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  for (const path of ["/api/admin/stats", "/api/admin/health"]) {
+    const response = await request(path, { method: "GET", token: raw.access_token });
+    assert.equal(response.status, 403); assert.equal(response.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  }
   const challenge = await login(user); assert.equal(challenge.status, 202); assert.equal(challenge.body.accessToken, undefined);
   const session = await request("/api/auth/verify-admin-otp", { body: { challengeToken: challenge.body.challengeToken, code: codes.get(user.email) } });
   assert.equal(session.status, 200);
+  assert.doesNotMatch(session.headers.get("set-cookie"), /(?:^|;)\s*(?:Max-Age|Expires)=/i);
   assert.equal((await request("/api/admin/users", { method: "GET", token: session.body.accessToken })).status, 200);
   assert.equal(await db.adminSessionVerification.count(), 1);
   assert.equal(await db.auditLog.count({ where: { action: "ADMIN_LOGIN_VERIFIED" } }), 1);
   const refresh = await request("/api/auth/refresh", { body: {}, cookie: session.headers.get("set-cookie").split(";")[0] });
   assert.equal(refresh.status, 200);
+  assert.doesNotMatch(refresh.headers.get("set-cookie"), /(?:^|;)\s*(?:Max-Age|Expires)=/i);
   assert.equal((await request("/api/admin/users", { method: "GET", token: refresh.body.accessToken })).status, 200);
+});
+
+for (const proofState of ["missing", "expired", "different session"]) {
+  test(`real PostgreSQL: refreshed ADMIN JWT and further refresh require a ${proofState === "missing" ? "present" : "valid"} OTP proof (${proofState})`, async () => {
+    const admin = await verified();
+    const before = await db.adminSessionVerification.findFirst({ where: { userId: admin.id } });
+    assert.ok(before);
+    const refreshed = await request("/api/auth/refresh", { body: {}, cookie: admin.cookie });
+    assert.equal(refreshed.status, 200);
+    const claims = (await jwtVerify(refreshed.body.accessToken, signingKey, { issuer, audience: "authenticated" })).payload;
+    assert.equal(claims.session_id, before.supabaseSessionId);
+    const proof = await db.adminSessionVerification.findUnique({ where: { id: before.id } });
+    assert.equal(proof.expiresAt.toISOString(), before.expiresAt.toISOString(), "refresh must not extend the OTP proof");
+    assert.equal(proof.verifiedAt.toISOString(), before.verifiedAt.toISOString(), "refresh must not re-verify the session");
+    assert.equal((await request("/api/admin/users", { method: "GET", token: refreshed.body.accessToken })).status, 200);
+    if (proofState === "missing") await db.adminSessionVerification.deleteMany({ where: { id: proof.id } });
+    else await db.adminSessionVerification.update({ where: { id: proof.id }, data: proofState === "expired"
+      ? { expiresAt: new Date(Date.now() - 1) } : { supabaseSessionId: randomUUID() } });
+    // The JWT is still signed and unexpired. Every admin route must re-check its proof.
+    for (const path of ["users", "devices", "audit", "stats", "health"]) {
+      const denied = await request(`/api/admin/${path}`, { method: "GET", token: refreshed.body.accessToken });
+      assert.equal(denied.status, 403); assert.equal(denied.body.code, "ADMIN_VERIFICATION_REQUIRED");
+    }
+    const denied = await request("/api/auth/refresh", { body: {}, cookie: refreshed.headers.get("set-cookie").split(";")[0] });
+    assert.equal(denied.status, 403); assert.equal(denied.body.code, "ADMIN_VERIFICATION_REQUIRED");
+    assert.equal(denied.body.accessToken, undefined);
+    assert.match(denied.headers.get("set-cookie"), /^__Host-leafcheck-refresh=;/);
+  });
+}
+
+test("real PostgreSQL: SuperAdmin-created inactive users remain banned and cannot sign in", async () => {
+  const admin = await verified();
+  const created = await request("/api/admin/users", { token: admin.accessToken, body: {
+    email: "initially-banned@example.test", password: "integration password", isActive: false,
+  } });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.data.isActive, false);
+  const persisted = await db.user.findUnique({ where: { id: created.body.data.id } });
+  assert.equal(persisted.isActive, false);
+  assert.equal((await login(persisted)).status, 401);
+  const audit = await db.auditLog.findFirst({ where: { targetId: persisted.id, action: "USER_CREATED" } });
+  assert.equal(audit.metadata.isActive, false);
 });
 
 test("real PostgreSQL: concurrent challenge issuance is limited and verification consumes once", async () => {
@@ -186,14 +252,14 @@ test("real PostgreSQL: CRUD audits are transactional and role changes invalidate
   const created = await request("/api/admin/users", { token: admin.accessToken, body: { email: "created@example.test", password: "integration password", role: "LEAD_DEV" } });
   assert.equal(created.status, 201); const target = created.body.data;
   const oldSession = await login(target); assert.equal(oldSession.status, 200);
-  const edited = await request(`/api/admin/users/${target.id}`, { token: admin.accessToken, method: "PATCH", body: { role: "ADMIN" } });
+  const edited = await request(`/api/admin/users/${target.id}`, { token: admin.accessToken, method: "PATCH", body: { role: "ADMIN", updatedAt: target.updatedAt } });
   assert.equal(edited.status, 200);
   assert.equal((await request("/api/admin/devices", { method: "GET", token: oldSession.body.accessToken })).status, 401);
   assert.equal((await login(target)).status, 202);
   assert.equal(await db.auditLog.count({ where: { action: "USER_CREATED", targetId: target.id } }), 1);
   assert.equal(await db.auditLog.count({ where: { action: "USER_UPDATED", targetId: target.id } }), 1);
   failAudit = true;
-  const failedUpdate = await request(`/api/admin/users/${target.id}`, { token: admin.accessToken, method: "PATCH", body: { name: "must roll back" } });
+  const failedUpdate = await request(`/api/admin/users/${target.id}`, { token: admin.accessToken, method: "PATCH", body: { name: "must roll back", updatedAt: edited.body.data.updatedAt } });
   assert.equal(failedUpdate.status, 503);
   assert.equal((await db.user.findUnique({ where: { id: target.id } })).name, null);
   const failedCreation = await request("/api/admin/users", { token: admin.accessToken, body: {
@@ -218,11 +284,46 @@ test("real PostgreSQL: deletion preserves historical audits and provider failure
   assert.equal(event.actorId, null); assert.equal(event.metadata.actorId, target.id);
 });
 
+test("real PostgreSQL: stale edits cannot restore a revoked role and rejected writes have no audit", async () => {
+  const first = await verified(), second = await verified(), target = await account("ADMIN");
+  const path = `/api/admin/users/${target.id}`;
+  const originalVersion = target.updatedAt.toISOString();
+  const demoted = await request(path, { method: "PATCH", token: second.accessToken, body: { role: "USER", updatedAt: originalVersion } });
+  assert.equal(demoted.status, 200);
+  assert.notEqual(demoted.body.data.updatedAt, originalVersion);
+  const stale = await request(path, { method: "PATCH", token: first.accessToken,
+    body: { name: "A stale name edit", role: "ADMIN", updatedAt: originalVersion } });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.code, "CONFLICT");
+  assert.equal(stale.body.error, "This user was modified by another administrator. Please refresh.");
+  const persisted = await db.user.findUnique({ where: { id: target.id } });
+  assert.equal(persisted.role, "USER");
+  assert.equal(persisted.name, null);
+  assert.equal(await db.auditLog.count({ where: { targetId: target.id, action: "USER_UPDATED" } }), 1);
+  const renamed = await request(path, { method: "PATCH", token: first.accessToken,
+    body: { name: "Reviewed name", updatedAt: demoted.body.data.updatedAt } });
+  assert.equal(renamed.status, 200);
+  assert.equal(renamed.body.data.role, "USER");
+  for (const body of [{ name: "missing version" }, { name: "invalid version", updatedAt: "yesterday" }, { updatedAt: renamed.body.data.updatedAt }]) {
+    assert.equal((await request(path, { method: "PATCH", token: first.accessToken, body })).status, 400);
+  }
+});
+
+test("real PostgreSQL: only one concurrent update can use the same user version", async () => {
+  const admin = await verified(), target = await account("USER");
+  const results = await Promise.all(["First name", "Second name"].map(name => request(`/api/admin/users/${target.id}`, {
+    method: "PATCH", token: admin.accessToken, body: { name, updatedAt: target.updatedAt.toISOString() },
+  })));
+  assert.deepEqual(results.map(result => result.status).sort(), [200, 409]);
+  assert.equal(results.find(result => result.status === 409).body.code, "CONFLICT");
+  assert.equal(await db.auditLog.count({ where: { targetId: target.id, action: "USER_UPDATED" } }), 1);
+});
+
 test("real PostgreSQL: concurrent administrator demotions preserve one authorized SuperAdmin", async () => {
   const first = await verified(), second = await verified();
   const results = await Promise.all([
-    request(`/api/admin/users/${second.id}`, { token: first.accessToken, method: "PATCH", body: { role: "LEAD_DEV" } }),
-    request(`/api/admin/users/${first.id}`, { token: second.accessToken, method: "PATCH", body: { role: "LEAD_DEV" } }),
+    request(`/api/admin/users/${second.id}`, { token: first.accessToken, method: "PATCH", body: { role: "LEAD_DEV", updatedAt: second.updatedAt } }),
+    request(`/api/admin/users/${first.id}`, { token: second.accessToken, method: "PATCH", body: { role: "LEAD_DEV", updatedAt: first.updatedAt } }),
   ]);
   assert.equal(results.filter(result => result.status === 200).length, 1);
   assert.ok(results.some(result => [401, 403, 409].includes(result.status)));

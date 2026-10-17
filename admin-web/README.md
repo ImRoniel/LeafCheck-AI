@@ -71,10 +71,34 @@ Demo and unregistered devices are excluded. Unavailable connectivity displays
 Unavailable instead of zero. Both staff roles may read aggregate totals, but
 only ADMIN fetches the five latest audit entries with `pageSize=5`.
 
-Create and Edit use accessible native dialogs. Edit sends only name and role;
-changing your own role signs you out immediately. Delete requires typing DELETE
+The device card shows `X online / Y total`: the total includes all registered
+devices, and its note identifies how many are simulated. Online counts exclude
+simulated devices. `/admin/health` checks PostgreSQL readiness and MongoDB ping
+with independent 2.5-second deadlines; its System Health card refreshes every minute.
+If the API cannot be reached, database status is Unknown rather than assumed down.
+
+Device readings and status refresh every 60 seconds while the tab is visible and
+on returning to the tab. Background refresh keeps the previous table visible and
+displays the last refresh time. Users have a Refresh button; submitting the same
+search reloads it. Lists recover to a valid page if concurrent deletions shrink
+the result set. Audit filters include action, inclusive local From/To dates, and
+optional actor/target IDs; applying or clearing filters resets pagination.
+
+Create and Edit use accessible native dialogs. Edit sends only changed name/role
+fields plus the row's `updatedAt`. Ban/unban also includes `updatedAt`. The backend
+rejects a stale version with `409 CONFLICT`; Close and refresh discards the stale
+draft before another edit. Changing your own role signs you out immediately.
+Create includes an Account Active switch, enabled by default. Turning it off sends
+`isActive:false` and creates a banned account immediately. Backend-generated provider
+IDs and verification timestamps remain outside the form.
+Validation errors appear beside their fields, including safe provider password
+policy errors. Delete requires typing DELETE
 and explains the cascade. A failed deletion can leave an account disabled; the
 table refreshes to reflect the backend state and the dialog permits a retry.
+
+Escape, Close, and Cancel remain available during a save/delete and abort its
+request. Cancellation or a network timeout does not prove that a write was rolled
+back: the UI prompts the administrator to refresh and review before retrying.
 
 The interface uses Lucide icons and shared theme-aware surfaces, badges, inputs,
 and table styles. The theme toggle defaults to the system preference and stores
@@ -115,6 +139,20 @@ and return focus to their trigger when it remains present.
 Access tokens stay in memory. Refresh credentials remain in the backend's
 HttpOnly cookie; neither token is written to localStorage or sessionStorage.
 
+The refresh cookie is a session cookie: login, successful administrator OTP
+verification, and refresh omit both Max-Age and Expires. Logout still sends an
+expired cookie to delete it. Existing persistent cookies are replaced on the next
+successful login or refresh; log out and sign in after updating the backend to
+verify the new cookie in browser tools.
+
+Reloading the app restores only a session with a current server-side OTP proof.
+Refresh checks the exact Supabase session's `AdminSessionVerification` before
+returning credentials, and every `/api/admin/*` request checks it again. Refresh
+does not extend or recreate the eight-hour proof. Restarting the dev servers is
+not a browser logout. Browsers with session restore can also retain session
+cookies across browser restarts, so this cookie setting cannot guarantee a new
+OTP after every restart; see [MDN's session-cookie behavior](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#expiresdate_optional).
+
 ## API utility
 
 `apiFetch(path, options)` accepts paths starting with `/`, relative to
@@ -140,6 +178,11 @@ Internal restoration requests can also opt out with `retryOnUnauthorized: false`
 A permission-denied 403 or a failed retry caused by a network error does not clear
 the session. `ADMIN_VERIFICATION_REQUIRED` instead invokes logout, requiring a
 fresh password/OTP flow without looping through refresh.
+
+Every fetch has a 10-second `AbortSignal.timeout` combined with caller cancellation.
+Writes are never automatically replayed for timeouts or network failures. An
+unrecoverable session displays “Your session has expired. Please log in again.”
+during sign-out and retains the alert on the login screen.
 A 204 needs no JSON parsing. Pending responses from a previous session are
 discarded, so logout cannot be undone by a late refresh. Requests fail clearly
 if `VITE_API_URL` is missing.
@@ -166,6 +209,26 @@ suite to save selected desktop/mobile previews with mocked data.
 web host to proxy `/api/*` to the backend before its SPA fallback. The Vite proxy
 is development-only. Serve `index.html` for other non-file paths so direct visits
 to routes such as `/users` work with `BrowserRouter`.
+
+For Vercel, select `admin-web` as the project root, use the Vite preset, and keep
+`VITE_API_URL=/api`. Copy `vercel.json.example` to `vercel.json` and replace
+`REPLACE_WITH_BACKEND_HOST` with the real backend hostname before deploying. The
+API rewrite must precede the SPA fallback. Set the backend's production
+`AUTH_ALLOWED_ORIGINS` to the exact HTTPS admin origin and restart it. The existing
+Secure HttpOnly SameSite=Strict refresh cookie requires this same-origin browser
+API path; setting credentials alone on a cross-site API URL is insufficient.
+The example is intentionally inactive until the actual production backend is known.
+
+After configuring a deployment, run this read-only check (no sign-in or writes):
+
+```bash
+npm run check:deployment --workspace=admin-web -- https://your-admin-host
+```
+
+It verifies SPA deep links, backend JSON authentication denial through `/api`, and
+the exact credentialed CORS preflight. Complete a password/OTP login and page reload
+in a browser separately to verify HttpOnly cookie continuity. No deployment is
+created or modified by the checker.
 
 ## Backend admin security integration
 

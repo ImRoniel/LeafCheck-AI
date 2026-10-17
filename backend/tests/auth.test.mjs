@@ -389,14 +389,13 @@ test("browser refresh is cookie-only with secure attributes and explicit origin/
   assert.equal(result.status, 201);
   assert.equal(result.body.refreshToken, undefined);
   const cookie = result.headers.get("set-cookie");
+  assert.doesNotMatch(cookie, /(?:^|;)\s*(?:Max-Age|Expires)=/i);
   for (const attribute of ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"])
     assert.ok(cookie.includes(attribute));
   const cookieHeader = cookie.split(";")[0];
-  assert.equal(
-    (await request("/auth/refresh", {}, { ...headers, Cookie: cookieHeader }))
-      .status,
-    200,
-  );
+  const refreshed = await request("/auth/refresh", {}, { ...headers, Cookie: cookieHeader });
+  assert.equal(refreshed.status, 200);
+  assert.doesNotMatch(refreshed.headers.get("set-cookie"), /(?:^|;)\s*(?:Max-Age|Expires)=/i);
   assert.equal(
     (await request("/auth/refresh", { refreshToken: "x" }, headers)).status,
     400,

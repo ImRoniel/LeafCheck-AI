@@ -5,6 +5,7 @@ export class HttpError extends Error {
     public status: number,
     public code: string,
     message: string,
+    public fieldErrors?: Readonly<Record<string, string>>,
   ) {
     super(message);
   }
@@ -32,7 +33,9 @@ export function bodyObject(
 }
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof HttpError) {
-    res.status(error.status).json({ error: error.message, code: error.code });
+    res.status(error.status).json({ error: error.message, code: error.code,
+      ...(error.fieldErrors ? { fieldErrors: error.fieldErrors } : {}),
+    });
   } else if (error?.type === "entity.too.large") {
     res
       .status(413)

@@ -9,6 +9,7 @@
     "typecheck": "tsc -b",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node --test tests/browser/*.test.mjs",
+    "check:deployment": "node scripts/check-deployment.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

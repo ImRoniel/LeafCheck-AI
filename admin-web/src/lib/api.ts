@@ -29,13 +29,15 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
   readonly retryAfter: number | undefined
+  readonly fieldErrors: Readonly<Record<string, string>>
 
-  constructor(status: number, message: string, code?: string, retryAfter?: number) {
+  constructor(status: number, message: string, code?: string, retryAfter?: number, fieldErrors: Readonly<Record<string, string>> = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.retryAfter = retryAfter
+    this.fieldErrors = fieldErrors
   }
 
   static async fromResponse(response: Response): Promise<ApiError> {
@@ -44,12 +46,20 @@ export class ApiError extends Error {
     const retryHeader = response.headers.get('Retry-After')
     const retryAfter = retryHeader === null ? NaN : /^[0-9]+$/.test(retryHeader)
       ? Number(retryHeader) : Math.ceil((Date.parse(retryHeader) - Date.now()) / 1000)
+    const fieldErrors: Record<string, string> = {}
+    if (isRecord(payload) && isRecord(payload.fieldErrors)) {
+      for (const key of ['email', 'password', 'name', 'role', 'isActive', 'updatedAt']) {
+        const message = payload.fieldErrors[key]
+        if (typeof message === 'string' && message.trim() && message.length <= 500) fieldErrors[key] = message
+      }
+    }
     return new ApiError(
       response.status,
       isRecord(payload) && typeof payload.error === 'string'
         ? payload.error : response.statusText || `API request failed (${response.status}).`,
       isRecord(payload) && typeof payload.code === 'string' ? payload.code : undefined,
       Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter : undefined,
+      fieldErrors,
     )
   }
 }
@@ -59,6 +69,17 @@ export interface ApiOptions extends RequestInit {
 }
 
 const sessionChanged = () => new DOMException('The session has changed.', 'AbortError')
+
+function waitWithSignal<T>(flight: Promise<T>, signal: AbortSignal | null | undefined): Promise<T> {
+  if (!signal) return flight
+  signal.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason)
+    signal.addEventListener('abort', abort, { once: true })
+    flight.then(value => { signal.removeEventListener('abort', abort); resolve(value) },
+      error => { signal.removeEventListener('abort', abort); reject(error) })
+  })
+}
 
 async function request(path: string, options: RequestInit): Promise<Response> {
   if (!baseUrl) {
@@ -74,11 +95,18 @@ async function request(path: string, options: RequestInit): Promise<Response> {
   headers.set('X-CSRF-Protection', '1')
   if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`)
 
-  return fetch(`${baseUrl}${path}`, {
-    ...options,
-    credentials: 'include',
-    headers,
-  })
+  const deadline = AbortSignal.timeout(10000)
+  const signal = options.signal ? AbortSignal.any([options.signal, deadline]) : deadline
+  try {
+    const response = await fetch(`${baseUrl}${path}`, { ...options, credentials: 'include', headers, signal })
+    signal.throwIfAborted()
+    return response
+  } catch (error) {
+    if (deadline.aborted && !options.signal?.aborted) {
+      throw new ApiError(0, 'The request timed out after 10 seconds. Refresh to check its result before trying again.', 'REQUEST_TIMEOUT')
+    }
+    throw error
+  }
 }
 
 /** Shared by restoration and 401 retries; discard results from a previous session. */
@@ -136,7 +164,7 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
 
   if (response.status === 401 && retryOnUnauthorized) {
     try {
-      if (accessToken === attemptedToken) await refreshAccessToken()
+      if (accessToken === attemptedToken) await waitWithSignal(refreshAccessToken(), init.signal)
       if (version !== sessionVersion) throw sessionChanged()
     } catch (error) {
       if (!init.signal?.aborted) await expireSession(version)

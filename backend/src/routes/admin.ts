@@ -6,6 +6,7 @@ import { diagnosisTelemetrySnapshot, readingIsFresh } from "../lib/diagnosis-tel
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { requireAnyPermission, requirePermission } from "../lib/permissions.js";
 import { readAdminStats } from "../lib/admin-stats.js";
+import { readAdminHealth } from "../lib/admin-health.js";
 import { requireAdminVerification } from "../lib/admin-verification.js";
 import { createAdminUser, updateAdminUser, deleteAdminUser, type AdminActor, type UpdateAdminUser } from "../lib/admin-users.js";
 import { credentials, validateName } from "../lib/auth-input.js";
@@ -38,8 +39,10 @@ export const adminResponseHeaders: RequestHandler = (_req, res, next) => {
 /** Keep admin error contracts local; never expose database/provider error text. */
 export const adminErrorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
   let status = 503, code = "ADMIN_DATA_UNAVAILABLE", message = "Admin data is temporarily unavailable.";
+  let fieldErrors: Readonly<Record<string, string>> | undefined;
   if (error instanceof HttpError) {
     status = error.status; code = error.code; message = error.message;
+    fieldErrors = error.fieldErrors;
   } else if (error && typeof error === "object" && "type" in error) {
     if (error.type === "entity.parse.failed") {
       status = 400; code = "INVALID_INPUT"; message = "Invalid JSON.";
@@ -47,7 +50,9 @@ export const adminErrorHandler: ErrorRequestHandler = (error: unknown, _req, res
       status = 400; code = "INVALID_INPUT"; message = "Request body too large.";
     }
   }
-  res.status(status).json({ error: message, code, requestId: context(res).requestId });
+  res.status(status).json({ error: message, code, requestId: context(res).requestId,
+    ...(fieldErrors ? { fieldErrors } : {}),
+  });
 };
 
 function invalidInput(message = "Invalid query parameters."): never {
@@ -132,7 +137,8 @@ const actor = (req: Request, res: Response): AdminActor => ({
 });
 
 function roleValue(value: unknown) {
-  if (value !== "USER" && value !== "ADMIN" && value !== "LEAD_DEV") invalidInput("Invalid user role.");
+  if (value !== "USER" && value !== "ADMIN" && value !== "LEAD_DEV")
+    throw new HttpError(400, "INVALID_INPUT", "Invalid user role.", { role: "Choose User, System Administrator, or SuperAdmin." });
   return value;
 }
 
@@ -140,6 +146,11 @@ adminRouter.get("/stats", requireAnyPermission("users.read", "devices.read"), as
   queryParams(req, []);
   const stats = await readAdminStats(context(res).asOf);
   res.json({ data: stats.data, meta: { ...meta(res), ...stats.meta } });
+}));
+
+adminRouter.get("/health", requireAnyPermission("users.read", "devices.read"), asyncRoute(async (req, res) => {
+  queryParams(req, []);
+  res.json(await readAdminHealth());
 }));
 
 adminRouter.post("/users", requirePermission("users.manage"), asyncRoute(async (req, res) => {
@@ -154,8 +165,11 @@ adminRouter.post("/users", requirePermission("users.manage"), asyncRoute(async (
 
 adminRouter.patch("/users/:id", requirePermission("users.manage"), asyncRoute(async (req, res) => {
   const id = resourceId(req.params.id);
-  const data = bodyObject(req.body, ["name", "role", "isActive"]);
-  if (Object.keys(data).length === 0) invalidInput("Provide at least one user field.");
+  const data = bodyObject(req.body, ["name", "role", "isActive", "updatedAt"]);
+  if (typeof data.updatedAt !== "string" || !Number.isFinite(Date.parse(data.updatedAt)) ||
+      new Date(data.updatedAt).toISOString() !== data.updatedAt)
+    invalidInput("The user's updatedAt timestamp is required. Please refresh.");
+  if (!Object.keys(data).some(key => key !== "updatedAt")) invalidInput("Provide at least one user field.");
   const change: UpdateAdminUser = {};
   if ("name" in data) change.name = validateName(data.name);
   if ("role" in data) change.role = roleValue(data.role);
@@ -163,7 +177,7 @@ adminRouter.patch("/users/:id", requirePermission("users.manage"), asyncRoute(as
     if (typeof data.isActive !== "boolean") invalidInput("isActive must be a boolean.");
     change.isActive = data.isActive;
   }
-  res.json({ data: await updateAdminUser(id, change, actor(req, res)), meta: meta(res) });
+  res.json({ data: await updateAdminUser(id, change, actor(req, res), new Date(data.updatedAt)), meta: meta(res) });
 }));
 
 adminRouter.delete("/users/:id", requirePermission("users.manage"), asyncRoute(async (req, res) => {

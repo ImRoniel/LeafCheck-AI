@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 process.env.VITE_API_URL = '/api'
-let vite, api, auth, admin, permissions, format, unsubscribe
+let vite, api, auth, admin, permissions, format, forms, auditFilters, unsubscribe
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json' },
 })
@@ -19,6 +19,8 @@ before(async () => {
   admin = await vite.ssrLoadModule('/src/lib/admin.ts')
   permissions = await vite.ssrLoadModule('/src/lib/permissions.ts')
   format = await vite.ssrLoadModule('/src/lib/format.ts')
+  forms = await vite.ssrLoadModule('/src/lib/user-form.ts')
+  auditFilters = await vite.ssrLoadModule('/src/lib/audit-filters.ts')
 })
 afterEach(() => {
   unsubscribe?.()
@@ -52,6 +54,61 @@ test('invalid login preserves the API error and never refreshes or triggers logo
     error instanceof api.ApiError && error.status === 401 && error.message === 'Invalid credentials' && error.code === 'INVALID_CREDENTIALS')
   assert.equal(fetch.mock.callCount(), 1)
   assert.equal(expired, 0)
+})
+
+test('every request gets a ten-second deadline and a timeout produces a recoverable error', async () => {
+  const deadline = new AbortController()
+  let expired = 0
+  unsubscribe = api.onSessionExpired(async () => { expired++ })
+  mock.method(AbortSignal, 'timeout', milliseconds => {
+    assert.equal(milliseconds, 10000)
+    return deadline.signal
+  })
+  const fetch = mock.method(globalThis, 'fetch', (_url, init) => new Promise((_resolve, reject) => {
+    assert.ok(init.signal instanceof AbortSignal)
+    init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
+  }))
+  const request = api.apiFetch('/admin/users')
+  deadline.abort(new DOMException('Timed out', 'TimeoutError'))
+  await assert.rejects(request, error => error.code === 'REQUEST_TIMEOUT' && /10 seconds/.test(error.message))
+  assert.equal(fetch.mock.callCount(), 1)
+  assert.equal(expired, 0)
+})
+
+test('caller cancellation aborts a write without refreshing, expiring or replaying it', async () => {
+  const controller = new AbortController()
+  let expired = 0
+  unsubscribe = api.onSessionExpired(async () => { expired++ })
+  const fetch = mock.method(globalThis, 'fetch', (_url, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
+  }))
+  const write = api.apiFetch('/admin/users/u1', { method: 'PATCH', body: '{}', signal: controller.signal })
+  controller.abort()
+  await assert.rejects(write, error => error.name === 'AbortError')
+  assert.equal(fetch.mock.callCount(), 1)
+  assert.equal(expired, 0)
+})
+
+test('cancelling one request while refreshing releases it without cancelling the shared refresh', async () => {
+  api.setAccessToken('expired')
+  let release, started
+  const ready = new Promise(resolve => { started = resolve })
+  mock.method(globalThis, 'fetch', async url => {
+    if (url.endsWith('/auth/refresh')) {
+      started()
+      return new Promise(resolve => { release = () => resolve(json({ accessToken: 'fresh' })) })
+    }
+    return json({ error: 'Expired' }, 401)
+  })
+  const controller = new AbortController()
+  const pending = api.apiFetch('/admin/users', { signal: controller.signal })
+  await ready
+  controller.abort()
+  await assert.rejects(pending, error => error.name === 'AbortError')
+  const shared = api.refreshAccessToken()
+  release()
+  await shared
+  assert.equal(api.getAccessToken(), 'fresh')
 })
 
 test('a protected 401 refreshes once and retries with the new token', async () => {
@@ -231,7 +288,7 @@ test('frontend permissions limit LEAD_DEV to devices and allow ADMIN user manage
 })
 
 test('table parsers accept masked user emails and operational devices without retaining owner data', () => {
-  const user = admin.readUserRow({ id: 'u1', name: null, emailMasked: 'a***@example.test', role: 'USER', isActive: true })
+  const user = admin.readUserRow({ id: 'u1', name: null, emailMasked: 'a***@example.test', role: 'USER', isActive: true, updatedAt: '2026-10-17T00:00:00.000Z' })
   assert.equal(user.email, null)
   assert.equal(user.emailMasked, 'a***@example.test')
   assert.equal(admin.readUserRow({ ...user, email: 'actual@example.test' }).email, 'actual@example.test')
@@ -253,13 +310,16 @@ test('audit outcomes distinguish failed, requested, cancelled, successful and un
 })
 
 test('dashboard stats validate counts and preserve unavailable connectivity instead of inventing zero', () => {
-  const payload = { data: { totalUsers: 12, totalActiveDevices: 3, totalPlants: 25, totalAiScans: 48 },
+  const payload = { data: { totalUsers: 12, totalDevices: 5, totalPhysicalDevices: 4, activeDevices: 3, totalActiveDevices: 3, totalPlants: 25, totalAiScans: 48 },
     meta: { asOf: new Date().toISOString(), telemetryDegraded: false } }
   assert.equal(admin.readAdminStats(payload).totalUsers, 12)
-  assert.equal(admin.readAdminStats({ ...payload, data: { ...payload.data, totalActiveDevices: null },
+  assert.equal(admin.readAdminStats({ ...payload, data: { ...payload.data, activeDevices: null, totalActiveDevices: null },
     meta: { ...payload.meta, telemetryDegraded: true } }).totalActiveDevices, null)
   for (const value of [-1, '3', 1.5]) {
     assert.throws(() => admin.readAdminStats({ ...payload, data: { ...payload.data, totalUsers: value } }), /unexpected response/)
+  }
+  for (const changes of [{ totalDevices: 3 }, { activeDevices: 6, totalActiveDevices: 6 }, { activeDevices: 2 }]) {
+    assert.throws(() => admin.readAdminStats({ ...payload, data: { ...payload.data, ...changes } }), /unexpected response/)
   }
 })
 
@@ -279,4 +339,40 @@ test('last-seen formatting handles missing readings, elapsed time and clock erro
   assert.equal(format.formatLastSeen(new Date(now).toISOString(), now), 'Just now')
   assert.equal(format.formatLastSeen(new Date(now - 120_000).toISOString(), now), '2 minutes ago')
   assert.equal(format.formatLastSeen(new Date(now + 120_000).toISOString(), now), 'Clock ahead')
+})
+
+test('API errors retain only bounded allowlisted field messages', async () => {
+  const error = await api.ApiError.fromResponse(json({ error: 'Invalid input', fieldErrors: {
+    email: 'Enter a valid address.', password: 'Password too weak.', name: 'x'.repeat(501), secret: 'PRIVATE', role: 42,
+  } }, 400))
+  assert.deepEqual(error.fieldErrors, { email: 'Enter a valid address.', password: 'Password too weak.' })
+})
+
+test('user form validation matches email and password length boundaries without inventing provider rules', () => {
+  assert.deepEqual(forms.validateUserForm({ name: '', role: 'USER', email: 'new@example.test', password: '😀'.repeat(8) }), {})
+  const errors = forms.validateUserForm({ name: 'x'.repeat(101), role: 'OWNER', email: 'invalid', password: 'short' })
+  assert.deepEqual(Object.keys(errors).sort(), ['email', 'name', 'password', 'role'])
+  assert.deepEqual(forms.validateUserForm({ name: '', role: 'ADMIN' }), {})
+  assert.equal(typeof forms.validateUserForm({ name: '', role: 'USER', password: 'x'.repeat(129) }).password, 'string')
+  assert.equal(forms.userFieldErrors(new api.ApiError(400, 'Password too weak.')).password, 'Password too weak.')
+  assert.equal(forms.userFieldErrors(new api.ApiError(409, 'Already exists.', 'EMAIL_CONFLICT')).email, 'Already exists.')
+})
+
+test('health parsing accepts readiness states and rejects unknown or invalid service data', () => {
+  assert.equal(admin.readAdminHealth({ api: 'ok', postgres: 'ok', mongo: 'down' }).mongo, 'down')
+  for (const value of [{ api: 'ok', postgres: 'ok' }, { api: 'down', postgres: 'ok', mongo: 'ok' }, { api: 'ok', postgres: 'maybe', mongo: 'ok' }]) {
+    assert.throws(() => admin.readAdminHealth(value), /unexpected response/)
+  }
+})
+
+test('audit filters use inclusive local calendar days, validate ranges, and preserve actor/target IDs', () => {
+  const actorId = '00000000-0000-4000-8000-000000000001'
+  const { params, errors } = auditFilters.auditFilterQuery({ action: ' user_updated ', from: '2026-10-17', to: '2026-10-17', actorId, targetId: ' deleted-user ' })
+  assert.deepEqual(errors, {})
+  assert.deepEqual(params, { action: 'USER_UPDATED', from: new Date('2026-10-17T00:00:00.000').toISOString(),
+    to: new Date('2026-10-17T23:59:59.999').toISOString(), actorId, targetId: 'deleted-user' })
+  assert.deepEqual(auditFilters.auditFilterQuery(auditFilters.emptyAuditFilters).params, {})
+  assert.ok(auditFilters.auditFilterQuery({ ...auditFilters.emptyAuditFilters, from: '2026-10-18', to: '2026-10-17' }).errors.to)
+  assert.ok(auditFilters.auditFilterQuery({ ...auditFilters.emptyAuditFilters, from: '2026-02-31' }).errors.from)
+  assert.ok(auditFilters.auditFilterQuery({ ...auditFilters.emptyAuditFilters, action: 'bad action', actorId: 'not-a-uuid' }).errors.actorId)
 })

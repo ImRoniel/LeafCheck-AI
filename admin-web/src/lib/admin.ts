@@ -20,6 +20,7 @@ export interface UserRow {
   emailMasked: string
   role: AuthUser['role']
   isActive: boolean
+  updatedAt: string
 }
 
 export interface DeviceRow {
@@ -45,11 +46,27 @@ export interface AuditRow {
 
 export interface AdminStats {
   totalUsers: number
+  totalDevices: number
+  totalPhysicalDevices: number
+  activeDevices: number | null
   totalActiveDevices: number | null
   totalPlants: number
   totalAiScans: number
   asOf: string
   telemetryDegraded: boolean
+}
+
+export interface AdminHealth {
+  api: 'ok'
+  postgres: 'ok' | 'down'
+  mongo: 'ok' | 'down'
+  checkedAt: string
+}
+
+export function readAdminHealth(value: unknown): AdminHealth {
+  if (!isRecord(value) || value.api !== 'ok' ||
+    (value.postgres !== 'ok' && value.postgres !== 'down') || (value.mongo !== 'ok' && value.mongo !== 'down')) return invalidResponse()
+  return { api: value.api, postgres: value.postgres, mongo: value.mongo, checkedAt: new Date().toISOString() }
 }
 
 function invalidResponse(): never {
@@ -85,10 +102,12 @@ export function readAdminList<T>(value: unknown, readRow: (row: unknown) => T): 
 export function readUserRow(value: unknown): UserRow {
   if (!isRecord(value) || typeof value.isActive !== 'boolean' ||
     (value.role !== 'USER' && value.role !== 'ADMIN' && value.role !== 'LEAD_DEV')) return invalidResponse()
+  const updatedAt = stringField(value, 'updatedAt')
+  if (!Number.isFinite(Date.parse(updatedAt))) return invalidResponse()
   return {
     id: stringField(value, 'id'), name: nullableString(value, 'name'),
     email: value.email === undefined ? null : stringField(value, 'email'), emailMasked: stringField(value, 'emailMasked'),
-    role: value.role, isActive: value.isActive,
+    role: value.role, isActive: value.isActive, updatedAt,
   }
 }
 
@@ -131,9 +150,14 @@ export function readAdminStats(value: unknown): AdminStats {
   }
   const asOf = stringField(value.meta, 'asOf')
   if (!Number.isFinite(Date.parse(asOf)) || typeof value.meta.telemetryDegraded !== 'boolean') return invalidResponse()
+  const totalDevices = count('totalDevices')
+  const totalPhysicalDevices = count('totalPhysicalDevices')
+  const activeDevices = value.data.activeDevices === null ? null : count('activeDevices')
+  if (totalPhysicalDevices > totalDevices || (activeDevices !== null && activeDevices > totalPhysicalDevices) ||
+      (value.data.totalActiveDevices !== undefined && value.data.totalActiveDevices !== activeDevices)) return invalidResponse()
   return {
     totalUsers: count('totalUsers'), totalPlants: count('totalPlants'), totalAiScans: count('totalAiScans'),
-    totalActiveDevices: value.data.totalActiveDevices === null ? null : count('totalActiveDevices'),
+    totalDevices, totalPhysicalDevices, activeDevices, totalActiveDevices: activeDevices,
     asOf, telemetryDegraded: value.meta.telemetryDegraded,
   }
 }
