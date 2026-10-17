@@ -85,6 +85,20 @@ test("one proxy hop accepts the nearest forwarded address, not earlier client en
   assert.equal(request.ip, "127.0.0.1");
 });
 
+test("unlisted origins return a structured 403 before login, preflight, or body parsing", async () => {
+  for (const method of ["GET", "OPTIONS", "POST"]) {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method,
+      headers: { Origin: "https://unlisted.example.test", "Content-Type": "application/json",
+        ...(method === "OPTIONS" ? { "Access-Control-Request-Method": "POST" } : {}) },
+      ...(method === "POST" ? { body: "{" } : {}),
+    });
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("access-control-allow-origin"), null);
+    assert.deepEqual(await response.json(), { error: "Origin rejected.", code: "ORIGIN_REJECTED" });
+  }
+});
+
 test("headers, preflight, independent quotas, and rejection before body parsing", async () => {
   const health = await fetch(`${baseUrl}/health`);
   assert.equal(health.status, 200);

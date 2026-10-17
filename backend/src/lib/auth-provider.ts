@@ -1,5 +1,6 @@
 import "./env.js";
 import { HttpError } from "./http.js";
+import { supabaseProviderConfig } from "./provider-config.js";
 
 export function authProvider(): "legacy" | "supabase" {
   const value = process.env.AUTH_PROVIDER ?? "legacy";
@@ -15,16 +16,5 @@ export function requireSupabase() {
 
 export function supabaseConfig() {
   requireSupabase();
-  const { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY } = process.env;
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !SUPABASE_SECRET_KEY)
-    throw new Error("Supabase URL, publishable key and secret key are required.");
-  const url = new URL(SUPABASE_URL);
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/")
-    throw new Error("SUPABASE_URL must be an HTTPS project origin.");
-  return {
-    url: url.origin,
-    issuer: `${url.origin}/auth/v1`,
-    publishableKey: SUPABASE_PUBLISHABLE_KEY,
-    secretKey: SUPABASE_SECRET_KEY,
-  };
+  return supabaseProviderConfig();
 }

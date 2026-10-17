@@ -95,7 +95,7 @@ async function request(path: string, options: RequestInit): Promise<Response> {
   headers.set('X-CSRF-Protection', '1')
   if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`)
 
-  const deadline = AbortSignal.timeout(10000)
+  const deadline = AbortSignal.timeout(60000)
   const signal = options.signal ? AbortSignal.any([options.signal, deadline]) : deadline
   try {
     const response = await fetch(`${baseUrl}${path}`, { ...options, credentials: 'include', headers, signal })
@@ -103,7 +103,7 @@ async function request(path: string, options: RequestInit): Promise<Response> {
     return response
   } catch (error) {
     if (deadline.aborted && !options.signal?.aborted) {
-      throw new ApiError(0, 'The request timed out after 10 seconds. Refresh to check its result before trying again.', 'REQUEST_TIMEOUT')
+      throw new ApiError(0, 'The server is waking up. Please wait a moment and try again.', 'REQUEST_TIMEOUT')
     }
     throw error
   }

@@ -57,12 +57,12 @@ test('invalid login preserves the API error and never refreshes or triggers logo
   assert.equal(expired, 0)
 })
 
-test('every request gets a ten-second deadline and a timeout produces a recoverable error', async () => {
+test('every request gets a sixty-second deadline and a timeout produces the server waking message', async () => {
   const deadline = new AbortController()
   let expired = 0
   unsubscribe = api.onSessionExpired(async () => { expired++ })
   mock.method(AbortSignal, 'timeout', milliseconds => {
-    assert.equal(milliseconds, 10000)
+    assert.equal(milliseconds, 60000)
     return deadline.signal
   })
   const fetch = mock.method(globalThis, 'fetch', (_url, init) => new Promise((_resolve, reject) => {
@@ -71,9 +71,27 @@ test('every request gets a ten-second deadline and a timeout produces a recovera
   }))
   const request = api.apiFetch('/admin/users')
   deadline.abort(new DOMException('Timed out', 'TimeoutError'))
-  await assert.rejects(request, error => error.code === 'REQUEST_TIMEOUT' && /10 seconds/.test(error.message))
+  await assert.rejects(request, error => error.code === 'REQUEST_TIMEOUT' &&
+    error.message === 'The server is waking up. Please wait a moment and try again.')
   assert.equal(fetch.mock.callCount(), 1)
   assert.equal(expired, 0)
+})
+
+test('a fifty-second cold-start login finishes before its deadline without replaying credentials', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  mock.method(AbortSignal, 'timeout', milliseconds => {
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), milliseconds)
+    return controller.signal
+  })
+  const fetch = mock.method(globalThis, 'fetch', (_url, init) => new Promise((resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
+    setTimeout(() => resolve(json({ status: 'otp_required' }, 202)), 50000)
+  }))
+  const request = api.apiFetch('/auth/login', { method: 'POST', body: '{}' })
+  t.mock.timers.tick(50000)
+  assert.equal((await request).status, 202)
+  assert.equal(fetch.mock.callCount(), 1)
 })
 
 test('caller cancellation aborts a write without refreshing, expiring or replaying it', async () => {

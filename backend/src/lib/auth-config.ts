@@ -24,11 +24,11 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env) {
     .filter(Boolean);
   for (const origin of origins) {
     const url = new URL(origin);
-    const localDevelopment =
-      env.NODE_ENV === "development" && origin === "http://localhost:5174";
-    if (url.origin !== origin || (url.protocol !== "https:" && !localDevelopment)) {
+    const localAdminAllowed = origin === "http://localhost:5174" &&
+      (env.NODE_ENV === "development" || env.AUTH_ALLOW_LOCAL_ADMIN_ORIGIN === "true");
+    if (url.origin !== origin || (url.protocol !== "https:" && !localAdminAllowed)) {
       throw new Error(
-        "AUTH_ALLOWED_ORIGINS must contain exact HTTPS origins without trailing slashes; http://localhost:5174 is allowed only in development",
+        "AUTH_ALLOWED_ORIGINS must contain exact HTTPS origins without trailing slashes; http://localhost:5174 requires development mode or AUTH_ALLOW_LOCAL_ADMIN_ORIGIN=true",
       );
     }
   }

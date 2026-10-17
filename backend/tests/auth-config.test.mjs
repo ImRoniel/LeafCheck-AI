@@ -30,6 +30,24 @@ test("production, test, and unspecified modes reject HTTP localhost origins", ()
   }
 });
 
+test("the explicit localhost opt-in permits only the configured admin origin in production", () => {
+  const env = { ...config, NODE_ENV: "production", AUTH_ALLOW_LOCAL_ADMIN_ORIGIN: "true" };
+  assert.deepEqual(loadAuthConfig({ ...env,
+    AUTH_ALLOWED_ORIGINS: "http://localhost:5174, https://admin.example.test" }).origins,
+  ["http://localhost:5174", "https://admin.example.test"]);
+  assert.deepEqual(loadAuthConfig(env).origins, ["https://admin.example.test"]);
+  assert.deepEqual(loadAuthConfig({ ...env, AUTH_ALLOWED_ORIGINS: "" }).origins, []);
+  for (const flag of [undefined, "false", "TRUE", "1"]) {
+    assert.throws(() => loadAuthConfig({ ...env, AUTH_ALLOW_LOCAL_ADMIN_ORIGIN: flag,
+      AUTH_ALLOWED_ORIGINS: "http://localhost:5174" }), /exact HTTPS origins/);
+  }
+  for (const origin of ["http://localhost:5173", "http://127.0.0.1:5174",
+    "http://localhost.evil.test:5174", "http://localhost:5174/", "http://localhost:5174/path",
+    "https://user:password@admin.example.test", "https://admin.example.test/path"]) {
+    assert.throws(() => loadAuthConfig({ ...env, AUTH_ALLOWED_ORIGINS: origin }), /exact HTTPS origins/);
+  }
+});
+
 test("development still rejects other HTTP origins and origins containing paths", () => {
   for (const origin of ["http://localhost:5173", "http://127.0.0.1:5174",
     "http://localhost.evil.test:5174", "http://localhost:5174/", "https://admin.example.test/path"]) {

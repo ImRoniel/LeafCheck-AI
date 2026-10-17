@@ -35,6 +35,15 @@ before(async () => {
   await vite.listen()
   origin = `http://127.0.0.1:${vite.httpServer.address().port}`
   browser = await chromium.launch({ headless: true })
+  // Warm Vite's module graph before assertions run with their shorter UI deadline.
+  // The throwaway context has no shared cookies/storage and cannot call a backend.
+  const warmup = await browser.newContext()
+  try {
+    await warmup.route('**/api/**', route => route.fulfill(reply({ error: 'No session' }, 401)))
+    const page = await warmup.newPage()
+    await page.goto(origin + '/login')
+    await page.getByLabel('Email', { exact: true }).waitFor({ timeout: 30000 })
+  } finally { await warmup.close() }
 })
 
 after(async () => { await browser?.close(); await vite?.close() })
@@ -236,8 +245,8 @@ async function memoryToken(page) {
   return page.evaluate(async () => (await import('/src/lib/api.ts')).getAccessToken())
 }
 
-async function stallWrite(page, method, simulateDeadline = false) {
-  await page.evaluate(({ method, simulateDeadline }) => {
+async function stallWrite(page, method, simulateDeadline = false, path = '/api/admin/users') {
+  await page.evaluate(({ method, simulateDeadline, path }) => {
     const network = window.fetch.bind(window)
     if (simulateDeadline) AbortSignal.timeout = milliseconds => {
       const controller = new AbortController()
@@ -245,7 +254,7 @@ async function stallWrite(page, method, simulateDeadline = false) {
       return controller.signal
     }
     window.fetch = (input, init) => {
-      if (String(input).includes('/api/admin/users') && init?.method === method) {
+      if (String(input).includes(path) && init?.method === method) {
         window.testWritePending = true
         return new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => {
           window.testWriteAborted = true
@@ -254,7 +263,7 @@ async function stallWrite(page, method, simulateDeadline = false) {
       }
       return network(input, init)
     }
-  }, { method, simulateDeadline })
+  }, { method, simulateDeadline, path })
 }
 
 async function screenshot(page, name) {
@@ -1016,7 +1025,23 @@ test('Cancel aborts a pending deletion without claiming the account was deleted'
   assert.equal(await page.getByText('Member deleted successfully.', { exact: true }).count(), 0)
 })
 
-test('a stalled save times out after ten seconds and requires review before retry', async t => {
+test('login waits through a fifty-second cold start and shows the waking message at sixty seconds', async t => {
+  const { page } = await app(t)
+  await page.goto(origin + '/login')
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.test')
+  await page.getByLabel('Password', { exact: true }).fill('correct-password')
+  await stallWrite(page, 'POST', true, '/api/auth/login')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.waitForFunction(() => window.testWritePending)
+  await page.clock.fastForward(50000)
+  assert.equal(await page.getByRole('button', { name: 'Signing in...', exact: true }).count(), 1)
+  await page.clock.fastForward(10001)
+  await page.getByRole('alert').filter({ hasText: 'The server is waking up. Please wait a moment and try again.' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Sign in', exact: true }).isEnabled(), true)
+  assert.equal(await memoryToken(page), null)
+})
+
+test('a stalled save times out after sixty seconds and requires review before retry', async t => {
   const { page } = await app(t, { restored: true })
   await page.goto(origin + '/users')
   await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
@@ -1024,7 +1049,7 @@ test('a stalled save times out after ten seconds and requires review before retr
   await page.getByLabel('Name', { exact: true }).fill('Pending change')
   await page.getByRole('button', { name: 'Save changes', exact: true }).click()
   await page.waitForFunction(() => window.testWritePending)
-  await page.clock.fastForward(9000)
+  await page.clock.fastForward(59000)
   assert.equal(await page.getByRole('button', { name: 'Saving...', exact: true }).count(), 1)
   await page.clock.fastForward(1001)
   await page.getByRole('alert').filter({ hasText: 'Its result is unknown.' }).waitFor()

@@ -18,9 +18,14 @@ to `http://127.0.0.1:4000`, preserving the API path, cookies, and auth headers.
 Set `API_PROXY_TARGET` in `admin-web/.env` if your backend uses another port.
 The backend's default port is 3000; set `PORT=4000` there to match the proxy default.
 
-For local browser auth, set `NODE_ENV=development` on the backend and include
-`http://localhost:5174` in its `AUTH_ALLOWED_ORIGINS` list. Production origins must
-use HTTPS. Restart Vite after changing environment variables. All `VITE_*`
+For local browser auth, include `http://localhost:5174` in the backend's
+`AUTH_ALLOWED_ORIGINS` list. A development backend permits that exact HTTP origin.
+To proxy to a production backend, also set `AUTH_ALLOW_LOCAL_ADMIN_ORIGIN=true`
+on that backend and redeploy. Keep `NODE_ENV=production` and preserve existing
+HTTPS origins in the allowlist. The flag permits only `http://localhost:5174`;
+it does not add the origin automatically or relax CSRF checks. Other production
+origins must use HTTPS. Rejected origins return `403 ORIGIN_REJECTED`.
+Restart Vite after changing environment variables. All `VITE_*`
 variables are public browser values; `API_PROXY_TARGET` is used only by Vite.
 
 ```bash
@@ -214,7 +219,9 @@ A permission-denied 403 or a failed retry caused by a network error does not cle
 the session. `ADMIN_VERIFICATION_REQUIRED` instead invokes logout, requiring a
 fresh password/OTP flow without looping through refresh.
 
-Every fetch has a 10-second `AbortSignal.timeout` combined with caller cancellation.
+Every fetch has a 60-second `AbortSignal.timeout` combined with caller cancellation
+to accommodate backend cold starts. A timeout reports “The server is waking up.
+Please wait a moment and try again.”
 Writes are never automatically replayed for timeouts or network failures. An
 unrecoverable session displays “Your session has expired. Please log in again.”
 during sign-out and retains the alert on the login screen.

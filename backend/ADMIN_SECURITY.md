@@ -162,6 +162,17 @@ transaction spanning Supabase Auth and application PostgreSQL.
 
 ## Database and verification
 
+When `AUTH_PROVIDER=supabase`, startup validates `SUPABASE_URL`,
+`SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` before listening. Missing or
+blank values and malformed Supabase origins stop startup with a safe diagnostic.
+The same validator is used for runtime provider requests.
+
+Production can accept local admin requests only when both
+`AUTH_ALLOW_LOCAL_ADMIN_ORIGIN=true` and the exact origin `http://localhost:5174`
+are configured in `AUTH_ALLOWED_ORIGINS`. Existing HTTPS allowlist entries remain
+valid. The opt-in permits no other HTTP origins and leaves browser CSRF checks
+in place. Global CORS rejection returns `403 ORIGIN_REJECTED`.
+
 Security tables live in the private `admin_security` schema, outside Supabase's
 public Data API. Do not expose this schema or grant client roles access. Existing
 domain tables remain in `public`. The provider-owned `auth` schema remains read-only

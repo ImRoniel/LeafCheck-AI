@@ -82,7 +82,9 @@ before(async () => {
     }
     if (path === "/logout") {
       const identity = tokens.get(bearer);
-      for (const [id, session] of sessions) if (session.userId === identity.id) sessions.delete(id);
+      const claims = (await jwtVerify(bearer, signingKey, { issuer, audience: "authenticated" })).payload;
+      for (const [id, session] of sessions) if (session.userId === identity.id &&
+        (parsed.searchParams.get("scope") !== "local" || id === claims.session_id)) sessions.delete(id);
       return new Response(null, { status: 204 });
     }
     if (path.startsWith("/admin/users/") && init.method === "DELETE") {

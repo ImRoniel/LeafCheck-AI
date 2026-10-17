@@ -8,7 +8,7 @@ import { adminSessionFixture } from "./helpers/admin-session-fixture.mjs";
 
 const origin = "http://localhost:5174";
 Object.assign(process.env, {
-  NODE_ENV: "development", AUTH_PROVIDER: "supabase", PORT: "0",
+  NODE_ENV: "production", AUTH_ALLOW_LOCAL_ADMIN_ORIGIN: "true", AUTH_PROVIDER: "supabase", PORT: "0",
   AUTH_JWT_SECRET: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM",
   AUTH_JWT_ISSUER: "proxy-test", AUTH_JWT_AUDIENCE: "proxy-test",
   AUTH_ALLOWED_ORIGINS: ` ${origin} `, VITE_API_URL: "/api",
@@ -152,7 +152,7 @@ test("apiFetch reaches /api/admin/users through the actual Vite proxy with heade
   }
 });
 
-test("backend CORS accepts the explicit localhost preflight and the proxy rejects unlisted origins", async () => {
+test("production CORS accepts explicitly opted-in localhost and the proxy rejects unlisted origins with 403", async () => {
   // Vite answers its own OPTIONS requests; exercise Express's preflight directly.
   const preflight = await network(`${backendUrl}/api/admin/users`, { method: "OPTIONS", headers: {
     Origin: origin, "Access-Control-Request-Method": "GET",
@@ -162,6 +162,7 @@ test("backend CORS accepts the explicit localhost preflight and the proxy reject
   assert.equal(preflight.headers.get("access-control-allow-origin"), origin);
   assert.equal(preflight.headers.get("access-control-allow-credentials"), "true");
   const denied = await network(`${proxyUrl}/api/admin/users`, { headers: { Origin: "https://evil.test" } });
-  assert.notEqual(denied.status, 200);
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).code, "ORIGIN_REJECTED");
   assert.equal(denied.headers.get("access-control-allow-origin"), null);
 });

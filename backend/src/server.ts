@@ -3,7 +3,7 @@ import express from "express";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { authConfig } from "./lib/auth-config.js";
-import { errorHandler } from "./lib/http.js";
+import { errorHandler, HttpError } from "./lib/http.js";
 import "./lib/provider-startup.js";
 import { ensureTTLIndex } from "./lib/ttl.js";
 import { aiRouter } from "./routes/ai.js";
@@ -29,7 +29,7 @@ app.use(
       // For development: allow requests with no origin (mobile apps) and whitelist others
       if (!origin) return callback(null, true); // Allow mobile apps
       if (authConfig.origins.includes(origin)) return callback(null, true);
-      return callback(new Error("CORS blocked"), false);
+      return callback(new HttpError(403, "ORIGIN_REJECTED", "Origin rejected."), false);
     },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
