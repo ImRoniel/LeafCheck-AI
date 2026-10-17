@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 process.env.VITE_API_URL = '/api'
-let vite, api, auth, unsubscribe
+let vite, api, auth, admin, permissions, unsubscribe
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json' },
 })
@@ -16,6 +16,8 @@ before(async () => {
   })
   api = await vite.ssrLoadModule('/src/lib/api.ts')
   auth = await vite.ssrLoadModule('/src/lib/auth.ts')
+  admin = await vite.ssrLoadModule('/src/lib/admin.ts')
+  permissions = await vite.ssrLoadModule('/src/lib/permissions.ts')
 })
 afterEach(() => {
   unsubscribe?.()
@@ -172,4 +174,77 @@ test('user parsing admits staff roles and identifies USER without trusting unkno
   assert.throws(() => auth.readUser({ email: 'staff@example.test', role: 'OWNER' }), /Invalid user response/)
   assert.throws(() => auth.readUser({ email: 42, role: 'ADMIN' }), /Invalid user response/)
   assert.throws(() => auth.readAccessToken({ accessToken: '' }), /Invalid authentication response/)
+})
+
+test('missing admin verification expires the session without refreshing, while ordinary RBAC 403 does not', async () => {
+  let expired = 0
+  api.setAccessToken('unverified')
+  unsubscribe = api.onSessionExpired(async () => { expired++; api.setAccessToken(null) })
+  const fetch = mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url, '/api/admin/users')
+    return json({ code: 'ADMIN_VERIFICATION_REQUIRED', error: 'Verify your administrator session.' }, 403)
+  })
+  await assert.rejects(api.apiFetch('/admin/users'), error => error.code === 'ADMIN_VERIFICATION_REQUIRED')
+  assert.equal(expired, 1)
+  assert.equal(fetch.mock.callCount(), 1)
+  assert.equal(api.getAccessToken(), null)
+})
+
+test('OTP authentication endpoints preserve 202 responses and 429 cooldowns without refreshing', async () => {
+  const paths = []
+  mock.method(globalThis, 'fetch', async (url, init) => {
+    paths.push(url)
+    assert.equal(init.headers.get('Authorization'), null)
+    assert.equal(init.headers.get('X-CSRF-Protection'), '1')
+    assert.equal(init.credentials, 'include')
+    if (url.endsWith('/login')) return json({ status: 'otp_required', challengeToken: 'pending' }, 202)
+    return new Response(JSON.stringify({ code: 'RATE_LIMITED', error: 'Please wait.' }), {
+      status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '90' },
+    })
+  })
+  assert.equal((await api.apiFetch('/auth/login', { method: 'POST' })).status, 202)
+  await assert.rejects(api.apiFetch('/auth/admin-otp/resend', { method: 'POST' }), error =>
+    error.status === 429 && error.retryAfter === 90 && error.message === 'Please wait.')
+  assert.deepEqual(paths, ['/api/auth/login', '/api/auth/admin-otp/resend'])
+})
+
+test('challenge parsing requires a valid token and expiry and enforces at least a 60-second resend cooldown', () => {
+  const payload = { status: 'otp_required', challengeToken: 'secret', maskedEmail: 'a***@example.test',
+    expiresAt: new Date(Date.now() + 300_000).toISOString(), resendAfter: 0 }
+  const start = Date.now()
+  const challenge = auth.readAdminChallenge(payload)
+  assert.equal(challenge.challengeToken, 'secret')
+  assert.ok(challenge.resendAvailableAt >= start + 60_000)
+  assert.equal(challenge.expiresAt, Date.parse(payload.expiresAt))
+  for (const change of [{ challengeToken: '' }, { maskedEmail: null }, { expiresAt: 'invalid' },
+    { expiresAt: new Date(0).toISOString() }, { resendAfter: '60' }]) {
+    assert.throws(() => auth.readAdminChallenge({ ...payload, ...change }), /Invalid sign-in challenge/)
+  }
+})
+
+test('frontend permissions limit LEAD_DEV to devices and allow ADMIN user management and audit', () => {
+  for (const permission of ['users.read', 'users.manage', 'devices.read', 'devices.manage', 'audit.read']) {
+    assert.equal(permissions.hasPermission('ADMIN', permission), true)
+    assert.equal(permissions.hasPermission('LEAD_DEV', permission), permission === 'devices.read')
+  }
+})
+
+test('table parsers accept masked user emails and operational devices without retaining owner data', () => {
+  const user = admin.readUserRow({ id: 'u1', name: null, emailMasked: 'a***@example.test', role: 'USER', isActive: true })
+  assert.equal(user.email, 'a***@example.test')
+  assert.throws(() => admin.readUserRow({ ...user, isActive: 'false' }), /unexpected response/)
+  const device = { id: 'd1', name: 'Sensor', macAddress: '00:11:22:33:44:55', plants: [], connectionStatus: 'ONLINE' }
+  assert.deepEqual(admin.readDeviceRow(device), device)
+  assert.equal('owner' in admin.readDeviceRow({ ...device, owner: { email: 'private@example.test' } }), false)
+  assert.throws(() => admin.readAdminList({ data: [], pagination: { page: 1, pageSize: 0, total: 0, totalPages: 0 } }, admin.readUserRow), /unexpected response/)
+})
+
+test('audit outcomes distinguish failed, requested, cancelled, successful and unclassified events', () => {
+  const row = { id: 'a1', actorId: null, targetId: null, createdAt: new Date().toISOString(), metadata: null }
+  for (const [action, outcome] of [['ADMIN_OTP_FAILED', 'Failed'], ['USER_DELETE_REQUESTED', 'Requested'],
+    ['ADMIN_OTP_CANCELLED', 'Cancelled'], ['USER_UPDATED', 'Succeeded'], ['CUSTOM_ACTION', 'Recorded']]) {
+    assert.equal(admin.auditOutcome({ ...row, action }), outcome)
+  }
+  assert.equal(admin.auditOutcome({ ...row, action: 'CUSTOM_ACTION', metadata: { outcome: 'Pending' } }), 'Pending')
+  assert.throws(() => admin.readAuditRow({ ...row, action: 'CUSTOM_ACTION', createdAt: 'invalid' }), /unexpected response/)
 })

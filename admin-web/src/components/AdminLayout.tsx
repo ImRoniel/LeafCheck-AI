@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { roleLabels, useSession } from '../context/session'
+import { hasPermission, type Permission } from '../lib/permissions'
 
-const navigation = [
+const navigation: { to: string; label: string; permission?: Permission }[] = [
   { to: '/dashboard', label: 'Overview' },
-  { to: '/users', label: 'Users' },
-  { to: '/devices', label: 'Devices' },
-  { to: '/audit', label: 'Audit logs' },
+  { to: '/users', label: 'Users', permission: 'users.read' },
+  { to: '/devices', label: 'Devices', permission: 'devices.read' },
+  { to: '/audit', label: 'Audit logs', permission: 'audit.read' },
 ]
 
 export function AdminLayout() {
@@ -32,7 +33,7 @@ export function AdminLayout() {
         </NavLink>
 
         <nav aria-label="Main navigation" className="mt-7 grid grid-cols-2 gap-2 md:grid-cols-1">
-          {navigation.map(({ to, label }) => (
+          {navigation.filter(item => !item.permission || (user && hasPermission(user.role, item.permission))).map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}

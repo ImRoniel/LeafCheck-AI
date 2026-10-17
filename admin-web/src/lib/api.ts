@@ -28,22 +28,28 @@ export function onSessionExpired(handler: () => Promise<void>): () => void {
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
+  readonly retryAfter: number | undefined
 
-  constructor(status: number, message: string, code?: string) {
+  constructor(status: number, message: string, code?: string, retryAfter?: number) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.retryAfter = retryAfter
   }
 
   static async fromResponse(response: Response): Promise<ApiError> {
     let payload: unknown
     try { payload = await response.json() } catch { /* Non-JSON errors use the HTTP fallback. */ }
+    const retryHeader = response.headers.get('Retry-After')
+    const retryAfter = retryHeader === null ? NaN : /^[0-9]+$/.test(retryHeader)
+      ? Number(retryHeader) : Math.ceil((Date.parse(retryHeader) - Date.now()) / 1000)
     return new ApiError(
       response.status,
       isRecord(payload) && typeof payload.error === 'string'
         ? payload.error : response.statusText || `API request failed (${response.status}).`,
       isRecord(payload) && typeof payload.code === 'string' ? payload.code : undefined,
+      Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter : undefined,
     )
   }
 }
@@ -142,7 +148,7 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   }
   if (!response.ok) {
     const error = await ApiError.fromResponse(response)
-    if (response.status === 401 && retryOnUnauthorized) {
+    if (retryOnUnauthorized && (response.status === 401 || error.code === 'ADMIN_VERIFICATION_REQUIRED')) {
       await expireSession(version)
     }
     throw error

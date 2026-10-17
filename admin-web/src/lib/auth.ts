@@ -11,6 +11,36 @@ export interface AuthUser {
 
 export type AdminUser = AuthUser & { role: AdminRole }
 
+export interface AdminChallenge {
+  challengeToken: string
+  maskedEmail: string
+  expiresAt: number
+  resendAvailableAt: number
+}
+
+export type LoginResult = { status: 'authenticated' } | { status: 'otp_required' }
+
+export function readChallengeTiming(value: unknown): Pick<AdminChallenge, 'expiresAt' | 'resendAvailableAt'> {
+  if (!isRecord(value) || value.status !== 'otp_required' || typeof value.expiresAt !== 'string') {
+    throw new Error('Invalid sign-in challenge response. Please sign in again.')
+  }
+  const expiresAt = Date.parse(value.expiresAt)
+  const resendAfter = value.resendAfter ?? 60
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now() ||
+    typeof resendAfter !== 'number' || !Number.isFinite(resendAfter) || resendAfter < 0) {
+    throw new Error('Invalid sign-in challenge response. Please sign in again.')
+  }
+  return { expiresAt, resendAvailableAt: Date.now() + Math.max(60, resendAfter) * 1000 }
+}
+
+export function readAdminChallenge(value: unknown): AdminChallenge {
+  if (!isRecord(value) || typeof value.challengeToken !== 'string' || !value.challengeToken.trim() ||
+    typeof value.maskedEmail !== 'string' || !value.maskedEmail.trim()) {
+    throw new Error('Invalid sign-in challenge response. Please sign in again.')
+  }
+  return { challengeToken: value.challengeToken, maskedEmail: value.maskedEmail, ...readChallengeTiming(value) }
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

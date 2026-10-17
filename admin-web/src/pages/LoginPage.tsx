@@ -1,31 +1,42 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useSession } from '../context/session'
+import { ApiError } from '../lib/api'
+import { useCountdown } from '../hooks/useCountdown'
 
 export function LoginPage() {
-  const { login, user, status, sessionError } = useSession()
+  const { login, user, status, sessionError, challenge } = useSession()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [retryAt, setRetryAt] = useState(0)
+  const retryIn = useCountdown(retryAt)
   const signingIn = status === 'authenticating'
   const busy = signingIn || status === 'signingOut'
   const error = formError ?? sessionError
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
-    if (busy) return
+    if (busy || retryIn > 0) return
     setFormError(null)
     try {
-      await login(email, password)
-      navigate('/dashboard', { replace: true })
+      const result = await login(email, password)
+      setPassword('')
+      navigate(result.status === 'otp_required' ? '/login/otp' : '/dashboard', { replace: true })
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (cause instanceof ApiError && cause.status === 429) {
+        setRetryAt(Date.now() + Math.max(60, cause.retryAfter ?? 60) * 1000)
+        setFormError(null)
+        return
+      }
       setFormError(cause instanceof Error ? cause.message : 'Unable to sign in. Please try again.')
     }
   }
 
   if (user) return <Navigate to="/dashboard" replace />
+  if (challenge && status === 'otp_required') return <Navigate to="/login/otp" replace />
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-12">
@@ -66,12 +77,13 @@ export function LoginPage() {
             />
           </div>
           {error && <p id="login-error" role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">{error}</p>}
-          <button type="submit" disabled={busy} className="w-full rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-900 disabled:cursor-wait disabled:opacity-60">
+          {retryIn > 0 && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">Please wait before requesting another code. Try again in {retryIn}s.</p>}
+          <button type="submit" disabled={busy || retryIn > 0} className="w-full rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60">
             {signingIn ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
 
-        <p className="mt-6 border-t border-slate-100 pt-5 text-xs leading-5 text-slate-500">Access is limited to SuperAdmin and Lead_Dev accounts.</p>
+        <p className="mt-6 border-t border-slate-100 pt-5 text-xs leading-5 text-slate-500">Access is limited to SuperAdmin and System Administrator accounts. SuperAdmins verify an email code before signing in.</p>
       </section>
     </main>
   )
