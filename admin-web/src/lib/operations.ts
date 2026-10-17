@@ -38,10 +38,13 @@ export interface PlatformSettings {
 }
 
 export interface ProviderStatus {
-  provider: 'gemini' | 'plantnet' | 'perenual'
+  provider: 'gemini' | 'plantnet' | 'perenual' | 'cloudinary'
   name: string
   configured: boolean
-  status: 'UNVERIFIED' | 'NOT_CONFIGURED'
+  status: 'CONFIGURED' | 'NOT_CONFIGURED'
+  model: string | null
+  cloudName: string | null
+  checkedAt: string
   message: string
   quota: { source: 'unavailable'; remaining: null; limit: null; resetAt: null }
   lastObservedAt: string | null
@@ -94,14 +97,25 @@ export function readPlatformSettings(value: unknown): PlatformSettings {
 }
 
 export function readIntegrations(value: unknown): { providers: ProviderStatus[]; asOf: string } {
-  if (!isRecord(value) || !Array.isArray(value.data) || !isRecord(value.meta)) return invalid()
+  if (!isRecord(value) || !Array.isArray(value.data) || value.data.length !== 4 || !isRecord(value.meta) || value.meta.schemaVersion !== 1) return invalid()
+  const asOf = date(value.meta.asOf)
+  const seen = new Set<ProviderStatus['provider']>()
   const providers = value.data.map((row: unknown): ProviderStatus => {
-    if (!isRecord(row) || (row.provider !== 'gemini' && row.provider !== 'plantnet' && row.provider !== 'perenual') ||
-      typeof row.configured !== 'boolean' || (row.status !== 'UNVERIFIED' && row.status !== 'NOT_CONFIGURED') ||
+    if (!isRecord(row) || (row.provider !== 'gemini' && row.provider !== 'plantnet' && row.provider !== 'perenual' && row.provider !== 'cloudinary') ||
+      typeof row.configured !== 'boolean' || row.status !== (row.configured ? 'CONFIGURED' : 'NOT_CONFIGURED') ||
+      seen.has(row.provider) || row.checkedAt !== asOf || row.model === undefined || row.cloudName === undefined ||
       !isRecord(row.quota) || row.quota.source !== 'unavailable' || row.quota.remaining !== null || row.quota.limit !== null || row.quota.resetAt !== null) return invalid()
-    return { provider: row.provider, name: text(row.name), configured: row.configured, status: row.status, message: text(row.message),
+    seen.add(row.provider)
+    const model = optionalText(row.model)
+    const cloudName = optionalText(row.cloudName)
+    if ((row.provider === 'gemini' ? model === null : model !== null) ||
+      (row.provider === 'cloudinary' ? row.configured !== (cloudName !== null) : cloudName !== null)) return invalid()
+    const observedRequests = numeric(row.observedRequests)
+    if (observedRequests !== null && (!Number.isSafeInteger(observedRequests) || observedRequests < 0)) return invalid()
+    return { provider: row.provider, name: text(row.name), configured: row.configured, status: row.configured ? 'CONFIGURED' : 'NOT_CONFIGURED', message: text(row.message),
+      model, cloudName, checkedAt: date(row.checkedAt),
       quota: { source: 'unavailable', remaining: null, limit: null, resetAt: null },
-      lastObservedAt: row.lastObservedAt === null ? null : date(row.lastObservedAt), observedRequests: numeric(row.observedRequests) }
+      lastObservedAt: row.lastObservedAt === null ? null : date(row.lastObservedAt), observedRequests }
   })
-  return { providers, asOf: date(value.meta.asOf) }
+  return { providers, asOf }
 }

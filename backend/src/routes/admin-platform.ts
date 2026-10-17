@@ -8,6 +8,7 @@ import { normalizeHardwareMac, platformId } from "../lib/platform-policy.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { authorizeOperation } from "../lib/admin-device-operations.js";
 import { resourceId } from "../lib/ownership.js";
+import { geminiModelName } from "../lib/provider-config.js";
 
 export const adminPlatformRouter = Router();
 const updater = { updatedBy: { select: { id: true, email: true, name: true } } } as const;
@@ -150,13 +151,19 @@ adminPlatformRouter.patch("/settings", requirePermission("settings.manage"), asy
 
 adminPlatformRouter.get("/integrations", requirePermission("integrations.read"), asyncRoute((req, res) => {
   validateGet(req, []);
+  const checkedAt = new Date().toISOString();
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim() || null;
   const data = [
-    { provider: "gemini", name: "Google Gemini", configured: Boolean(process.env.GEMINI_API_KEY?.trim()) },
-    { provider: "plantnet", name: "Pl@ntNet", configured: Boolean(process.env.PLANTNET_API_KEY?.trim()) },
-    { provider: "perenual", name: "Perenual", configured: Boolean(process.env.PERENUAL_API_KEY?.trim()) },
-  ].map(provider => ({ ...provider, status: provider.configured ? "UNVERIFIED" : "NOT_CONFIGURED",
+    { provider: "gemini", name: "Google Gemini", configured: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      model: geminiModelName(), cloudName: null, message: "Plant identification and health analysis." },
+    { provider: "plantnet", name: "Pl@ntNet", configured: Boolean(process.env.PLANTNET_API_KEY?.trim()),
+      model: null, cloudName: null, message: "Plant species identification." },
+    { provider: "perenual", name: "Perenual", configured: Boolean(process.env.PERENUAL_API_KEY?.trim()),
+      model: null, cloudName: null, message: "Plant care reference data." },
+    { provider: "cloudinary", name: "Cloudinary", configured: Boolean(cloudName),
+      model: null, cloudName, message: "Plant photo storage." },
+  ].map(provider => ({ ...provider, status: provider.configured ? "CONFIGURED" : "NOT_CONFIGURED", checkedAt,
     quota: { source: "unavailable", remaining: null, limit: null, resetAt: null }, lastObservedAt: null, observedRequests: null,
-    message: provider.configured ? "Key configured. Provider health and account quota have not been verified." : "Provider key is not configured.",
   }));
-  res.json({ data, meta: meta() });
+  res.json({ data, meta: { schemaVersion: 1, asOf: checkedAt } });
 }));

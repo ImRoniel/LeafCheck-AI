@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { HttpError } from "./http.js";
-import { geminiApiKey } from "./provider-config.js";
+import { geminiApiKey, geminiModelName } from "./provider-config.js";
 
 export function geminiModel(structured = true) {
   // Resolve after dotenv/startup, not while the route module is being imported.
@@ -16,7 +16,7 @@ export function geminiModel(structured = true) {
   }
   return new GoogleGenerativeAI(key).getGenerativeModel(
     {
-      model: process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+      model: geminiModelName(),
       ...(structured
         ? { generationConfig: { responseMimeType: "application/json" } }
         : {}),

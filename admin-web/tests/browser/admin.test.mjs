@@ -16,6 +16,16 @@ const sensor = { id: 'sensor-1', macAddress: 'AA:BB:CC:DD:EE:FF', name: 'Office 
 const reply = (body, status = 200, headers = {}) => ({ status, body: JSON.stringify(body), contentType: 'application/json', headers })
 const list = (data, page = 1, total = data.length, meta = {}, pageSize = 25) => ({ data,
   pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }, meta })
+const integrationPayload = (checkedAt, missing = []) => ({ data: ['gemini', 'plantnet', 'perenual', 'cloudinary'].map(provider => ({
+  provider, name: { gemini: 'Gemini', plantnet: 'Pl@ntNet', perenual: 'Perenual', cloudinary: 'Cloudinary' }[provider],
+  configured: !missing.includes(provider), status: missing.includes(provider) ? 'NOT_CONFIGURED' : 'CONFIGURED',
+  model: provider === 'gemini' ? 'gemini-2.5-flash' : null, cloudName: provider === 'cloudinary' && !missing.includes(provider) ? 'leafcheck-plants' : null,
+  checkedAt, message: missing.includes(provider) ? 'Add the required service settings to configure this integration.' : {
+    gemini: 'Plant health analysis and scan recommendations.', plantnet: 'Plant species identification from uploaded images.',
+    perenual: 'Plant care guidance and species information.', cloudinary: 'Cloud image hosting for plant photos and scan uploads.',
+  }[provider],
+  quota: { source: 'unavailable', remaining: null, limit: null, resetAt: null }, lastObservedAt: null, observedRequests: null,
+})), meta: { schemaVersion: 1, asOf: checkedAt } })
 
 before(async () => {
   process.env.VITE_API_URL = '/api'
@@ -182,7 +192,7 @@ async function app(t, options = {}) {
       }
       if (path === '/admin/integrations') {
         assert.equal(actor.role, 'ADMIN')
-        return await route.fulfill(reply({ data: ['gemini', 'plantnet', 'perenual'].map(provider => ({ provider, name: provider === 'gemini' ? 'Gemini' : provider === 'plantnet' ? 'Pl@ntNet' : 'Perenual', configured: provider !== 'perenual', status: provider !== 'perenual' ? 'UNVERIFIED' : 'NOT_CONFIGURED', message: 'Configuration alone does not verify health.', quota: { source: 'unavailable', remaining: null, limit: null, resetAt: null }, lastObservedAt: null, observedRequests: null })), meta: { asOf: new Date().toISOString() } }))
+        return await route.fulfill(reply(integrationPayload(userVersion)))
       }
       if (path === '/admin/audit') {
         assert.equal(actor.role, 'ADMIN', 'LEAD_DEV must never request audit logs')
@@ -528,14 +538,68 @@ test('platform settings require explicit confirmation and send only changed fiel
   assert.equal(await page.getByRole('switch', { name: 'Enable AI scanning', exact: true }).isChecked(), false)
 })
 
-test('provider monitor shows unverified configuration and unavailable quota without paid requests', async t => {
+test('provider monitor shows four green configuration cards, runtime model and cloud name without paid requests', async t => {
   const { page, requests } = await app(t, { restored: true })
+  await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto(`${origin}/integrations`)
   await page.getByRole('heading', { name: 'Gemini', exact: true }).waitFor()
-  assert.equal(await page.getByText('Unverified', { exact: true }).count(), 2)
-  assert.equal(await page.getByText('Not configured', { exact: true }).count(), 1)
-  assert.equal(await page.getByText('No verified source', { exact: true }).count(), 3)
+  assert.equal(await page.getByText('Configured', { exact: true }).count(), 4)
+  assert.equal(await page.getByText('Not configured', { exact: true }).count(), 0)
+  assert.equal(await page.getByText('Quota limits apply', { exact: true }).count(), 4)
+  for (const name of ['Gemini', 'Pl@ntNet', 'Perenual', 'Cloudinary']) {
+    const card = page.getByRole('article', { name, exact: true })
+    const badge = card.getByText('Configured', { exact: true })
+    assert.match(await badge.getAttribute('class'), /bg-success-bg text-success-fg/)
+    assert.equal(await card.locator('time').getAttribute('datetime'), userVersion)
+  }
+  await page.getByRole('article', { name: 'Gemini', exact: true }).getByText('gemini-2.5-flash', { exact: true }).waitFor()
+  await page.getByRole('article', { name: 'Cloudinary', exact: true }).getByText('leafcheck-plants', { exact: true }).waitFor()
+  assert.equal(await page.getByText('Unverified', { exact: true }).count(), 0)
+  assert.equal(await page.getByText('None recorded', { exact: true }).count(), 0)
+  assert.equal(await page.getByText('Observed application calls', { exact: true }).count(), 0)
   assert.equal(requests.filter(request => /scan|analyze|quota/.test(request.path)).length, 0)
+  await screenshot(page, 'integrations-dashboard-desktop')
+  await page.setViewportSize({ width: 390, height: 844 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  await screenshot(page, 'integrations-dashboard-mobile')
+})
+
+test('provider monitor updates Last Checked on refresh and preserves the previous snapshot on failure', async t => {
+  let currentCheckedAt = userVersion
+  let failing = false
+  const { page, requests } = await app(t, { restored: true, handle: entry => {
+    if (entry.path !== '/admin/integrations') return null
+    return failing ? reply({ error: 'Configuration check temporarily unavailable.' }, 503) : reply(integrationPayload(currentCheckedAt))
+  } })
+  await page.goto(`${origin}/integrations`)
+  const checked = page.getByRole('article', { name: 'Last status check', exact: true }).locator('time')
+  await checked.waitFor()
+  assert.equal(await checked.getAttribute('datetime'), userVersion)
+  const initialChecks = requests.filter(request => request.path === '/admin/integrations').length
+  currentCheckedAt = '2026-10-17T00:01:00.000Z'
+  await page.getByRole('button', { name: 'Refresh status', exact: true }).click()
+  await page.waitForFunction(() => document.querySelector('article[aria-label="Last status check"] time')?.getAttribute('datetime') === '2026-10-17T00:01:00.000Z')
+  failing = true
+  await page.getByRole('button', { name: 'Refresh status', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Configuration check temporarily unavailable.' }).waitFor()
+  assert.equal(await checked.getAttribute('datetime'), '2026-10-17T00:01:00.000Z')
+  assert.equal(await page.getByText('Configured', { exact: true }).count(), 4)
+  await page.getByText('Showing the last successful configuration check.', { exact: true }).waitFor()
+  assert.equal(requests.filter(request => request.path === '/admin/integrations').length, initialChecks + 2)
+  assert.equal(requests.filter(request => request.path.startsWith('/admin/') && request.path !== '/admin/integrations').length, 0)
+})
+
+test('provider monitor keeps missing credentials neutral and summarizes pending configuration', async t => {
+  const { page } = await app(t, { restored: true, handle: entry => entry.path === '/admin/integrations'
+    ? reply(integrationPayload(userVersion, ['perenual', 'cloudinary'])) : null })
+  await page.goto(`${origin}/integrations`)
+  const cloudinary = page.getByRole('article', { name: 'Cloudinary', exact: true })
+  await cloudinary.getByRole('heading', { name: 'Cloudinary', exact: true }).waitFor()
+  assert.equal(await page.getByText('Not configured', { exact: true }).count(), 2)
+  assert.match(await cloudinary.getByText('Not configured', { exact: true }).getAttribute('class'), /bg-panel-muted text-secondary/)
+  await cloudinary.getByText('Not set', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('article', { name: 'Pending configuration', exact: true }).getByText('2', { exact: false }).count(), 1)
+  await page.getByText('2 services need configuration', { exact: true }).waitFor()
 })
 
 test('users table supports paginated search, creation, ban/unban and prevents self-ban', async t => {

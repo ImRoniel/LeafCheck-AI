@@ -1,5 +1,10 @@
 export class ProviderConfigurationError extends Error {}
 
+/** Shared by the request runtime and the configuration-only admin monitor. */
+export function geminiModelName(env: NodeJS.ProcessEnv = process.env): string {
+  return env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+}
+
 export function geminiApiKey(env: NodeJS.ProcessEnv = process.env): string {
   const key = env.GEMINI_API_KEY?.trim();
   if (!key) {

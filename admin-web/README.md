@@ -84,8 +84,14 @@ provisioning supports pre-registration and versioned approval/revocation with au
 reasons. Settings require confirmation and a reason; saves include only changed
 flags and the singleton version. Disabling a service explicitly warns that it
 affects all clients. Staff password and email OTP remains required; universal-user
-OTP is shown as planned. Provider cards show configured/unverified status and
-unavailable quotas instead of inventing provider capacity or issuing analysis calls.
+OTP is shown as planned. The AI & API Monitor summarizes configuration readiness
+for Gemini, Pl@ntNet, Perenual, and Cloudinary. Green Configured badges mean required
+service settings are present. Gemini shows its actual runtime model; Cloudinary shows
+its cloud name. Missing credentials display Not configured. Cards explain that
+quota limits apply without inventing usage counts or remaining capacity. Refresh
+status checks backend configuration and updates Last checked only after success;
+an error retains the previous snapshot and its timestamp. It does not issue provider
+analysis or quota requests.
 
 The Overview requests `/admin/stats` for total users, active physical devices,
 registered plants, and saved AI analyses. Active means the latest sensor reading

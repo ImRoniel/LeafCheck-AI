@@ -137,20 +137,72 @@ test("disabled scanning blocks both analysis entry points before validation, ima
   assert.equal((await request("/api/scan/archives")).status,200);
 });
 
-test("monitor separates key configuration from verified health without probing or fabricated quota",async () => {
-  const keys=["GEMINI_API_KEY","PLANTNET_API_KEY","PERENUAL_API_KEY"];
+const monitorKeys=["GEMINI_API_KEY","PLANTNET_API_KEY","PERENUAL_API_KEY","GEMINI_MODEL","CLOUDINARY_CLOUD_NAME","CLOUDINARY_API_KEY","CLOUDINARY_API_SECRET","CLOUDINARY_URL"];
+async function withMonitorEnvironment(values, operation) {
+  const keys=monitorKeys;
   const previous=Object.fromEntries(keys.map(key => [key,process.env[key]]));
   try {
-    for(const key of keys) process.env[key]="private-provider-secret";
-    const observed=await request("/api/admin/integrations");assert.equal(observed.status,200);assert.equal(observed.body.data.length,3);
-    for(const row of observed.body.data) {
-      assert.equal(row.configured,true);assert.equal(row.status,"UNVERIFIED");assert.equal(row.quota.remaining,null);
-      assert.equal(row.quota.source,"unavailable");assert.equal(row.lastObservedAt,null);assert.equal(row.observedRequests,null);
-    }
-    assert.doesNotMatch(JSON.stringify(observed.body),/private-provider-secret/);assert.equal(providerCalls,0);
-    for(const key of keys) delete process.env[key];
-    assert.ok((await request("/api/admin/integrations")).body.data.every(row => row.status === "NOT_CONFIGURED"));
+    for(const key of keys) if(values[key]===undefined) delete process.env[key];else process.env[key]=values[key];
+    await operation();
   } finally {for(const key of keys) if(previous[key]===undefined) delete process.env[key];else process.env[key]=previous[key];}
+}
+
+test("monitor returns four configured services, safe details, and no quota or health observations",async () => {
+  await withMonitorEnvironment({GEMINI_API_KEY:" private-gemini-key ",PLANTNET_API_KEY:" private-plantnet-key ",PERENUAL_API_KEY:" private-perenual-key ",
+    GEMINI_MODEL:" custom-gemini-model ",CLOUDINARY_CLOUD_NAME:" leafcheck-photos ",CLOUDINARY_API_KEY:"private-cloudinary-key",
+    CLOUDINARY_API_SECRET:"private-cloudinary-secret",CLOUDINARY_URL:"cloudinary://private-url-credentials"},async () => {
+    const observed=await request("/api/admin/integrations");assert.equal(observed.status,200);assert.equal(observed.body.data.length,4);
+    assert.deepEqual(observed.body.data.map(row => row.provider),["gemini","plantnet","perenual","cloudinary"]);
+    assert.equal(observed.body.meta.schemaVersion,1);
+    for(const row of observed.body.data) {
+      assert.equal(row.configured,true);assert.equal(row.status,"CONFIGURED");
+      assert.deepEqual(row.quota,{source:"unavailable",remaining:null,limit:null,resetAt:null});
+      assert.equal(row.lastObservedAt,null);assert.equal(row.observedRequests,null);
+      assert.equal(row.checkedAt,observed.body.meta.asOf);assert.ok(Number.isFinite(Date.parse(row.checkedAt)));
+      assert.equal(row.model,row.provider === "gemini" ? "custom-gemini-model" : null);
+      assert.equal(row.cloudName,row.provider === "cloudinary" ? "leafcheck-photos" : null);
+      assert.doesNotMatch(row.message,/healthy|verified|checked|available quota|remaining quota/i);
+    }
+    assert.doesNotMatch(JSON.stringify(observed.body),/private-|GEMINI_API_KEY|PLANTNET_API_KEY|PERENUAL_API_KEY|CLOUDINARY_API/);
+    assert.equal(providerCalls,0);
+  });
+});
+
+test("missing and whitespace configuration stay unconfigured and use the runtime Gemini default",async () => {
+  for(const missing of [undefined," \t "]) {
+    await withMonitorEnvironment(Object.fromEntries(monitorKeys.map(key => [key,missing])),async () => {
+      const observed=await request("/api/admin/integrations");assert.equal(observed.status,200);
+      assert.equal(observed.body.data.length,4);
+      for(const row of observed.body.data) {assert.equal(row.configured,false);assert.equal(row.status,"NOT_CONFIGURED");assert.equal(row.cloudName,null);}
+      assert.equal(observed.body.data.find(row => row.provider === "gemini").model,"gemini-2.5-flash");
+      assert.equal(providerCalls,0);
+    });
+  }
+});
+
+test("Cloudinary configuration is determined by its public cloud name",async () => {
+  await withMonitorEnvironment({CLOUDINARY_CLOUD_NAME:" leafcheck-images "},async () => {
+    const cloudinary=(await request("/api/admin/integrations")).body.data.find(row => row.provider === "cloudinary");
+    assert.equal(cloudinary.status,"CONFIGURED");assert.equal(cloudinary.cloudName,"leafcheck-images");
+  });
+  await withMonitorEnvironment({CLOUDINARY_API_KEY:"private-key",CLOUDINARY_API_SECRET:"private-secret",CLOUDINARY_URL:"cloudinary://private-url"},async () => {
+    const cloudinary=(await request("/api/admin/integrations")).body.data.find(row => row.provider === "cloudinary");
+    assert.equal(cloudinary.status,"NOT_CONFIGURED");assert.equal(cloudinary.cloudName,null);
+  });
+});
+
+test("refresh re-reads configuration and returns a later configuration check timestamp",async () => {
+  await withMonitorEnvironment({GEMINI_API_KEY:"private-key"},async () => {
+    mock.timers.enable({apis:["Date"],now:Date.parse("2026-10-17T08:00:00.000Z")});
+    try {
+      const initial=(await request("/api/admin/integrations")).body;
+      mock.timers.tick(1000);process.env.GEMINI_MODEL="changed-model";
+      const refreshed=(await request("/api/admin/integrations")).body;
+      assert.ok(Date.parse(refreshed.meta.asOf)>Date.parse(initial.meta.asOf));
+      assert.equal(refreshed.data.find(row => row.provider === "gemini").model,"changed-model");
+      assert.ok(refreshed.data.every(row => row.checkedAt === refreshed.meta.asOf));assert.equal(providerCalls,0);
+    } finally {mock.timers.reset();}
+  });
 });
 
 test("invalid settings and provisioning requests fail without writes",async () => {

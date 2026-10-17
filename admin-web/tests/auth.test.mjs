@@ -309,6 +309,55 @@ test('versioned operational details and settings reject invalid concurrency time
   assert.throws(() => operations.readPlatformSettings({ data: { ...settings, aiScanningEnabled: 'true' } }), /unexpected response/)
 })
 
+const providerPayload = () => {
+  const checkedAt = '2026-10-17T00:00:00.000Z'
+  return { data: ['gemini', 'plantnet', 'perenual', 'cloudinary'].map(provider => ({ provider,
+    name: provider, configured: true, status: 'CONFIGURED', checkedAt,
+    model: provider === 'gemini' ? 'gemini-2.5-flash' : null,
+    cloudName: provider === 'cloudinary' ? 'leafcheck-plants' : null,
+    message: 'Configuration is present.', quota: { source: 'unavailable', remaining: null, limit: null, resetAt: null },
+    lastObservedAt: null, observedRequests: null,
+  })), meta: { schemaVersion: 1, asOf: checkedAt } }
+}
+
+test('monitor parser accepts four providers, current configured statuses, Gemini model and Cloudinary name', () => {
+  const parsed = operations.readIntegrations(providerPayload())
+  assert.equal(parsed.providers.length, 4)
+  assert.equal(parsed.providers.find(provider => provider.provider === 'gemini').model, 'gemini-2.5-flash')
+  assert.equal(parsed.providers.find(provider => provider.provider === 'cloudinary').cloudName, 'leafcheck-plants')
+  assert.equal(parsed.providers.every(provider => provider.checkedAt === parsed.asOf), true)
+  const missing = providerPayload()
+  missing.data[3] = { ...missing.data[3], configured: false, status: 'NOT_CONFIGURED', cloudName: null }
+  assert.equal(operations.readIntegrations(missing).providers[3].configured, false)
+})
+
+test('monitor parser rejects inconsistent statuses, invalid or mismatched timestamps and malformed service details', () => {
+  for (const changes of [
+    { status: 'UNVERIFIED' }, { status: 'NOT_CONFIGURED' }, { configured: 'true' },
+    { model: '' }, { model: null }, { model: undefined }, { model: 42 }, { cloudName: 'wrong-provider' },
+    { checkedAt: 'invalid' }, { checkedAt: '2026-10-17T00:01:00.000Z' },
+    { observedRequests: -1 }, { observedRequests: 1.5 },
+  ]) {
+    const payload = providerPayload()
+    payload.data[0] = { ...payload.data[0], ...changes }
+    assert.throws(() => operations.readIntegrations(payload), /unexpected response/)
+  }
+  for (const changes of [{ cloudName: '' }, { cloudName: null }, { cloudName: 42 }, { cloudName: undefined }, { model: 'wrong-provider' }]) {
+    const payload = providerPayload()
+    payload.data[3] = { ...payload.data[3], ...changes }
+    assert.throws(() => operations.readIntegrations(payload), /unexpected response/)
+  }
+  const duplicate = providerPayload()
+  duplicate.data[3] = duplicate.data[2]
+  assert.throws(() => operations.readIntegrations(duplicate), /unexpected response/)
+  const incomplete = providerPayload()
+  incomplete.data.pop()
+  assert.throws(() => operations.readIntegrations(incomplete), /unexpected response/)
+  const oldVersion = providerPayload()
+  oldVersion.meta.schemaVersion = 2
+  assert.throws(() => operations.readIntegrations(oldVersion), /unexpected response/)
+})
+
 test('table parsers accept masked user emails and operational devices without retaining owner data', () => {
   const user = admin.readUserRow({ id: 'u1', name: null, emailMasked: 'a***@example.test', role: 'USER', isActive: true, updatedAt: '2026-10-17T00:00:00.000Z' })
   assert.equal(user.email, null)

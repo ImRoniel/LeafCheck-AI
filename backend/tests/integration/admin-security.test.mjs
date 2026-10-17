@@ -498,5 +498,10 @@ test("real PostgreSQL: provisioning is versioned, revocation retains device hist
   assert.equal((await request(settingsPath, { method: "PATCH", token: admin.accessToken, body })).status, 409);
   const monitor = await request("/api/admin/integrations", { method: "GET", token: admin.accessToken });
   assert.equal(monitor.status, 200);
+  assert.deepEqual(monitor.body.data.map(provider => provider.provider), ["gemini", "plantnet", "perenual", "cloudinary"]);
+  assert.equal(monitor.body.meta.schemaVersion, 1);
+  assert.ok(monitor.body.data.every(provider => provider.checkedAt === monitor.body.meta.asOf &&
+    provider.status === (provider.configured ? "CONFIGURED" : "NOT_CONFIGURED")));
+  assert.equal(monitor.body.data.find(provider => provider.provider === "gemini").model, process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash");
   assert.ok(monitor.body.data.every(provider => provider.quota.remaining === null && provider.lastObservedAt === null));
 });

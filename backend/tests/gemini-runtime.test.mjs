@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { geminiError, geminiModel } from "../src/lib/gemini.ts";
 import {
   geminiApiKey,
+  geminiModelName,
   validateProviderConfig,
 } from "../src/lib/provider-config.ts";
 
@@ -73,6 +74,17 @@ test("startup validation and both model modes accept legacy and AQ. keys", () =>
     process.env.GEMINI_API_KEY = key;
     assert.doesNotThrow(() => geminiModel());
     assert.doesNotThrow(() => geminiModel(false));
+  }
+});
+
+test("configuration monitor model name matches the actual SDK default and trimmed override", () => {
+  process.env.GEMINI_API_KEY=keyA;
+  for(const configured of [undefined," \t "," custom-model "]) {
+    if(configured===undefined) delete process.env.GEMINI_MODEL;else process.env.GEMINI_MODEL=configured;
+    const expected=configured?.trim() || "gemini-2.5-flash";
+    assert.equal(geminiModelName(),expected);
+    assert.equal(geminiModel().model,`models/${expected}`);
+    assert.equal(geminiModel(false).model,`models/${expected}`);
   }
 });
 
