@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Activity, ChevronRight, CircleUserRound, Cpu, LayoutDashboard, Leaf, LogOut, Moon, PlugZap, ScrollText, Settings, ShieldCheck, Sun, Users, type LucideIcon } from 'lucide-react'
+import { Activity, ChevronRight, CircleUserRound, Cpu, KeyRound, LayoutDashboard, Leaf, LogOut, Moon, PlugZap, ScrollText, Settings, ShieldCheck, Sun, Users, type LucideIcon } from 'lucide-react'
 import { roleLabels, useSession } from '../context/session'
 import { useTheme } from '../context/theme'
 import { initials } from '../lib/format'
@@ -17,10 +17,10 @@ const navigation: { to: string; label: string; icon: LucideIcon; permission?: Pe
   { to: '/audit', label: 'Audit logs', icon: ScrollText, permission: 'audit.read' },
 ]
 
-const pageTitles: Record<string, string> = { '/dashboard': 'Overview', '/users': 'User Management', '/devices': 'Device Inventory', '/diagnostics': 'Diagnostics', '/provisioning': 'Provisioning', '/integrations': 'AI & API Monitor', '/settings': 'System Settings', '/audit': 'Audit Logs', '/forbidden': 'Access Restricted' }
+const pageTitles: Record<string, string> = { '/dashboard': 'Overview', '/users': 'User Management', '/devices': 'Device Inventory', '/diagnostics': 'Diagnostics', '/provisioning': 'Provisioning', '/integrations': 'AI & API Monitor', '/settings': 'System Settings', '/audit': 'Audit Logs', '/forbidden': 'Access Restricted', '/change-password': 'Change Password' }
 
 export function AdminLayout() {
-  const { user, logout, status } = useSession()
+  const { user, passwordPolicy, logout, status } = useSession()
   const { theme, toggleTheme } = useTheme()
   const { pathname } = useLocation()
   const title = pageTitles[pathname] ?? 'Workspace'
@@ -82,6 +82,7 @@ export function AdminLayout() {
               <p className="break-all text-xs font-semibold">{user?.email ?? 'No active session'}</p>
               <p className="mt-0.5 text-[11px] text-subtle">{user ? roleLabels[user.role] : 'No role assigned'}</p>
             </div>
+            <NavLink to="/change-password" className="button-secondary"><KeyRound size={15} aria-hidden="true" />Change Password</NavLink>
             <button
               type="button"
               onClick={() => { void logout() }}
@@ -95,6 +96,11 @@ export function AdminLayout() {
 
         <main id="main-content" className="flex-1 p-5 sm:p-6 lg:p-9">
           <div className="mx-auto w-full max-w-7xl">
+            {passwordPolicy?.isExpiringSoon && <div role="status" className="notice-warning mb-6">
+              {passwordPolicy.isExpired ? 'Your password is at least 30 days old. Please update it.'
+                : `Your password expires in ${passwordPolicy.daysUntilExpiry} days. Please update it soon.`}
+              {' '}<NavLink to="/change-password" className="font-semibold underline">Change password</NavLink>
+            </div>}
             <Outlet />
           </div>
         </main>

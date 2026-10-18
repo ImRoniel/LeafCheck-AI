@@ -17,10 +17,13 @@ export async function deployIntegrationPostgres(runPrisma) {
       .filter(name => name.endsWith("_admin_security_foundation"));
     const featureMigrations = (await readdir(join(prismaDirectory, "migrations")))
       .filter(name => name.endsWith("_admin_features_v2"));
-    const preFeatures = featureMigrations.length ? current
+    const passwordMigrations = (await readdir(join(prismaDirectory, "migrations")))
+      .filter(name => name.endsWith("_password_policy_warning"));
+    const prePassword = passwordMigrations.length ? current.replace(/^\s*passwordChangedAt\s+[^\n]*\r?\n/gm, "") : current;
+    const preFeatures = featureMigrations.length ? prePassword
       .replace(/\nenum DeviceProvisionStatus \{[\s\S]*?\n\}\n/g, "\n")
       .replace(/\nmodel (?:DeviceProvision|PlatformSettings) \{[\s\S]*?\n\}\n/g, "\n")
-      .replace(/^\s*\w+\s+(?:DeviceProvision|PlatformSettings)(?:\[\]|\?)[^\n]*\r?\n/gm, "") : current;
+      .replace(/^\s*\w+\s+(?:DeviceProvision|PlatformSettings)(?:\[\]|\?)[^\n]*\r?\n/gm, "") : prePassword;
     const preSecurity = securityMigrations.length ? preFeatures
       .replace(/\nmodel (?:AdminChallenge|AdminSessionVerification|AuditLog) \{[\s\S]*?\n\}\n/g, "\n")
       .replace(/^\s*(?:adminChallenges|adminVerifications|auditLogs|authVersion|authInvalidBefore)\s+[^\n]*\r?\n/gm, "") : preFeatures;
@@ -39,6 +42,8 @@ export async function deployIntegrationPostgres(runPrisma) {
     for (const migration of securityMigrations)
       await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
     for (const migration of featureMigrations)
+      await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
+    for (const migration of passwordMigrations)
       await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
     await cp(join(prismaDirectory, "migrations/migration_lock.toml"), join(temporary, "migrations/migration_lock.toml"));
     await writeFile(schema, current);

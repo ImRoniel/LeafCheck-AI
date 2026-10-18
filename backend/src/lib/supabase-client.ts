@@ -64,6 +64,21 @@ async function request(path: string, method: string, body?: unknown, accessToken
     throw new HttpError(503, "PROVIDER_UNAVAILABLE", "Email authentication is temporarily unavailable.");
   }
   if (!response.ok) {
+    if (path === "/user" && method === "PUT" && response.status >= 400 && response.status < 429) {
+      let failure: unknown;
+      try { failure = await response.json(); } catch { /* Never forward provider diagnostics. */ }
+      const code = object(failure).code ?? object(failure).error_code;
+      if (code === "same_password") throw new HttpError(400, "SAME_PASSWORD", "Choose a different new password.", {
+        newPassword: "The new password must differ from your current password.",
+      });
+      if (code === "weak_password") throw new HttpError(400, "WEAK_PASSWORD", "Choose a stronger new password.", {
+        newPassword: "Choose a longer, unique password that meets the password requirements.",
+      });
+      if (code === "current_password_mismatch" || code === "current_password_required")
+        throw new HttpError(400, "CURRENT_PASSWORD_INVALID", "Your current password is incorrect.", { currentPassword: "Your current password is incorrect." });
+      if (code === "reauthentication_needed" || code === "reauthentication_not_valid")
+        throw new HttpError(400, "REAUTHENTICATION_REQUIRED", "Sign in again and verify your email code before changing your password.");
+    }
     // Provisioning errors are visible only to a verified SuperAdmin. Map known
     // codes to our own messages; never forward provider text or diagnostics.
     if (admin && path === "/admin/users" && method === "POST" && response.status >= 400 && response.status < 429) {
@@ -100,13 +115,14 @@ export const supabasePublic = {
   verify: (email: string, code: string, type: EmailOtpType) =>
     request("/verify", "POST", { email, token: code, type }).then(providerTokens),
   user: (token: string) => request("/user", "GET", undefined, token).then(providerUser),
-  updatePassword: (token: string, password: string) => request("/user", "PUT", { password }, token),
+  updatePassword: (token: string, password: string, currentPassword?: string) =>
+    request("/user", "PUT", { password, ...(currentPassword === undefined ? {} : { current_password: currentPassword }) }, token),
 };
 export const supabaseAdmin = {
   createUser: (email: string, password: string, name: string | null) =>
     request("/admin/users", "POST", { email, password, email_confirm: true, user_metadata: { name } }, undefined, true).then(providerUser),
   deleteUser: (id: string) => request(`/admin/users/${encodeURIComponent(id)}`, "DELETE", undefined, undefined, true),
   // Supabase authenticates logout with the user's JWT; the secret key stays server-side.
-  logout: (token: string, scope: "local" | "global") =>
+  logout: (token: string, scope: "local" | "global" | "others") =>
     request(`/logout?scope=${scope}`, "POST", undefined, token, true),
 };

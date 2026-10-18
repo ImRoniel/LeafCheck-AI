@@ -14,6 +14,7 @@ import { DiagnosticsPage } from './pages/DiagnosticsPage'
 import { ProvisioningPage } from './pages/ProvisioningPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { IntegrationsPage } from './pages/IntegrationsPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
 
 export default function App() {
   const { user, status } = useSession()
@@ -26,6 +27,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AdminLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route element={<RequireAuth permission="devices.read" />}>
             <Route path="/devices" element={<DevicesPage />} />
             <Route path="/diagnostics" element={<DiagnosticsPage />} />

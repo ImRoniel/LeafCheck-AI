@@ -6,11 +6,12 @@ import { asyncRoute, HttpError } from "./http.js";
 import { prismaPg } from "./prisma-pg.js";
 import { authProvider } from "./auth-provider.js";
 import { authenticatedProviderSession } from "./supabase-session.js";
+import { passwordPolicyStatus } from "./password-policy.js";
 
 // Credential projection excludes provider identity fields and public responses.
 export const legacyUserSelect = {
   id: true, email: true, name: true, password: true, isActive: true,
-  role: true, authInvalidBefore: true, createdAt: true, updatedAt: true,
+  role: true, authInvalidBefore: true, createdAt: true, updatedAt: true, passwordChangedAt: true,
 } as const;
 type ApplicationUser = Pick<User, keyof typeof legacyUserSelect>;
 
@@ -28,6 +29,8 @@ export const safeUser = (user: ApplicationUser) => ({
   role: user.role,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
+  passwordChangedAt: user.passwordChangedAt ?? null,
+  passwordPolicy: passwordPolicyStatus(user.passwordChangedAt),
 });
 export async function accessToken(userId: string, sessionId: string) {
   return new SignJWT({ sid: sessionId })

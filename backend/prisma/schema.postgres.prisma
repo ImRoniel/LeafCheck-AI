@@ -39,6 +39,7 @@ model User {
   email     String   @unique
   name      String?
   password  String
+  passwordChangedAt DateTime? @default(now())
   supabaseUserId String? @unique
   emailVerifiedAt DateTime?
   isActive  Boolean  @default(true)

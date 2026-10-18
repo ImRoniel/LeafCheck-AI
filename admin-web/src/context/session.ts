@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { AdminChallenge, AdminRole, AdminUser, LoginResult } from '../lib/auth'
+import type { AdminChallenge, AdminRole, AdminUser, LoginResult, PasswordPolicy } from '../lib/auth'
 
 export type { AdminRole, AdminUser } from '../lib/auth'
 export type SessionStatus = 'restoring' | 'anonymous' | 'authenticating' | 'otp_required' | 'authenticated' | 'signingOut'
@@ -11,6 +11,7 @@ export const roleLabels: Record<AdminRole, string> = {
 
 interface SessionContextValue {
   user: AdminUser | null
+  passwordPolicy: PasswordPolicy | null
   status: SessionStatus
   sessionError: string | null
   challenge: AdminChallenge | null
@@ -21,6 +22,7 @@ interface SessionContextValue {
   resendAdminOtp: () => Promise<void>
   logout: () => Promise<void>
   restoreSession: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
 }
 
 export const SessionContext = createContext<SessionContextValue | null>(null)

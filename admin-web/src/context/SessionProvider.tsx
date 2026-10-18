@@ -23,6 +23,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const loginPending = useRef(false)
   const challengeRef = useRef<AdminChallenge | null>(null)
   const otpFlight = useRef<Promise<void> | null>(null)
+  const passwordFlight = useRef<Promise<void> | null>(null)
 
   const updateChallenge = useCallback((value: AdminChallenge | null) => {
     challengeRef.current = value
@@ -104,7 +105,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStatus('anonymous')
         if (error instanceof ApiError && error.code === 'ADMIN_VERIFICATION_REQUIRED') {
           setSessionError('Please sign in again and verify your administrator code.')
-        } else if (hadSession || ['/dashboard', '/users', '/devices', '/diagnostics', '/provisioning', '/settings', '/integrations', '/audit', '/forbidden'].includes(window.location.pathname.replace(/\/+$/, ''))) {
+        } else if (hadSession || ['/dashboard', '/users', '/devices', '/diagnostics', '/provisioning', '/settings', '/integrations', '/audit', '/forbidden', '/change-password'].includes(window.location.pathname.replace(/\/+$/, ''))) {
           setSessionError(sessionExpiredMessage)
         } else if (!(error instanceof ApiError && error.status === 401)) {
           setSessionError('Unable to restore your session. Please sign in again.')
@@ -129,6 +130,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       throw error
     }
   }, [performLogout, updateChallenge])
+
+  const changePassword = useCallback((currentPassword: string, newPassword: string): Promise<void> => {
+    if (!user || status !== 'authenticated') return Promise.reject(new Error('Please sign in before changing your password.'))
+    if (passwordFlight.current) return Promise.reject(new Error('A password change is already in progress.'))
+    const current = operation.current
+    const flight = (async () => {
+      const response = await apiFetch('/auth/change-password', {
+        ...jsonPost, body: JSON.stringify({ currentPassword, newPassword }), retryOnUnauthorized: true,
+      })
+      const payload: unknown = await response.json()
+      if (!mounted.current || current !== operation.current) throw cancelled()
+      const updatedUser = readUser(payload)
+      if (!isAdminUser(updatedUser) || updatedUser.id !== user.id) throw new Error('Invalid password change response.')
+      setUser(updatedUser)
+    })().finally(() => { passwordFlight.current = null })
+    passwordFlight.current = flight
+    return flight
+  }, [status, user])
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     if (challengeRef.current) return { status: 'otp_required' }
@@ -268,7 +287,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [performLogout, restoreSession])
 
   return (
-    <SessionContext.Provider value={{ user, status, sessionError, challenge, otpBusy, login, logout, restoreSession, verifyAdminOtp, resendAdminOtp, cancelAdminOtp }}>
+    <SessionContext.Provider value={{ user, passwordPolicy: user?.passwordPolicy ?? null, status, sessionError, challenge, otpBusy, login, logout, restoreSession, changePassword, verifyAdminOtp, resendAdminOtp, cancelAdminOtp }}>
       {sessionError && status === 'signingOut' && <div role="alert" className="notice-error fixed top-4 right-4 left-4 z-50 mx-auto max-w-xl shadow-lg">{sessionError}</div>}
       {children}
     </SessionContext.Provider>

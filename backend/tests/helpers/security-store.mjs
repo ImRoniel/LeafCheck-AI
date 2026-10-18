@@ -9,6 +9,7 @@ export function matches(row, where = {}) {
     if (condition === null || typeof condition !== "object" || condition instanceof Date) return value === condition;
     if ("equals" in condition && value !== condition.equals) return false;
     if ("in" in condition && !condition.in.includes(value)) return false;
+    if ("not" in condition && value === condition.not) return false;
     if ("gt" in condition && !(value > condition.gt)) return false;
     if ("gte" in condition && !(value >= condition.gte)) return false;
     if ("lt" in condition && !(value < condition.lt)) return false;

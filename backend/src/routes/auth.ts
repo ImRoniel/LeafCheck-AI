@@ -18,6 +18,7 @@ import { revokeProviderSession } from "../lib/supabase-session.js";
 import { beginAdminChallenge, verifyAdminOtp, resendAdminOtp, cancelAdminOtp, type ChallengeContext } from "../lib/admin-mfa.js";
 import { verificationRequired } from "../lib/admin-verification.js";
 import { credentials } from "../lib/auth-input.js";
+import { changePassword } from "../lib/change-password.js";
 export { validateName } from "../lib/auth-input.js";
 
 export const authRouter = Router();
@@ -28,7 +29,7 @@ const cookieOptions = {
   sameSite: "strict" as const,
   path: "/",
 };
-const browserSupabasePaths = new Set(["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel"]);
+const browserSupabasePaths = new Set(["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel", "/change-password"]);
 
 function challengeContext(req: Request, res: Response): ChallengeContext {
   return { client: res.locals.client, origin: req.get("origin") ?? null, ipAddress: req.ip };
@@ -187,6 +188,23 @@ authRouter.post(
     }
   }),
 );
+authRouter.post("/change-password", requireAuth, asyncRoute(async (req, res) => {
+  requireSupabase();
+  const data = bodyObject(req.body, ["currentPassword", "newPassword"]);
+  const fieldErrors: Record<string, string> = {};
+  if (typeof data.currentPassword !== "string" || !data.currentPassword || [...data.currentPassword].length > 128)
+    fieldErrors.currentPassword = "Enter your current password (up to 128 characters).";
+  if (typeof data.newPassword !== "string" || [...data.newPassword].length < 8 || [...data.newPassword].length > 128)
+    fieldErrors.newPassword = "Password must contain 8–128 characters.";
+  if (typeof data.newPassword === "string" && data.newPassword === data.currentPassword)
+    fieldErrors.newPassword = "The new password must differ from your current password.";
+  if (Object.keys(fieldErrors).length || typeof data.currentPassword !== "string" || typeof data.newPassword !== "string")
+    throw new HttpError(400, "INVALID_INPUT", "Check the password fields and try again.", fieldErrors);
+  const user = await changePassword(res.locals.auth.user, res.locals.auth.sessionId,
+    req.get("authorization")!.slice(7), data.currentPassword, data.newPassword, req.ip);
+  res.json(safeUser(user));
+}));
+
 for (const path of ["/logout", "/logout-all"]) {
   authRouter.post(
     path,

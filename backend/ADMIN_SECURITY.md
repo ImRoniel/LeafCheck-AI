@@ -1,5 +1,45 @@
 # Admin backend security and CRUD foundation
 
+## Password age warnings
+
+Password age is advisory only. `GET /api/users/me` and authentication user payloads
+include `passwordChangedAt` and `passwordPolicy` (`daysUntilExpiry`,
+`isExpiringSoon`, `isExpired`). Warnings start at 23 elapsed days; 30 days sets the
+expired flag but never denies access, refresh, OTP verification, or password repair.
+There is no hard-enforcement switch in this implementation.
+
+Apply `20261018000000_password_policy_warning` before starting the updated backend:
+
+```sh
+npx prisma migrate deploy --schema=prisma/schema.postgres.prisma
+npm run build
+```
+
+The generated migration first adds a nullable column without a default, preserving
+existing rows as null, then sets the default for future inserts. Unknown history
+does not warn; its neutral policy reports 30 days remaining without writing a
+timestamp. Profile edits and logins do not reset password age. Successful password
+changes and recovery resets record a new timestamp. Direct Supabase changes are
+not synchronized in this warning-only release, so hard enforcement must remain
+outside its scope.
+
+`POST /api/auth/change-password` accepts only `{currentPassword,newPassword}` and
+requires a live authenticated session, browser Origin/CSRF checks, and the current
+OTP proof for either staff role. Current credentials are checked by Supabase in a
+temporary session that is immediately revoked. The password update, with the
+current-password field, uses the original user's JWT, not an administrative
+password override. The application records the timestamp and a `PASSWORD_CHANGED`
+audit, consumes pending challenges, and removes other OTP proofs. Provider session
+revocation is confirmed for all other sessions. The current session and its original
+OTP deadline remain valid; no privilege or session lifetime is extended.
+
+On success, the endpoint returns the updated safe user and fresh warning status.
+Invalid credentials, weak passwords and validation errors leave the timestamp
+unchanged. Provider and application writes are not one transaction: a confirmed
+provider update followed by a database or cleanup failure returns
+`PASSWORD_CHANGE_INCOMPLETE`, explicitly instructing sign-in with the new password;
+clients do not automatically replay that operation.
+
 The browser continues to use Express through `/api`. Access tokens stay in memory;
 refresh credentials use the Secure HttpOnly SameSite=Strict
 `__Host-leafcheck-refresh` session cookie. Successful issuance and rotation omit

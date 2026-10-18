@@ -243,6 +243,17 @@ test('a response from a previous session cannot replace a new session', async ()
   assert.equal(expired, 0)
 })
 
+test('password policy parsing preserves warnings and treats missing or invalid advisory data as optional', () => {
+  const warning = { daysUntilExpiry: 6, isExpiringSoon: true, isExpired: false }
+  assert.deepEqual(auth.readPasswordPolicy(warning), warning)
+  assert.deepEqual(auth.readUser({ email: 'staff@example.test', role: 'ADMIN', passwordPolicy: warning }).passwordPolicy, warning)
+  for (const value of [undefined, null, {}, { ...warning, daysUntilExpiry: NaN },
+    { ...warning, daysUntilExpiry: -1 }, { ...warning, isExpired: 'false' }]) {
+    assert.equal(auth.readPasswordPolicy(value), null)
+    assert.equal(auth.readUser({ email: 'staff@example.test', role: 'ADMIN', passwordPolicy: value }).role, 'ADMIN')
+  }
+})
+
 test('user parsing admits staff roles and identifies USER without trusting unknown roles', () => {
   for (const role of ['ADMIN', 'LEAD_DEV', 'USER']) {
     const user = auth.readUser({ email: 'staff@example.test', role })

@@ -64,13 +64,23 @@ before(async () => {
     const path = parsed.pathname.slice("/auth/v1".length);
     const body = init.body ? JSON.parse(init.body) : {};
     const bearer = new Headers(init.headers).get("authorization")?.slice(7);
-    if (path === "/user") return tokens.has(bearer) ? json(serialize(tokens.get(bearer))) : json({}, 401);
+    if (path === "/user") {
+      const identity = tokens.get(bearer);
+      if (!identity) return json({}, 401);
+      if (init.method === "PUT") {
+        if (body.current_password !== (identity.password ?? "integration password")) return json({ code: "current_password_mismatch" }, 400);
+        identity.password = body.password;
+        const claims = (await jwtVerify(bearer, signingKey, { issuer, audience: "authenticated" })).payload;
+        for (const [id, session] of sessions) if (session.userId === identity.id && id !== claims.session_id) sessions.delete(id);
+      }
+      return json(serialize(identity));
+    }
     if (path === "/token") {
       if (parsed.searchParams.get("grant_type") === "refresh_token") {
         const id = tokens.get(body.refresh_token), session = sessions.get(id);
         return session ? json(await issue(identities.get(session.userId), id)) : json({}, 400);
       }
-      const identity = [...identities.values()].find(row => row.email === body.email && body.password === "integration password");
+      const identity = [...identities.values()].find(row => row.email === body.email && body.password === (row.password ?? "integration password"));
       return identity ? json(await issue(identity)) : json({}, 400);
     }
     if (path === "/otp") { codes.set(body.email, "00123456"); return json({}); }
@@ -83,8 +93,8 @@ before(async () => {
     if (path === "/logout") {
       const identity = tokens.get(bearer);
       const claims = (await jwtVerify(bearer, signingKey, { issuer, audience: "authenticated" })).payload;
-      for (const [id, session] of sessions) if (session.userId === identity.id &&
-        (parsed.searchParams.get("scope") !== "local" || id === claims.session_id)) sessions.delete(id);
+      for (const [id, session] of sessions) if (session.userId === identity.id && (parsed.searchParams.get("scope") === "local"
+        ? id === claims.session_id : parsed.searchParams.get("scope") === "others" ? id !== claims.session_id : true)) sessions.delete(id);
       return new Response(null, { status: 204 });
     }
     if (path.startsWith("/admin/users/") && init.method === "DELETE") {
@@ -101,10 +111,11 @@ before(async () => {
     throw new Error("Unexpected mock provider operation");
   });
   const { authRouter } = await import("../../src/routes/auth.ts");
+  const { usersRouter } = await import("../../src/routes/users.ts");
   const { adminRouter, adminErrorHandler } = await import("../../src/routes/admin.ts");
   const { errorHandler } = await import("../../src/lib/http.ts");
   const app = express(); app.use(express.json()); app.use("/api/auth", authRouter);
-  app.use("/api/admin", adminRouter, adminErrorHandler); app.use(errorHandler);
+  app.use("/api/admin", adminRouter, adminErrorHandler); app.use("/api/users", usersRouter); app.use(errorHandler);
   server = app.listen(0, "127.0.0.1"); await new Promise(resolve => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -135,6 +146,49 @@ async function verified() {
   const result = await request("/api/auth/verify-admin-otp", { body: { challengeToken: challenge.body.challengeToken, code: codes.get(user.email) } });
   assert.equal(result.status, 200); return { ...result.body, id: user.id, updatedAt: user.updatedAt.toISOString(), cookie: result.headers.get("set-cookie").split(";")[0] };
 }
+
+test("real PostgreSQL: new passwords default to now, unknown history stays null, and 24-day-old passwords warn", async () => {
+  const user = await account("USER");
+  assert.ok(user.passwordChangedAt instanceof Date);
+  assert.ok(Math.abs(Date.now() - user.passwordChangedAt.getTime()) < 5000);
+  await db.user.update({ where: { id: user.id }, data: { passwordChangedAt: null } });
+  const session = await issue(identities.get(user.supabaseUserId));
+  const me = () => request("/api/users/me", { method: "GET", token: session.access_token });
+  assert.equal((await me()).body.passwordChangedAt, null);
+  const changedAt = new Date(Date.now() - 24 * 86400000);
+  await db.user.update({ where: { id: user.id }, data: { createdAt: changedAt, passwordChangedAt: changedAt } });
+  const warning = await me();
+  assert.equal(warning.status, 200);
+  assert.deepEqual(warning.body.passwordPolicy, { daysUntilExpiry: 6, isExpiringSoon: true, isExpired: false });
+});
+
+test("real PostgreSQL: password changes revoke other sessions, preserve current OTP and persist advisory status", async () => {
+  const admin = await verified();
+  const proof = await db.adminSessionVerification.findFirst({ where: { userId: admin.id } });
+  const user = await db.user.findUnique({ where: { id: admin.id } });
+  const oldSession = await issue(identities.get(user.supabaseUserId));
+  await db.adminSessionVerification.create({ data: { userId: user.id, supabaseSessionId: sessions.get(tokens.get(oldSession.refresh_token)).id,
+    expiresAt: new Date(Date.now() + 3600000), authVersion: user.authVersion } });
+  await db.user.update({ where: { id: user.id }, data: { passwordChangedAt: new Date(Date.now() - 35 * 86400000) } });
+  assert.equal((await request("/api/admin/users", { method: "GET", token: admin.accessToken })).status, 200);
+  const before = Date.now();
+  const changed = await request("/api/auth/change-password", { token: admin.accessToken, body: {
+    currentPassword: "integration password", newPassword: "changed integration password",
+  } });
+  assert.equal(changed.status, 200);
+  const saved = await db.user.findUnique({ where: { id: user.id } });
+  assert.ok(saved.passwordChangedAt.getTime() >= before);
+  assert.equal(saved.password, "unusable legacy hash");
+  assert.deepEqual(changed.body.passwordPolicy, { daysUntilExpiry: 30, isExpiringSoon: false, isExpired: false });
+  assert.equal((await request("/api/users/me", { method: "GET", token: oldSession.access_token })).status, 401);
+  assert.equal((await request("/api/auth/refresh", { cookie: `__Host-leafcheck-refresh=${oldSession.refresh_token}`, body: {} })).status, 401);
+  assert.equal((await request("/api/admin/users", { method: "GET", token: admin.accessToken })).status, 200);
+  assert.equal(await db.adminSessionVerification.count({ where: { userId: user.id } }), 1);
+  const retained = await db.adminSessionVerification.findUnique({ where: { id: proof.id } });
+  assert.equal(retained.expiresAt.getTime(), proof.expiresAt.getTime());
+  assert.equal((await request("/api/auth/refresh", { cookie: admin.cookie, body: {} })).status, 200);
+  assert.equal(await db.auditLog.count({ where: { action: "PASSWORD_CHANGED", targetId: user.id } }), 1);
+});
 
 test("real PostgreSQL: LEAD_DEV completes OTP, cannot read users, and receives no owner identity", async () => {
   const lead = await account("LEAD_DEV"), owner = await account("USER");

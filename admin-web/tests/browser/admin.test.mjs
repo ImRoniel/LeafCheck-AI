@@ -1315,3 +1315,132 @@ test('dark mode persists only the theme preference and remains usable on narrow 
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   await screenshot(page, 'overview-dark-mobile')
 })
+
+test('password warnings remain advisory and a successful change clears the banner for both staff roles', async t => {
+  for (const actor of [admin, operator]) {
+    let changed = false
+    const warning = { daysUntilExpiry: 6, isExpiringSoon: true, isExpired: false }
+    const fresh = { daysUntilExpiry: 30, isExpiringSoon: false, isExpired: false }
+    const { page, requests } = await app(t, { actor, restored: true, handle: entry => {
+      if (entry.path === '/users/me') return reply({ ...actor, passwordPolicy: changed ? fresh : warning })
+      if (entry.path === '/auth/change-password') {
+        assert.equal(entry.method, 'POST')
+        assert.equal(entry.headers.authorization, 'Bearer verified-memory-jwt')
+        assert.deepEqual(entry.body, { currentPassword: 'original password', newPassword: '  new password value  ' })
+        changed = true
+        return reply({ ...actor, passwordChangedAt: new Date().toISOString(), passwordPolicy: fresh })
+      }
+    } })
+    await page.goto(origin + '/dashboard')
+    await page.getByText('Your password expires in 6 days. Please update it soon.', { exact: false }).waitFor()
+    await page.getByRole('link', { name: 'Change Password', exact: true }).click()
+    await page.waitForURL('**/change-password')
+    await page.getByLabel('Current Password', { exact: true }).fill('original password')
+    await page.getByLabel('New Password', { exact: true }).fill('  new password value  ')
+    await page.getByLabel('Confirm New Password', { exact: true }).fill('different password')
+    await page.getByRole('button', { name: 'Update Password', exact: true }).click()
+    await page.getByText('The new passwords do not match.', { exact: true }).waitFor()
+    assert.equal(requests.filter(entry => entry.path === '/auth/change-password').length, 0)
+    await page.getByLabel('Confirm New Password', { exact: true }).fill('  new password value  ')
+    await page.getByRole('button', { name: 'Update Password', exact: true }).click()
+    await page.getByText('Password updated successfully. Your other sessions have been signed out.', { exact: true }).waitFor()
+    assert.equal(await page.getByText('Your password expires in 6 days.', { exact: false }).count(), 0)
+    for (const label of ['Current Password', 'New Password', 'Confirm New Password']) assert.equal(await page.getByLabel(label, { exact: true }).inputValue(), '')
+    assert.equal(await memoryToken(page), 'verified-memory-jwt')
+    assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 0)
+    assert.equal(requests.filter(entry => entry.path === '/auth/change-password').length, 1)
+    assert.deepEqual(await page.evaluate(() => [Object.keys(localStorage), Object.keys(sessionStorage)]), [[], []])
+    await page.reload()
+    await page.getByRole('heading', { name: 'Change Password', exact: true }).waitFor()
+    assert.equal(await page.getByText('Your password expires', { exact: false }).count(), 0)
+  }
+})
+
+test('expired password warnings allow dashboard access and password repair without a redirect loop', async t => {
+  const { page } = await app(t, { restored: true, handle: entry => entry.path === '/users/me'
+    ? reply({ ...admin, passwordPolicy: { daysUntilExpiry: 0, isExpiringSoon: true, isExpired: true } }) : undefined })
+  await page.goto(origin + '/dashboard')
+  await page.getByText('Your password is at least 30 days old. Please update it.', { exact: false }).waitFor()
+  await page.getByRole('article', { name: 'AI scans', exact: true }).waitFor()
+  assert.ok(page.url().endsWith('/dashboard'))
+  await page.getByRole('link', { name: 'Change Password', exact: true }).click()
+  await page.getByLabel('Current Password', { exact: true }).waitFor()
+  assert.ok(page.url().endsWith('/change-password'))
+  assert.equal(await memoryToken(page), 'verified-memory-jwt')
+})
+
+test('unknown password history does not warn and anonymous users cannot open password repair', async t => {
+  const restored = await app(t, { restored: true, handle: entry => entry.path === '/users/me'
+    ? reply({ ...admin, passwordChangedAt: null, passwordPolicy: { daysUntilExpiry: 30, isExpiringSoon: false, isExpired: false } }) : undefined })
+  await restored.page.goto(origin + '/change-password')
+  await restored.page.getByLabel('Current Password', { exact: true }).waitFor()
+  assert.equal(await restored.page.getByText('Your password expires', { exact: false }).count(), 0)
+  const anonymous = await app(t)
+  await anonymous.page.goto(origin + '/change-password')
+  await anonymous.page.waitForURL('**/login')
+  assert.equal(await anonymous.page.getByLabel('Current Password', { exact: true }).count(), 0)
+})
+
+test('incorrect passwords and duplicate submissions keep the session and never replay a pending change', async t => {
+  let release
+  const { page, requests } = await app(t, { restored: true, handle: async entry => {
+    if (entry.path !== '/auth/change-password') return
+    if (entry.body.currentPassword === 'incorrect password') return reply({ code: 'CURRENT_PASSWORD_INVALID', error: 'Your current password is incorrect.',
+      fieldErrors: { currentPassword: 'Your current password is incorrect.' } }, 400)
+    await new Promise(resolve => { release = resolve })
+    return reply({ ...admin, passwordPolicy: { daysUntilExpiry: 30, isExpiringSoon: false, isExpired: false } })
+  } })
+  await page.goto(origin + '/change-password')
+  await page.getByLabel('Current Password', { exact: true }).fill('incorrect password')
+  await page.getByLabel('New Password', { exact: true }).fill('replacement password')
+  await page.getByLabel('Confirm New Password', { exact: true }).fill('replacement password')
+  await page.getByRole('button', { name: 'Update Password', exact: true }).click()
+  await page.locator('#currentPassword-error').waitFor()
+  assert.equal(await memoryToken(page), 'verified-memory-jwt')
+  await page.getByLabel('Current Password', { exact: true }).fill('original password')
+  const requestStarted = page.waitForRequest(request => request.url().endsWith('/auth/change-password') && request.postDataJSON().currentPassword === 'original password')
+  await page.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit() })
+  await requestStarted
+  assert.equal(await page.getByRole('button', { name: 'Updating password...', exact: true }).isDisabled(), true)
+  assert.equal(requests.filter(entry => entry.path === '/auth/change-password').length, 2)
+  release()
+  await page.getByText('Password updated successfully.', { exact: false }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 0)
+})
+
+test('password repair refreshes an expired access token once and late responses cannot undo logout', async t => {
+  let attempts = 0
+  const refreshed = await app(t, { restored: true, handle: entry => {
+    if (entry.path !== '/auth/change-password') return
+    attempts++
+    return attempts === 1 ? reply({ code: 'INVALID_SESSION', error: 'Expired access token.' }, 401)
+      : reply({ ...admin, passwordPolicy: { daysUntilExpiry: 30, isExpiringSoon: false, isExpired: false } })
+  } })
+  await refreshed.page.goto(origin + '/change-password')
+  for (const [label, value] of [['Current Password', 'original password'], ['New Password', 'replacement password'], ['Confirm New Password', 'replacement password']])
+    await refreshed.page.getByLabel(label, { exact: true }).fill(value)
+  await refreshed.page.getByRole('button', { name: 'Update Password', exact: true }).click()
+  await refreshed.page.getByText('Password updated successfully.', { exact: false }).waitFor()
+  assert.equal(attempts, 2)
+  assert.equal(refreshed.requests.filter(entry => entry.path === '/auth/refresh').length, 2)
+
+  let release
+  const late = await app(t, { restored: true, handle: async entry => {
+    if (entry.path !== '/auth/change-password') return
+    await new Promise(resolve => { release = resolve })
+    return reply({ ...admin, passwordPolicy: { daysUntilExpiry: 30, isExpiringSoon: false, isExpired: false } })
+  } })
+  await late.page.goto(origin + '/change-password')
+  for (const [label, value] of [['Current Password', 'original password'], ['New Password', 'replacement password'], ['Confirm New Password', 'replacement password']])
+    await late.page.getByLabel(label, { exact: true }).fill(value)
+  const requestStarted = late.page.waitForRequest(request => request.url().endsWith('/auth/change-password'))
+  await late.page.getByRole('button', { name: 'Update Password', exact: true }).click()
+  await requestStarted
+  await late.page.getByRole('button', { name: 'Log out', exact: true }).click()
+  await late.page.waitForURL('**/login')
+  const responseFinished = late.page.waitForResponse(response => response.url().endsWith('/auth/change-password'))
+  release()
+  await responseFinished
+  assert.equal(await memoryToken(late.page), null)
+  assert.ok(late.page.url().endsWith('/login'))
+})

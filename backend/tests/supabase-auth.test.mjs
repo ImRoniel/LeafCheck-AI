@@ -22,10 +22,11 @@ const challenges = new Map(), verifications = new Map(), auditLogs = new Map(), 
 const preservedId = "2da2cd1a-e594-43cc-a165-552342882246";
 let server, base, network, sequence = 10000000, upstreamCalls = [], asymmetric, publicJwk;
 let algorithm = "HS256", refuseRevocation = false, autoConfirm = false;
+let passwordUpdateError = null, skipPasswordRevocation = false;
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
 const db = {
   user: memoryModel(users, { unique: ["email", "supabaseUserId"], defaults: () => ({ name: null, role: "USER", isActive: true,
-    authVersion: 0, authInvalidBefore: null, createdAt: new Date(), updatedAt: new Date() }) }),
+    authVersion: 0, authInvalidBefore: null, passwordChangedAt: new Date(), createdAt: new Date(), updatedAt: new Date() }) }),
   adminChallenge: memoryModel(challenges, { unique: ["challengeHash"], resolveUser: id => users.get(id), defaults: () => ({
     attempts: 0, maxAttempts: 5, consumedAt: null, createdAt: new Date(), lastSentAt: new Date(),
   }) }),
@@ -135,17 +136,21 @@ async function providerRequest(input, init = {}) {
   if (!identity) return json({}, 401);
   if (path === "/user") {
     if (init.method === "PUT") {
-      if (body.password === identity.password) return json({}, 422);
+      if (passwordUpdateError) return json({ code: passwordUpdateError }, 422);
+      if (body.current_password !== undefined && body.current_password !== identity.password) return json({ code: "current_password_mismatch" }, 400);
+      if (body.password === identity.password) return json({ code: "same_password" }, 422);
       identity.password = body.password;
       // Supabase password update revokes other sessions, retaining the current one.
-      for (const [id, session] of sessions) if (session.userId === identity.id && id !== claims.session_id) sessions.delete(id);
+      if (!skipPasswordRevocation)
+        for (const [id, session] of sessions) if (session.userId === identity.id && id !== claims.session_id) sessions.delete(id);
     }
     return json(serialized(identity));
   }
   if (path === "/logout") {
-    if (!refuseRevocation) {
+    if (!refuseRevocation && !(skipPasswordRevocation && url.searchParams.get("scope") === "others")) {
       for (const [id, session] of sessions)
-        if (url.searchParams.get("scope") === "local" ? id === claims.session_id : session.userId === identity.id) sessions.delete(id);
+        if (session.userId === identity.id && (url.searchParams.get("scope") === "local" ? id === claims.session_id
+          : url.searchParams.get("scope") === "others" ? id !== claims.session_id : true)) sessions.delete(id);
     }
     return new Response(null, { status: 204 });
   }
@@ -159,7 +164,8 @@ before(async () => {
   mock.module(new URL("../src/lib/prisma-pg.js", import.meta.url).href, { namedExports: { prismaPg: db } });
   mock.module(new URL("../src/lib/prisma-auth-read.js", import.meta.url).href, { namedExports: { authRead } });
   const { authRouter } = await import("../src/routes/auth.ts");
-  const { requireAuth, requireAdmin, safeUser } = await import("../src/lib/auth.ts");
+  const { requireAuth, requireAdmin } = await import("../src/lib/auth.ts");
+  const { usersRouter } = await import("../src/routes/users.ts");
   const { errorHandler } = await import("../src/lib/http.ts");
   mock.module(new URL("../src/lib/prisma.js", import.meta.url).href, { namedExports: { prisma: { sensorReading: { findFirst: async () => null } } } });
   const { adminRouter, adminErrorHandler } = await import("../src/routes/admin.ts");
@@ -172,7 +178,7 @@ before(async () => {
   app.use("/api/admin", adminErrorHandler);
   app.use("/api/devices", devicesRouter);
   app.use("/api/plants", plantsRouter);
-  app.get("/api/users/me", requireAuth, (_req, res) => res.json(safeUser(res.locals.auth.user)));
+  app.use("/api/users", usersRouter);
   app.get("/admin", requireAuth, requireAdmin, (_req, res) => res.json({ ok: true }));
   app.use(errorHandler);
   server = app.listen(0, "127.0.0.1");
@@ -184,9 +190,10 @@ beforeEach(() => {
   users.clear(); identities.clear(); sessions.clear(); refreshTokens.clear(); codes.clear(); upstreamCalls = [];
   challenges.clear(); verifications.clear(); auditLogs.clear(); devices.clear();
   algorithm = "HS256"; refuseRevocation = false; autoConfirm = false;
+  passwordUpdateError = null; skipPasswordRevocation = false;
   users.set(preservedId, { id: preservedId, email: "cuaresmaroniel27@gmail.com", password: "preserve-exact-hash",
     role: "USER", isActive: true, name: "Preserved", supabaseUserId: null, emailVerifiedAt: null,
-    createdAt: new Date(), updatedAt: new Date() });
+    createdAt: new Date(), updatedAt: new Date(), passwordChangedAt: null });
 });
 after(async () => {
   await new Promise(resolve => server.close(resolve));
@@ -262,7 +269,7 @@ test("Supabase browser login and refresh use cookies; both logout scopes clear a
 });
 
 test("Supabase browser actions enforce origin/CSRF and keep registration, OTP and recovery native-only", async () => {
-  for (const path of ["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel"]) {
+  for (const path of ["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel", "/change-password"]) {
     for (const headers of [{ Origin: null }, { Origin: "https://evil.test", "X-Auth-Client": "native" },
       { "X-CSRF-Protection": null }, { "X-CSRF-Protection": "0" }]) {
       const result = await browserRequest(path, { headers });
@@ -604,6 +611,163 @@ test("registration requires the emailed OTP, provisions once, and preserves the 
   assert.deepEqual(users.get(preservedId), preserved);
   assert.equal((await request("/api/users/me", undefined, verified.body.accessToken, "GET")).body.id, user.id);
 });
+test("a user created with a password 24 days ago receives a six-day warning from users/me", async () => {
+  const account = await registered();
+  const createdAt = new Date(Date.now() - 24 * 86400000);
+  Object.assign(users.get(account.user.id), { createdAt, passwordChangedAt: createdAt });
+  const me = await request("/api/users/me", undefined, account.accessToken, "GET");
+  assert.equal(me.status, 200);
+  assert.equal(me.body.passwordChangedAt, createdAt.toISOString());
+  assert.deepEqual(me.body.passwordPolicy, { daysUntilExpiry: 6, isExpiringSoon: true, isExpired: false });
+});
+
+test("unknown password history stays null after reads, login and ordinary profile changes", async () => {
+  const account = await registered();
+  Object.assign(users.get(account.user.id), { createdAt: new Date(Date.now() - 90 * 86400000), passwordChangedAt: null });
+  const login = await request("/login", { email: account.user.email, password: "original password" });
+  const me = await request("/api/users/me", undefined, login.body.accessToken, "GET");
+  assert.equal(me.body.passwordChangedAt, null);
+  assert.equal(me.body.passwordPolicy.isExpiringSoon, false);
+  const edit = await request("/api/users/me", { name: "Updated name" }, login.body.accessToken, "PATCH");
+  assert.equal(edit.status, 200);
+  assert.equal(users.get(account.user.id).passwordChangedAt, null);
+});
+
+test("expired passwords remain advisory and never block admin reads, writes or refresh", async () => {
+  const admin = await verifiedAdministrator();
+  users.get(admin.user.id).passwordChangedAt = new Date(Date.now() - 45 * 86400000);
+  const me = await request("/api/users/me", undefined, admin.accessToken, "GET");
+  assert.equal(me.status, 200);
+  assert.equal(me.body.passwordPolicy.isExpired, true);
+  assert.equal((await adminRequest("/users", admin.accessToken)).status, 200);
+  const edit = await adminRequest(`/users/${preservedId}`, admin.accessToken, "PATCH", {
+    name: "Still allowed", updatedAt: users.get(preservedId).updatedAt.toISOString(),
+  });
+  assert.equal(edit.status, 200);
+  assert.equal((await browserRequest("/refresh", { cookie: admin.cookie })).status, 200);
+});
+
+test("browser password change records the timestamp, revokes old sessions and retains the current one", async () => {
+  const account = await registered();
+  const other = await request("/login", { email: account.user.email, password: "original password" });
+  const oldHash = users.get(account.user.id).password;
+  const before = Date.now();
+  const result = await browserRequest("/change-password", { token: account.accessToken, body: {
+    currentPassword: "original password", newPassword: "  replacement password  ",
+  } });
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get("set-cookie"), null, "the current refresh cookie is preserved");
+  assert.ok(Date.parse(result.body.passwordChangedAt) >= before);
+  assert.equal(users.get(account.user.id).passwordChangedAt.toISOString(), result.body.passwordChangedAt);
+  assert.equal(users.get(account.user.id).password, oldHash);
+  assert.deepEqual(result.body.passwordPolicy, { daysUntilExpiry: 30, isExpiringSoon: false, isExpired: false });
+  assert.equal(sessions.size, 1);
+  assert.equal((await request("/api/users/me", undefined, account.accessToken, "GET")).status, 200);
+  assert.equal((await request("/api/users/me", undefined, other.body.accessToken, "GET")).status, 401);
+  assert.equal((await request("/refresh", { refreshToken: other.body.refreshToken })).status, 401);
+  assert.equal((await request("/refresh", { refreshToken: account.refreshToken })).status, 200);
+  assert.equal((await request("/login", { email: account.user.email, password: "original password" })).status, 401);
+  assert.equal((await request("/login", { email: account.user.email, password: "  replacement password  " })).status, 200);
+  assert.equal([...auditLogs.values()].filter(row => row.action === "PASSWORD_CHANGED").length, 1);
+  const updated = upstreamCalls.find(call => call.path === "/user" && call.body.password);
+  assert.deepEqual(updated.body, { password: "  replacement password  ", current_password: "original password" });
+  assert.equal(updated.headers.get("apikey"), "sb_publishable_test");
+  assert.ok(!JSON.stringify([...auditLogs.values()]).includes("replacement password"));
+});
+
+test("staff password change preserves the current OTP deadline and invalidates other proofs and challenges", async () => {
+  const admin = await verifiedAdministrator();
+  const proof = [...verifications.values()][0];
+  for (const challenge of challenges.values()) challenge.lastSentAt = new Date(Date.now() - 61_000);
+  const another = await browserRequest("/login", { body: { email: admin.user.email, password: "original password" } });
+  assert.equal(another.status, 202);
+  const other = await browserRequest("/verify-admin-otp", { body: {
+    challengeToken: another.body.challengeToken, code: codes.get(`${admin.user.email}:magiclink`),
+  } });
+  assert.equal(other.status, 200);
+  for (const challenge of challenges.values()) challenge.lastSentAt = new Date(Date.now() - 61_000);
+  const pending = await browserRequest("/login", { body: { email: admin.user.email, password: "original password" } });
+  assert.equal(pending.status, 202);
+  const result = await browserRequest("/change-password", { token: admin.accessToken, body: {
+    currentPassword: "original password", newPassword: "new staff password",
+  } });
+  assert.equal(result.status, 200);
+  assert.equal((await adminRequest("/users", admin.accessToken)).status, 200);
+  assert.equal((await adminRequest("/users", other.body.accessToken)).status, 401);
+  assert.equal(verifications.size, 1);
+  assert.equal([...verifications.values()][0].expiresAt.getTime(), proof.expiresAt.getTime());
+  assert.equal([...verifications.values()][0].supabaseSessionId, proof.supabaseSessionId);
+  assert.ok([...challenges.values()].every(challenge => challenge.consumedAt));
+  assert.equal((await browserRequest("/refresh", { cookie: admin.cookie })).status, 200);
+});
+
+test("password changes require authentication, staff OTP and the correct current password", async () => {
+  const body = { currentPassword: "original password", newPassword: "replacement password" };
+  assert.equal((await browserRequest("/change-password", { body })).status, 401);
+  const account = await registered();
+  const before = users.get(account.user.id).passwordChangedAt;
+  const rejected = await browserRequest("/change-password", { token: account.accessToken, body: { ...body, currentPassword: "wrong password" } });
+  assert.equal(rejected.status, 400);
+  assert.equal(rejected.body.code, "CURRENT_PASSWORD_INVALID");
+  assert.equal(users.get(account.user.id).passwordChangedAt, before);
+  users.get(account.user.id).role = "ADMIN";
+  const unverified = await browserRequest("/change-password", { token: account.accessToken, body });
+  assert.equal(unverified.status, 403);
+  assert.equal(unverified.body.code, "ADMIN_VERIFICATION_REQUIRED");
+  assert.equal(upstreamCalls.some(call => call.path === "/user" && call.body.password), false);
+});
+
+test("password validation and provider rejection never update the timestamp or revoke the current session", async () => {
+  const account = await registered();
+  const before = users.get(account.user.id).passwordChangedAt;
+  for (const body of [{}, { currentPassword: "original password", newPassword: "short" },
+    { currentPassword: "original password", newPassword: "original password" },
+    { currentPassword: "original password", newPassword: "replacement password", passwordChangedAt: new Date().toISOString() }]) {
+    assert.equal((await browserRequest("/change-password", { token: account.accessToken, body })).status, 400);
+  }
+  passwordUpdateError = "weak_password";
+  const weak = await browserRequest("/change-password", { token: account.accessToken, body: {
+    currentPassword: "original password", newPassword: "weak new password",
+  } });
+  assert.equal(weak.status, 400);
+  assert.equal(weak.body.code, "WEAK_PASSWORD");
+  assert.equal(typeof weak.body.fieldErrors.newPassword, "string");
+  assert.equal(users.get(account.user.id).passwordChangedAt, before);
+  assert.equal((await request("/api/users/me", undefined, account.accessToken, "GET")).status, 200);
+});
+
+test("a database failure after the provider changes the password reports the partial outcome without replay", async t => {
+  const account = await registered();
+  const before = users.get(account.user.id).passwordChangedAt;
+  const update = db.user.update;
+  t.mock.method(db.user, "update", async args => {
+    if (args.data.passwordChangedAt) throw new Error("private database failure");
+    return update(args);
+  });
+  const result = await browserRequest("/change-password", { token: account.accessToken, body: {
+    currentPassword: "original password", newPassword: "replacement password",
+  } });
+  assert.equal(result.status, 503);
+  assert.equal(result.body.code, "PASSWORD_CHANGE_INCOMPLETE");
+  assert.equal(identities.get(users.get(account.user.id).supabaseUserId).password, "replacement password");
+  assert.equal(users.get(account.user.id).passwordChangedAt.getTime(), before.getTime());
+  assert.equal(upstreamCalls.filter(call => call.path === "/user" && call.body.password).length, 1);
+  assert.equal(JSON.stringify(result.body).includes("private database"), false);
+});
+
+test("a provider password change with unconfirmed session cleanup returns an explicit partial-success error", async () => {
+  const account = await registered();
+  await request("/login", { email: account.user.email, password: "original password" });
+  skipPasswordRevocation = true;
+  const result = await browserRequest("/change-password", { token: account.accessToken, body: {
+    currentPassword: "original password", newPassword: "replacement password",
+  } });
+  assert.equal(result.status, 503);
+  assert.equal(result.body.code, "PASSWORD_CHANGE_INCOMPLETE");
+  assert.match(result.body.error, /password was changed/);
+  assert.equal(identities.get(users.get(account.user.id).supabaseUserId).password, "replacement password");
+});
+
 test("password reset consumes the recovery code, rejects old password and revokes every session", async () => {
   const account = await registered();
   const hash = users.get(account.user.id).password;
@@ -615,6 +779,7 @@ test("password reset consumes the recovery code, rejects old password and revoke
   assert.equal((await request("/reset-password", { email: account.user.email, code: "00000000", newPassword: "new password value" })).status, 400);
   const reset = await request("/reset-password", { email: account.user.email, code, newPassword: "  new password value  " });
   assert.equal(reset.status, 204);
+  assert.ok(users.get(account.user.id).passwordChangedAt instanceof Date);
   assert.equal(sessions.size, 0);
   assert.equal(users.get(account.user.id).password, hash);
   for (const token of [account.accessToken, second.body.accessToken])

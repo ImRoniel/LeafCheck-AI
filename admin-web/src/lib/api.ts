@@ -57,7 +57,7 @@ export class ApiError extends Error {
       ? Number(retryHeader) : Math.ceil((Date.parse(retryHeader) - Date.now()) / 1000)
     const fieldErrors: Record<string, string> = {}
     if (isRecord(payload) && isRecord(payload.fieldErrors)) {
-      for (const key of ['email', 'password', 'name', 'role', 'isActive', 'updatedAt']) {
+      for (const key of ['email', 'password', 'currentPassword', 'newPassword', 'name', 'role', 'isActive', 'updatedAt']) {
         const message = payload.fieldErrors[key]
         if (typeof message === 'string' && message.trim() && message.length <= 500) fieldErrors[key] = message
       }

@@ -1,5 +1,11 @@
 export type AdminRole = 'ADMIN' | 'LEAD_DEV'
 
+export interface PasswordPolicy {
+  daysUntilExpiry: number
+  isExpiringSoon: boolean
+  isExpired: boolean
+}
+
 export interface AuthUser {
   email: string
   role: AdminRole | 'USER'
@@ -7,6 +13,8 @@ export interface AuthUser {
   name?: string | null
   createdAt?: string
   updatedAt?: string
+  passwordChangedAt?: string | null
+  passwordPolicy?: PasswordPolicy | null
 }
 
 export type AdminUser = AuthUser & { role: AdminRole }
@@ -65,7 +73,15 @@ export function readUser(value: unknown): AuthUser {
   if (value.name !== undefined && value.name !== null && typeof value.name !== 'string') {
     throw new Error('Invalid user response.')
   }
-  return { ...value, email: value.email, role: value.role }
+  return { ...value, email: value.email, role: value.role, passwordPolicy: readPasswordPolicy(value.passwordPolicy) }
+}
+
+/** Optional advisory data must never prevent a valid user from signing in. */
+export function readPasswordPolicy(value: unknown): PasswordPolicy | null {
+  if (!isRecord(value) || typeof value.daysUntilExpiry !== 'number' ||
+    !Number.isSafeInteger(value.daysUntilExpiry) || value.daysUntilExpiry < 0 || value.daysUntilExpiry > 30 ||
+    typeof value.isExpiringSoon !== 'boolean' || typeof value.isExpired !== 'boolean') return null
+  return { daysUntilExpiry: value.daysUntilExpiry, isExpiringSoon: value.isExpiringSoon, isExpired: value.isExpired }
 }
 
 export function isAdminUser(user: AuthUser): user is AdminUser {

@@ -3,11 +3,12 @@ import { legacyUserSelect, requireAuth, safeUser } from "../lib/auth.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { validateName } from "./auth.js";
+import { attachPasswordPolicyStatus } from "../lib/password-policy.js";
 
 export const usersRouter = Router();
 usersRouter.use(requireAuth);
-usersRouter.get("/me", (_req, res) => {
-  res.json(safeUser(res.locals.auth.user));
+usersRouter.get("/me", attachPasswordPolicyStatus, (_req, res) => {
+  res.json({ ...safeUser(res.locals.auth.user), passwordPolicy: res.locals.passwordPolicy });
 });
 usersRouter.patch(
   "/me",

@@ -74,10 +74,10 @@ export function assertProviderSessionCurrent(user: { authInvalidBefore?: Date | 
   if (user.authInvalidBefore && createdAt <= user.authInvalidBefore) throw invalid();
 }
 
-export async function revokeProviderSession(token: string, scope: "local" | "global") {
+export async function revokeProviderSession(token: string, scope: "local" | "global" | "others") {
   const claims = await verifiedClaims(token);
   const ids = scope === "local" ? [claims.session_id as string]
-    : (await authRead.sessions(claims.sub!)).map(row => row.id);
+    : (await authRead.sessions(claims.sub!)).filter(row => scope !== "others" || row.id !== claims.session_id).map(row => row.id);
   try { await supabaseAdmin.logout(token, scope); }
   catch (error) {
     // Password updates can already have deleted the recovery session. Accept

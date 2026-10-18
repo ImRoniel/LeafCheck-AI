@@ -145,6 +145,20 @@ and return focus to their trigger when it remains present.
 
 ## Authentication
 
+Password age warnings are advisory. Staff see a yellow banner after 23 days and
+can open `/change-password` using the link beside Log out. Expired status never
+blocks the portal or redirects to login. Unknown history does not show a warning.
+The form checks confirmation locally and sends only the current and new passwords
+to `/api/auth/change-password`. A successful response updates the session's policy,
+removes the warning, clears the form and displays a success toast. Other sessions
+are revoked; the current session retains its original OTP expiry.
+
+This authenticated mutation may refresh once after a 401 before retrying; password
+validation, provider failures and uncertain outcomes are never automatically replayed.
+The backend's additive password-policy migration must be applied before deploying
+the new backend. Direct Supabase changes remain outside timestamp synchronization
+in this warning-only release.
+
 `useSession()` exposes `user`, `status`, `sessionError`, `login(email, password)`,
 `logout()`, `restoreSession()`, `challenge`, `otpBusy`, `verifyAdminOtp(token, code)`,
 `resendAdminOtp()`, and `cancelAdminOtp()`.

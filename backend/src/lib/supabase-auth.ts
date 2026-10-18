@@ -99,7 +99,9 @@ export async function resetPassword(email: string, code: string, password: strin
     if (session.user.id !== expected.id) throw new HttpError(400, "INVALID_CODE", "The code is invalid or expired.");
     await supabasePublic.updatePassword(tokens.accessToken, password);
     await securityTransaction(async tx => {
-      await tx.user.update({ where: { id: session.user.id }, data: { authVersion: { increment: 1 }, authInvalidBefore: new Date() } });
+      await tx.user.update({ where: { id: session.user.id }, data: {
+        passwordChangedAt: new Date(), authVersion: { increment: 1 }, authInvalidBefore: new Date(),
+      } });
       await invalidateAdminCredentials(tx, session.user.id);
     });
     // Never expose recovery credentials or leave a password-reset session alive.
