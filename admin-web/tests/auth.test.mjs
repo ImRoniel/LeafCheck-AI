@@ -483,6 +483,9 @@ test('last-seen formatting handles missing readings, elapsed time and clock erro
   assert.equal(format.formatLastSeen(new Date(now).toISOString(), now), 'Just now')
   assert.equal(format.formatLastSeen(new Date(now - 120_000).toISOString(), now), '2 minutes ago')
   assert.equal(format.formatLastSeen(new Date(now + 120_000).toISOString(), now), 'Clock ahead')
+  assert.equal(format.formatLastSeen(new Date(now).toISOString(), now, 'compact'), 'just now')
+  assert.equal(format.formatLastSeen(new Date(now - 600_000).toISOString(), now, 'compact'), '10m ago')
+  assert.equal(format.formatLastSeen(new Date(now - 2_700_000).toISOString(), now, 'compact'), '45m ago')
 })
 
 test('API errors retain only bounded allowlisted field messages', async () => {

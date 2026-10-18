@@ -56,7 +56,13 @@ export function DevicesPage() {
                   <td className="table-cell font-mono text-xs whitespace-nowrap">{device.macAddress}</td>
                   <td className="table-cell font-semibold text-foreground"><span className="flex items-center gap-2"><Cpu size={16} className="shrink-0 text-subtle" aria-hidden="true" />{device.name}</span></td>
                   <td className="table-cell">{device.plants.length ? <span className="flex items-center gap-2"><Sprout size={15} className="shrink-0 text-brand" aria-hidden="true" />{device.plants.map(plant => plant.name).join(', ')}</span> : <span className="text-subtle">Unlinked</span>}</td>
-                  <td className="table-cell"><StatusBadge tone={tones[device.connectionStatus] ?? 'neutral'} dot>{statusLabels[device.connectionStatus] ?? 'Unknown'}</StatusBadge></td>
+                  <td className="table-cell">
+                    <StatusBadge tone={tones[device.connectionStatus] ?? 'neutral'} dot
+                      title={`Status is based on measurements received within the last 30 minutes. Last seen: ${device.readingError ? 'Unavailable' : device.lastReadingAt ? formatTimestamp(device.lastReadingAt) : 'Never seen'}.`}>
+                      {statusLabels[device.connectionStatus] ?? 'Unknown'}
+                      {!device.readingError && device.lastReadingAt && <> · {formatLastSeen(device.lastReadingAt, now, 'compact')}</>}
+                    </StatusBadge>
+                  </td>
                   <td className="table-cell whitespace-nowrap text-xs"><span className="inline-flex items-center gap-1.5" title={device.lastReadingAt ? formatTimestamp(device.lastReadingAt) : undefined}><Clock3 size={13} className="text-subtle" aria-hidden="true" />{device.readingError ? 'Unavailable' : formatLastSeen(device.lastReadingAt, now)}</span></td>
                   <td className="table-cell"><button type="button" className="button-secondary" aria-label={`Manage ${device.name}`} aria-haspopup="dialog" onClick={() => setSelected(device.id)}>Manage</button></td>
                 </tr>

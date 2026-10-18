@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Activity, Pencil, RefreshCw, Unlink } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../context/session'
 import { useAdminResource } from '../hooks/useAdminResource'
+import { useAutoRefresh } from '../hooks/useAutoRefresh'
+import { useNow } from '../hooks/useNow'
 import { readDeviceDetails, readTelemetryReadings } from '../lib/operations'
 import { hasPermission } from '../lib/permissions'
-import { formatAuditAction, formatTimestamp } from '../lib/format'
+import { formatAuditAction, formatLastSeen, formatTimestamp } from '../lib/format'
 import { Modal } from './Modal'
 import { RequestError } from './AdminTable'
 import { StatusBadge } from './StatusBadge'
@@ -19,11 +21,13 @@ export function DeviceDetailsPanel({ deviceId, onClose, onChanged, diagnostics =
   const { user } = useSession()
   const [action, setAction] = useState<'rename' | 'unlink' | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const now = useNow()
   const detail = useAdminResource(`/admin/devices/${encodeURIComponent(deviceId)}`, readDeviceDetails)
   const readings = useAdminResource(`/admin/devices/${encodeURIComponent(deviceId)}/readings?limit=5`, readTelemetryReadings)
   const device = detail.result
   const canManage = !!user && hasPermission(user.role, 'devices.manage')
-  function reload() { detail.reload(); readings.reload() }
+  const reload = useCallback(() => { detail.reload(); readings.reload() }, [detail.reload, readings.reload])
+  useAutoRefresh(reload)
   function saved() { setNotice(action === 'rename' ? 'Device renamed.' : 'Device unlinked. Historical readings and reports are preserved.'); setAction(null); reload(); onChanged() }
   function review() { setAction(null); reload(); onChanged() }
   return <Modal title="Device details" description="Operational status and the latest stored sensor measurements." onClose={onClose} slideOver>
@@ -31,7 +35,11 @@ export function DeviceDetailsPanel({ deviceId, onClose, onChanged, diagnostics =
     {detail.loading ? <p role="status" className="text-sm text-subtle">Loading device details...</p> : device && <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h3 className="text-xl font-semibold">{device.name}</h3><p className="mt-2 font-mono text-sm text-subtle">{device.macAddress}</p></div>
-        <StatusBadge tone={device.simulated ? 'info' : device.connectionStatus === 'ONLINE' ? 'success' : 'neutral'} dot>{device.simulated ? 'Simulated device' : formatAuditAction(device.connectionStatus)}</StatusBadge>
+        <StatusBadge tone={device.simulated ? 'info' : device.connectionStatus === 'ONLINE' ? 'success' : 'neutral'} dot
+          title={`Status is based on measurements received within the last 30 minutes. Last seen: ${device.readingError ? 'Unavailable' : device.lastReadingAt ? formatTimestamp(device.lastReadingAt) : 'Never seen'}.`}>
+          {device.simulated ? 'Simulated device' : formatAuditAction(device.connectionStatus)}
+          {!device.readingError && device.lastReadingAt && <> · {device.connectionStatus !== 'UNKNOWN' && 'seen '}{formatLastSeen(device.lastReadingAt, now, 'compact')}</>}
+        </StatusBadge>
       </div>
       <dl className="my-5 grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-sm"><dt className="text-subtle">Linked plant</dt><dd>{device.pairing?.plantName ?? (device.plants.map(plant => plant.name).join(', ') || 'Unlinked')}</dd>
         <dt className="text-subtle">Last measurement</dt><dd>{device.lastReadingAt ? formatTimestamp(device.lastReadingAt) : 'Unavailable'}</dd>

@@ -422,7 +422,7 @@ test('LEAD_DEV verifies OTP, sees operations and cannot fetch platform pages thr
   await page.getByRole('link', { name: 'Devices', exact: true }).click()
   await page.getByRole('cell', { name: 'AA:BB:CC:DD:EE:FF', exact: true }).waitFor()
   assert.equal(await page.getByRole('cell', { name: 'Monstera', exact: true }).count(), 1)
-  assert.equal(await page.getByRole('cell', { name: 'Online', exact: true }).count(), 1)
+  assert.equal(await page.getByRole('cell', { name: /^Online · / }).count(), 1)
   assert.equal(requests.filter(request => ['/admin/users', '/admin/audit', '/admin/devices/whitelist', '/admin/settings', '/admin/integrations'].includes(request.path)).length, 0)
   assert.equal(requests.filter(request => request.path === '/auth/verify-admin-otp').length, 1)
   assert.equal(await page.getByRole('link', { name: 'Diagnostics', exact: true }).count(), 1)
@@ -980,11 +980,11 @@ test('device polling updates status each minute, pauses while hidden, and refres
       lastReadingAt: new Date(Date.now() - (late ? 31 * 60_000 : 120_000)).toISOString() }]))
   } })
   await page.goto(origin + '/devices')
-  await page.getByRole('cell', { name: 'Online', exact: true }).waitFor()
+  await page.getByRole('cell', { name: /^Online · / }).waitFor()
   const initial = requests.filter(entry => entry.path === '/admin/devices').length
   late = true
   await page.clock.fastForward(60_001)
-  await page.getByRole('cell', { name: 'Offline', exact: true }).waitFor()
+  await page.getByRole('cell', { name: /^Offline · / }).waitFor()
   assert.ok(requests.filter(entry => entry.path === '/admin/devices').length > initial)
   await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }))
   const hidden = requests.filter(entry => entry.path === '/admin/devices').length
@@ -995,7 +995,7 @@ test('device polling updates status each minute, pauses while hidden, and refres
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
     document.dispatchEvent(new Event('visibilitychange'))
   })
-  await page.getByRole('cell', { name: 'Online', exact: true }).waitFor()
+  await page.getByRole('cell', { name: /^Online · / }).waitFor()
   await page.getByRole('link', { name: 'Overview', exact: true }).click()
   await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor()
   const left = requests.filter(entry => entry.path === '/admin/devices').length
@@ -1336,13 +1336,61 @@ test('changing your own role signs out rather than retaining an obsolete admin s
   assert.equal(requests.filter(request => request.path === '/auth/logout').length, 1)
 })
 
-test('Last Seen advances with time and online status has both a dot and a text label', async t => {
+test('Last Seen advances with time and online status includes its age, dot and freshness tooltip', async t => {
   const { page } = await app(t, { actor: operator, restored: true })
   await page.goto(origin + '/devices')
   await page.getByRole('cell', { name: '2 minutes ago', exact: true }).waitFor()
-  assert.equal(await page.getByRole('cell', { name: 'Online', exact: true }).locator('[aria-hidden="true"]').count(), 1)
+  const status = page.getByRole('cell', { name: 'Online · 2m ago', exact: true })
+  assert.equal(await status.locator('[aria-hidden="true"]').count(), 1)
+  assert.match(await status.locator('[title]').getAttribute('title'),
+    /^Status is based on measurements received within the last 30 minutes\. Last seen: .+\d{2}:\d{2}.+\.$/)
   await page.clock.fastForward(61_000)
   await page.getByRole('cell', { name: '3 minutes ago', exact: true }).waitFor()
+  await page.getByRole('cell', { name: 'Online · 3m ago', exact: true }).waitFor()
+})
+
+test('device details polls status and readings every minute despite age updates, pauses while hidden and stops on close', async t => {
+  let offline = false
+  const onlineTimestamp = new Date(Date.now() - 120_000).toISOString()
+  const offlineTimestamp = new Date(Date.now() - 31 * 60_000).toISOString()
+  const { page, requests } = await app(t, { actor: operator, restored: true, handle: entry => {
+    if (entry.path === '/admin/devices/sensor-1' && entry.method === 'GET') return reply({ data: {
+      ...sensor, updatedAt: userVersion, connectionStatus: offline ? 'OFFLINE' : 'ONLINE',
+      lastReadingAt: offline ? offlineTimestamp : onlineTimestamp,
+    } })
+  } })
+  await page.goto(origin + '/devices')
+  await page.getByRole('button', { name: 'Manage Office sensor', exact: true }).click()
+  const panel = page.getByRole('dialog', { name: 'Device details', exact: true })
+  await panel.getByText('Online · seen 2m ago', { exact: true }).waitFor()
+  await panel.getByRole('cell', { name: '2,180', exact: true }).waitFor()
+  const title = await panel.getByText('Online · seen 2m ago', { exact: true }).getAttribute('title')
+  assert.match(title, /^Status is based on measurements received within the last 30 minutes\. Last seen: /)
+  assert.ok(title.includes(await panel.locator('dd').nth(1).innerText()))
+  const counts = () => ['/admin/devices/sensor-1', '/admin/devices/sensor-1/readings']
+    .map(path => requests.filter(entry => entry.path === path).length)
+  const initial = counts()
+  offline = true
+  await page.clock.fastForward(30_001)
+  assert.deepEqual(counts(), initial)
+  await page.clock.fastForward(30_001)
+  await panel.getByText(/^Offline · seen \d+m ago$/).waitFor()
+  assert.deepEqual(counts(), initial.map(count => count + 1))
+  await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }))
+  const hidden = counts()
+  await page.clock.fastForward(60_001)
+  assert.deepEqual(counts(), hidden)
+  offline = false
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await panel.getByText(/^Online · seen \d+m ago$/).waitFor()
+  assert.deepEqual(counts(), hidden.map(count => count + 1))
+  await panel.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  const closed = counts()
+  await page.clock.fastForward(60_001)
+  assert.deepEqual(counts(), closed)
 })
 
 test('dark mode persists only the theme preference and remains usable on narrow screens', async t => {
@@ -1497,7 +1545,7 @@ test('inactivity signs out once at five minutes despite background polling and s
       return reply({ error: 'Expired', code: 'INVALID_SESSION' }, 401)
   } })
   await page.goto(origin + '/devices')
-  await page.getByRole('cell', { name: 'Online', exact: true }).waitFor()
+  await page.getByRole('cell', { name: /^Online · / }).waitFor()
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
   await page.mouse.move(20, 20)
   const polls = requests.filter(entry => entry.path === '/admin/devices').length
