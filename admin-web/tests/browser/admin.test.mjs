@@ -1230,6 +1230,51 @@ test('a gateway timeout after creation requires review instead of allowing a dup
   assert.equal(requests.filter(entry => entry.path === '/admin/users' && entry.method === 'POST').length, 1)
 })
 
+for (const retryStatus of [204, 401]) {
+  test(`logout refreshes and retries once after a 401 when the retry returns ${retryStatus}`, async t => {
+    let logoutCalls = 0
+    const { page, requests } = await app(t, { restored: true, handle: async (entry, state) => {
+      if (entry.path !== '/auth/logout') return
+      assert.equal(entry.headers.authorization, 'Bearer verified-memory-jwt')
+      if (++logoutCalls === 1) return reply({ error: 'Expired', code: 'INVALID_SESSION' }, 401)
+      state.signedIn = false
+      return retryStatus === 204 ? { status: 204 } : reply({ error: 'Still expired' }, 401)
+    } })
+    await page.goto(origin + '/dashboard')
+    await page.getByRole('button', { name: 'Log out', exact: true }).waitFor()
+    const start = requests.length
+    await page.getByRole('button', { name: 'Log out', exact: true }).click()
+    await page.waitForURL('**/login')
+    assert.deepEqual(requests.slice(start).filter(entry => entry.path.startsWith('/auth/')).map(entry => entry.path),
+      ['/auth/logout', '/auth/refresh', '/auth/logout'])
+    assert.equal(await memoryToken(page), null)
+  })
+}
+
+test('logout finishes locally when the refresh attempt after a 401 is rejected', async t => {
+  let logoutStarted = false
+  const { page, requests } = await app(t, { restored: true, handle: async entry => {
+    if (entry.path === '/auth/logout') {
+      logoutStarted = true
+      return reply({ error: 'Expired', code: 'INVALID_SESSION' }, 401, {
+        'Set-Cookie': '__Host-leafcheck-refresh=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Strict',
+      })
+    }
+    if (entry.path === '/auth/refresh' && logoutStarted) return reply({ error: 'No refresh cookie' }, 401)
+  } })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('button', { name: 'Log out', exact: true }).waitFor()
+  const start = requests.length
+  await page.getByRole('button', { name: 'Log out', exact: true }).click()
+  await page.waitForURL('**/login')
+  assert.deepEqual(requests.slice(start).filter(entry => entry.path.startsWith('/auth/')).map(entry => entry.path),
+    ['/auth/logout', '/auth/refresh'])
+  assert.equal(await memoryToken(page), null)
+  await page.reload()
+  await page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
+  assert.equal(await memoryToken(page), null)
+})
+
 test('failed refresh shows a session-expired alert during logout and on the login screen', async t => {
   let failRefresh = false, releaseLogout
   const { page, requests } = await app(t, { restored: true, handle: async entry => {
@@ -1443,4 +1488,339 @@ test('password repair refreshes an expired access token once and late responses 
   await responseFinished
   assert.equal(await memoryToken(late.page), null)
   assert.ok(late.page.url().endsWith('/login'))
+})
+
+test('inactivity signs out once at five minutes despite background polling and synthetic input', async t => {
+  const { page, requests } = await app(t, { restored: true, actor: operator, handle: (entry, state) => {
+    // A poll already dispatched at the boundary is rejected like the real backend.
+    if (entry.path.startsWith('/admin/') && !state.signedIn)
+      return reply({ error: 'Expired', code: 'INVALID_SESSION' }, 401)
+  } })
+  await page.goto(origin + '/devices')
+  await page.getByRole('cell', { name: 'Online', exact: true }).waitFor()
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  await page.mouse.move(20, 20)
+  const polls = requests.filter(entry => entry.path === '/admin/devices').length
+  for (let minute = 0; minute < 4; minute++) {
+    const refreshed = page.waitForResponse(response => response.url().includes('/admin/devices?'))
+    await page.clock.fastForward(60_000)
+    await refreshed
+  }
+  assert.ok(requests.filter(entry => entry.path === '/admin/devices').length >= polls + 4)
+  await page.evaluate(() => window.dispatchEvent(new MouseEvent('mousemove')))
+  await page.clock.fastForward(59_999)
+  assert.equal(await memoryToken(page), 'verified-memory-jwt')
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 0)
+  await page.clock.fastForward(1)
+  await page.waitForURL('**/login')
+  assert.equal(await memoryToken(page), null)
+  await page.clock.fastForward(301_000)
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 1)
+})
+
+for (const input of ['pointerdown', 'keydown', 'mousemove']) {
+  test(`inactivity is reset by trusted ${input} without changing the authenticated session`, async t => {
+    const { page, requests } = await app(t, { restored: true })
+    await page.goto(origin + '/dashboard')
+    await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor()
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+    await page.mouse.move(10, 10)
+    await page.clock.fastForward(240_000)
+    if (input === 'pointerdown') { await page.mouse.down(); await page.mouse.up() }
+    else if (input === 'keydown') await page.keyboard.press('Shift')
+    else await page.mouse.move(30, 30)
+    await page.clock.fastForward(299_999)
+    assert.equal(await memoryToken(page), 'verified-memory-jwt')
+    assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 0)
+    await page.clock.fastForward(1)
+    await page.waitForURL('**/login')
+    assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 1)
+  })
+}
+
+test('inactivity allows a fifty-second save started near the old deadline to finish', async t => {
+  let release, started
+  const pending = new Promise(resolve => { started = resolve })
+  const { page, requests } = await app(t, { restored: true, handle: async entry => {
+    if (entry.method === 'PATCH') {
+      started()
+      await new Promise(resolve => { release = resolve })
+    }
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Edit Member', exact: true }).click()
+  await page.getByLabel('Name', { exact: true }).fill('Renamed during cold start')
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  await page.mouse.move(10, 10)
+  await page.clock.fastForward(290_000)
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await pending
+  await page.clock.fastForward(50_000)
+  assert.equal(await memoryToken(page), 'verified-memory-jwt')
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 0)
+  release()
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  await page.getByRole('cell', { name: 'Renamed during cold start', exact: true }).waitFor()
+  assert.equal(requests.filter(entry => entry.method === 'PATCH').length, 1)
+})
+
+test('inactivity checks elapsed time on tab return before accepting new activity', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor()
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }))
+  await page.clock.setSystemTime(await page.evaluate(() => Date.now() + 301_000))
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await page.waitForURL('**/login')
+  await page.mouse.move(30, 30)
+  assert.equal(await memoryToken(page), null)
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 1)
+})
+
+test('inactivity cleanup leaves a new sign-in its full deadline after manual logout', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor()
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  await page.clock.fastForward(240_000)
+  await page.getByRole('button', { name: 'Log out', exact: true }).click()
+  await page.waitForURL('**/login')
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.test')
+  await page.getByLabel('Password', { exact: true }).fill('correct-password')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.waitForURL('**/login/otp')
+  await page.getByLabel('Verification code').fill('00001234')
+  await page.getByRole('button', { name: 'Verify Code', exact: true }).click()
+  await page.waitForURL('**/dashboard')
+  await page.mouse.move(20, 20)
+  await page.clock.fastForward(61_000)
+  assert.equal(await memoryToken(page), 'verified-memory-jwt')
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 1)
+  await page.clock.fastForward(239_000)
+  await page.waitForURL('**/login')
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 2)
+})
+
+test('inactivity logout finishes locally after an expired JWT and rejected refresh without a loop', async t => {
+  const { page, requests } = await app(t, { restored: true, handle: (entry, state) => {
+    if (entry.path === '/auth/logout') {
+      state.signedIn = false
+      return reply({ error: 'Expired', code: 'INVALID_SESSION' }, 401, {
+        'Set-Cookie': '__Host-leafcheck-refresh=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Strict',
+      })
+    }
+  } })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor()
+  const start = requests.length
+  await page.clock.fastForward(301_000)
+  await page.waitForURL('**/login')
+  assert.deepEqual(requests.slice(start).filter(entry => entry.path.startsWith('/auth/')).map(entry => entry.path),
+    ['/auth/logout', '/auth/refresh'])
+  assert.equal(await memoryToken(page), null)
+  await page.reload()
+  await page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
+})
+
+test('inactivity logout retains the server sign-out warning when the backend is unavailable', async t => {
+  const { page, requests } = await app(t, { restored: true, handle: entry => {
+    if (entry.path === '/auth/logout') return reply({ error: 'Unavailable' }, 503)
+  } })
+  await page.goto(origin + '/dashboard')
+  await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor()
+  await page.clock.fastForward(301_000)
+  await page.waitForURL('**/login')
+  await page.getByRole('alert').filter({ hasText: 'Unable to confirm server sign-out.' }).waitFor()
+  assert.equal(await memoryToken(page), null)
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 1)
+})
+
+async function fillRecovery(page, code = '00123456', password = 'replacement password') {
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.test')
+  await page.getByLabel('Recovery code', { exact: true }).fill(code)
+  await page.getByLabel('New password', { exact: true }).fill(password)
+  await page.getByLabel('Confirm new password', { exact: true }).fill(password)
+}
+
+test('recovery preserves leading zeros, prevents duplicate submissions and returns to password-plus-OTP login', async t => {
+  const { page, requests } = await app(t, { handle: entry => {
+    if (entry.path === '/auth/forgot-password') return reply({
+      message: 'If an eligible account exists, a recovery code has been sent.', resendAfter: 60,
+    }, 202)
+    if (entry.path === '/auth/reset-password') {
+      assert.deepEqual(entry.body, { email: 'admin@example.test', code: '00123456', newPassword: '  replacement password  ' })
+      assert.equal(entry.headers.authorization, undefined)
+      assert.equal(entry.headers['x-auth-client'], undefined)
+      return { status: 204 }
+    }
+  } })
+  await page.goto(origin + '/login')
+  await page.getByLabel('Email', { exact: true }).fill('ADMIN@EXAMPLE.TEST')
+  await page.getByRole('button', { name: 'Forgot password?', exact: true }).click()
+  await page.waitForURL('**/forgot-password')
+  await page.getByRole('heading', { name: 'Forgot password', exact: true }).waitFor()
+  assert.equal(await page.getByLabel('Email', { exact: true }).inputValue(), 'admin@example.test')
+  await page.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit() })
+  await page.waitForURL('**/reset-password')
+  assert.equal(requests.filter(entry => entry.path === '/auth/forgot-password').length, 1)
+  assert.equal(await page.getByLabel('Recovery code', { exact: true }).getAttribute('type'), 'text')
+  await fillRecovery(page, '00123456', '  replacement password  ')
+  await page.getByLabel('Confirm new password', { exact: true }).fill('different password')
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'The new passwords do not match.' }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/auth/reset-password').length, 0)
+  await page.getByLabel('Confirm new password', { exact: true }).fill('  replacement password  ')
+  await page.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit() })
+  await page.waitForURL('**/login')
+  await page.getByRole('status').filter({ hasText: 'Your password has been reset.' }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/auth/reset-password').length, 1)
+  assert.equal(requests.filter(entry => entry.path === '/auth/otp/verify' || entry.path === '/auth/verify-admin-otp').length, 0)
+  assert.equal(await memoryToken(page), null)
+  assert.deepEqual(await page.evaluate(() => [localStorage.length, sessionStorage.length]), [0, 0])
+  assert.doesNotMatch(await page.evaluate(() => JSON.stringify(history.state)), /00123456|replacement password/)
+  assert.doesNotMatch(page.url(), /00123456|replacement|admin@/)
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.test')
+  await page.getByLabel('Password', { exact: true }).fill('  replacement password  ')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.waitForURL('**/login/otp')
+  assert.equal(await memoryToken(page), null)
+  await page.getByLabel('Verification code').fill('00001234')
+  await page.getByRole('button', { name: 'Verify Code', exact: true }).click()
+  await page.waitForURL('**/dashboard')
+  assert.equal(await memoryToken(page), 'verified-memory-jwt')
+})
+
+test('recovery routes allow anonymous direct visits and reloads without inactivity or auth redirects', async t => {
+  const { page, requests } = await app(t)
+  for (const [path, heading] of [['/forgot-password', 'Forgot password'], ['/reset-password', 'Reset password']]) {
+    await page.goto(origin + path)
+    await page.getByRole('heading', { name: heading, exact: true }).waitFor()
+    await page.clock.fastForward(301_000)
+    assert.equal(new URL(page.url()).pathname, path)
+    await page.reload()
+    await page.getByRole('heading', { name: heading, exact: true }).waitFor()
+    assert.equal(await memoryToken(page), null)
+  }
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 0)
+  assert.equal(requests.filter(entry => entry.path.startsWith('/admin/')).length, 0)
+})
+
+test('recovery does not interrupt a pending administrator challenge or a verified session', async t => {
+  const pending = await app(t)
+  await signIn(pending.page)
+  await pending.page.waitForURL('**/login/otp')
+  for (const path of ['/forgot-password', '/reset-password']) {
+    await pending.page.evaluate(path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')) }, path)
+    await pending.page.waitForURL('**/login/otp')
+  }
+  await pending.page.clock.fastForward(301_000)
+  assert.equal(pending.requests.filter(entry => entry.path === '/auth/logout').length, 0)
+  const verified = await app(t, { restored: true })
+  await verified.page.goto(origin + '/forgot-password')
+  await verified.page.waitForURL('**/dashboard')
+  assert.equal(await memoryToken(verified.page), 'verified-memory-jwt')
+})
+
+test('recovery resend retains its cooldown across reloads and honors a backend 429', async t => {
+  let sends = 0
+  const { page, requests } = await app(t, { handle: entry => {
+    if (entry.path !== '/auth/forgot-password') return
+    if (++sends === 2) return reply({ error: 'Please wait before requesting another code.' }, 429, { 'Retry-After': '90' })
+    return reply({ message: 'If an eligible account exists, a recovery code has been sent.', resendAfter: 60 }, 202)
+  } })
+  await page.goto(origin + '/forgot-password')
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.test')
+  await page.getByRole('button', { name: 'Send recovery code', exact: true }).click()
+  await page.waitForURL('**/reset-password')
+  assert.equal(await page.getByRole('button', { name: /Resend code/ }).isDisabled(), true)
+  await page.clock.fastForward(61_000)
+  await page.getByRole('button', { name: 'Resend code', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Please wait before requesting another code.' }).waitFor()
+  await page.reload()
+  await page.getByRole('heading', { name: 'Reset password', exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: /Resend code/ }).isDisabled(), true)
+  assert.equal(await page.getByLabel('Email', { exact: true }).inputValue(), 'admin@example.test')
+  await page.clock.fastForward(91_000)
+  await page.getByLabel('Recovery code', { exact: true }).fill('00000000')
+  await page.getByRole('button', { name: 'Resend code', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'If an eligible account exists, a new recovery code has been sent.' }).waitFor()
+  assert.equal(await page.getByLabel('Recovery code', { exact: true }).inputValue(), '')
+  assert.equal(sends, 3)
+  assert.equal(requests.filter(entry => entry.path === '/auth/logout').length, 0)
+})
+
+test('recovery validates email, code and password locally and keeps rejected codes inline', async t => {
+  const { page, requests } = await app(t, { handle: entry => {
+    if (entry.path === '/auth/reset-password') return reply({ error: 'Invalid or expired code. Request a new one.', code: 'INVALID_CODE' }, 400)
+  } })
+  await page.goto(origin + '/forgot-password')
+  await page.getByLabel('Email', { exact: true }).fill('invalid')
+  await page.getByRole('button', { name: 'Send recovery code', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Enter a valid email address.' }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/auth/forgot-password').length, 0)
+  await page.goto(origin + '/reset-password')
+  await fillRecovery(page, '1234567', 'short')
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Enter the eight-digit recovery code' }).waitFor()
+  await page.getByRole('alert').filter({ hasText: 'Password must contain 8–128 characters.' }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/auth/reset-password').length, 0)
+  await fillRecovery(page, '00000000')
+  const refreshes = requests.filter(entry => entry.path === '/auth/refresh').length
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Invalid or expired code.' }).waitFor()
+  assert.equal(new URL(page.url()).pathname, '/reset-password')
+  assert.equal(requests.filter(entry => entry.path === '/auth/refresh').length, refreshes)
+  assert.equal(requests.filter(entry => entry.path === '/auth/reset-password').length, 1)
+  assert.equal(await memoryToken(page), null)
+})
+
+for (const failure of ['server', 'network']) {
+  test(`recovery never replays an uncertain ${failure} outcome and requires a fresh code`, async t => {
+    const { page, requests } = await app(t, { handle: entry => {
+      if (entry.path === '/auth/reset-password') return reply({ error: 'Unavailable' }, 503)
+      if (entry.path === '/auth/forgot-password') return reply({ resendAfter: 60 }, 202)
+    } })
+    let attempts = 0
+    if (failure === 'network') await page.route('**/api/auth/reset-password', async route => { attempts++; await route.abort('failed') })
+    await page.goto(origin + '/reset-password')
+    await fillRecovery(page)
+    await page.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit() })
+    await page.getByRole('alert').filter({ hasText: 'Your password may have changed.' }).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'Reset password', exact: true }).isDisabled(), true)
+    await page.locator('form').evaluate(form => form.requestSubmit())
+    assert.equal(failure === 'network' ? attempts : requests.filter(entry => entry.path === '/auth/reset-password').length, 1)
+    assert.equal(await memoryToken(page), null)
+    await page.getByRole('button', { name: 'Resend code', exact: true }).click()
+    await page.getByRole('status').filter({ hasText: 'a new recovery code has been sent.' }).waitFor()
+    assert.equal(await page.getByLabel('Recovery code', { exact: true }).inputValue(), '')
+    assert.equal(await page.getByRole('button', { name: 'Reset password', exact: true }).isEnabled(), true)
+  })
+}
+
+test('recovery ignores a late send-code response after the user returns to login', async t => {
+  let release, started
+  const pending = new Promise(resolve => { started = resolve })
+  const { page } = await app(t, { handle: async entry => {
+    if (entry.path !== '/auth/forgot-password') return
+    started()
+    await new Promise(resolve => { release = resolve })
+    return reply({ resendAfter: 60 }, 202)
+  } })
+  await page.goto(origin + '/login')
+  await page.getByRole('button', { name: 'Forgot password?', exact: true }).click()
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.test')
+  await page.getByRole('button', { name: 'Send recovery code', exact: true }).click()
+  await pending
+  await page.goBack()
+  await page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
+  const finished = page.waitForResponse(response => response.url().endsWith('/auth/forgot-password'))
+  release()
+  await finished
+  await page.clock.runFor(20)
+  assert.equal(new URL(page.url()).pathname, '/login')
+  assert.equal(await memoryToken(page), null)
 })

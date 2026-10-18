@@ -268,16 +268,42 @@ test("Supabase browser login and refresh use cookies; both logout scopes clear a
   }
 });
 
-test("Supabase browser actions enforce origin/CSRF and keep registration, OTP and recovery native-only", async () => {
-  for (const path of ["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel", "/change-password"]) {
+test("Supabase browser logout clears the refresh cookie even with an expired or missing JWT", async () => {
+  const account = await registered();
+  const { payload } = await jwtVerify(account.accessToken, signingKey, { issuer, audience: "authenticated" });
+  const now = Math.floor(Date.now() / 1000);
+  const expired = await new SignJWT({ session_id: payload.session_id })
+    .setProtectedHeader({ alg: "HS256" }).setSubject(payload.sub).setIssuer(issuer).setAudience("authenticated")
+    .setIssuedAt(now - 900).setExpirationTime(now - 60).sign(signingKey);
+  for (const path of ["/logout", "/logout-all"]) {
+    for (const token of [expired, undefined]) {
+      const result = await browserRequest(path, {
+        token, cookie: `__Host-leafcheck-refresh=${account.refreshToken}`,
+      });
+      assert.equal(result.status, 401);
+      assert.equal(result.body.code, "INVALID_SESSION");
+      const cleared = result.headers.get("set-cookie");
+      assert.match(cleared, /^__Host-leafcheck-refresh=;/);
+      assert.match(cleared, /Expires=Thu, 01 Jan 1970/);
+      for (const attribute of ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"])
+        assert.ok(cleared.includes(attribute));
+    }
+  }
+  assert.ok(sessions.has(payload.session_id), "failed authentication must not authorize server revocation");
+  assert.equal(upstreamCalls.filter(call => call.path === "/logout").length, 0);
+});
+
+test("Supabase browser actions enforce origin/CSRF and keep registration and general OTP native-only", async () => {
+  for (const path of ["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel", "/change-password", "/forgot-password", "/reset-password"]) {
     for (const headers of [{ Origin: null }, { Origin: "https://evil.test", "X-Auth-Client": "native" },
       { "X-CSRF-Protection": null }, { "X-CSRF-Protection": "0" }]) {
       const result = await browserRequest(path, { headers });
       assert.equal(result.status, 403);
       assert.equal(result.body.code, "ORIGIN_REJECTED");
+      assert.equal(result.headers.get("set-cookie"), null);
     }
   }
-  for (const path of ["/register", "/otp/request", "/otp/verify", "/otp/resend", "/forgot-password", "/reset-password"]) {
+  for (const path of ["/register", "/otp/request", "/otp/verify", "/otp/resend"]) {
     const result = await browserRequest(path);
     assert.equal(result.status, 400);
     assert.equal(result.body.code, "NATIVE_REQUIRED");
@@ -788,6 +814,125 @@ test("password reset consumes the recovery code, rejects old password and revoke
   assert.equal((await request("/login", { email: account.user.email, password: "original password" })).status, 401);
   assert.equal((await request("/login", { email: account.user.email, password: "  new password value  " })).status, 200);
   assert.equal((await request("/reset-password", { email: account.user.email, code, newPassword: "another password" })).status, 400);
+});
+
+test("browser recovery acknowledges known and unknown emails identically without changing sessions", async () => {
+  const account = await registered();
+  const sessionIds = [...sessions.keys()];
+  const expected = { message: "If an eligible account exists, a recovery code has been sent.", resendAfter: 60 };
+  for (const email of [account.user.email.toUpperCase(), "missing@example.test", users.get(preservedId).email]) {
+    const result = await browserRequest("/forgot-password", { body: { email } });
+    assert.equal(result.status, 202);
+    assert.deepEqual(result.body, expected);
+    assert.equal(result.headers.get("set-cookie"), null);
+  }
+  assert.deepEqual([...sessions.keys()], sessionIds);
+  assert.equal(upstreamCalls.filter(call => call.path === "/recover").length, 1);
+  assert.equal(upstreamCalls.filter(call => call.path.startsWith("/admin/users")).length, 0);
+});
+
+test("recovery reset returns the same invalid-code error for known, unknown and unmapped emails", async () => {
+  const account = await registered();
+  for (const browser of [false, true]) {
+    const results = [];
+    for (const email of [account.user.email, "missing@example.test", users.get(preservedId).email]) {
+      const body = { email, code: "00000000", newPassword: "replacement password" };
+      const result = browser ? await browserRequest("/reset-password", { body }) : await request("/reset-password", body);
+      assert.equal(result.status, 400);
+      assert.equal(result.headers.get("set-cookie"), null);
+      results.push(result.body);
+    }
+    assert.deepEqual(results[0], { code: "INVALID_CODE", error: "Invalid or expired code. Request a new one." });
+    assert.deepEqual(results[1], results[0]);
+    assert.deepEqual(results[2], results[0]);
+  }
+});
+
+test("browser reset validates eight-digit strings and passwords before contacting the provider", async () => {
+  for (const code of ["123456", "1234567", "123456789", "1234abcd", 12345678]) {
+    const result = await browserRequest("/reset-password", { body: { email: "missing@example.test", code, newPassword: "replacement password" } });
+    assert.equal(result.status, 400);
+    assert.equal(result.body.code, "INVALID_INPUT");
+  }
+  for (const newPassword of ["short", "x".repeat(129)]) {
+    const result = await browserRequest("/reset-password", { body: { email: "missing@example.test", code: "00123456", newPassword } });
+    assert.equal(result.status, 400);
+    assert.equal(result.body.code, "INVALID_INPUT");
+  }
+  assert.equal(upstreamCalls.length, 0);
+});
+
+for (const role of ["ADMIN", "LEAD_DEV"]) {
+  test(`browser ${role} recovery preserves leading zeros, revokes old sessions and requires fresh admin OTP`, async () => {
+    const account = await verifiedAdministrator(role);
+    const user = users.get(account.user.id);
+    user.passwordChangedAt = new Date(Date.now() - 24 * 86400000);
+    const version = user.authVersion;
+    async function startLogin(password) {
+      for (const challenge of challenges.values()) if (challenge.userId === user.id)
+        challenge.lastSentAt = new Date(Date.now() - 61_000);
+      return browserRequest("/login", { body: { email: user.email, password } });
+    }
+    const secondChallenge = await startLogin("original password");
+    assert.equal(secondChallenge.status, 202);
+    const second = await browserRequest("/verify-admin-otp", { body: {
+      challengeToken: secondChallenge.body.challengeToken, code: codes.get(`${user.email}:magiclink`),
+    } });
+    assert.equal(second.status, 200);
+    assert.equal((await startLogin("original password")).status, 202);
+    assert.equal((await browserRequest("/forgot-password", { body: { email: user.email } })).status, 202);
+    const started = Date.now();
+    codes.set(`${user.email}:recovery`, "00123456");
+    const reset = await browserRequest("/reset-password", { cookie: account.cookie, body: {
+      email: user.email, code: "00123456", newPassword: "replacement password",
+    } });
+    assert.equal(reset.status, 204);
+    assert.equal(reset.body, null);
+    const cleared = reset.headers.get("set-cookie");
+    assert.match(cleared, /^__Host-leafcheck-refresh=;/);
+    assert.match(cleared, /Expires=Thu, 01 Jan 1970/);
+    for (const attribute of ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"]) assert.ok(cleared.includes(attribute));
+    const updated = users.get(user.id);
+    assert.ok(updated.passwordChangedAt.getTime() >= started);
+    assert.ok(updated.authInvalidBefore.getTime() >= started);
+    assert.equal(updated.authVersion, version + 1);
+    assert.equal(sessions.size, 0);
+    assert.equal([...verifications.values()].filter(proof => proof.userId === user.id).length, 0);
+    assert.ok([...challenges.values()].filter(challenge => challenge.userId === user.id).every(challenge => challenge.consumedAt));
+    assert.equal(upstreamCalls.filter(call => call.path === "/verify").at(-1).body.token, "00123456");
+    assert.equal(upstreamCalls.filter(call => call.path === "/verify").at(-1).body.type, "recovery");
+    for (const token of [account.accessToken, second.body.accessToken])
+      assert.equal((await request("/api/users/me", undefined, token, "GET")).status, 401);
+    assert.equal((await browserRequest("/refresh", { cookie: account.cookie })).status, 401);
+    assert.equal((await browserRequest("/reset-password", { body: {
+      email: user.email, code: "00123456", newPassword: "another replacement password",
+    } })).status, 400);
+    assert.equal((await browserRequest("/login", { body: { email: user.email, password: "original password" } })).status, 401);
+    const login = await startLogin("replacement password");
+    assert.equal(login.status, 202);
+    assert.equal(login.body.accessToken, undefined);
+    const verified = await browserRequest("/verify-admin-otp", { body: {
+      challengeToken: login.body.challengeToken, code: codes.get(`${user.email}:magiclink`),
+    } });
+    assert.equal(verified.status, 200);
+    assert.equal(verified.body.user.role, role);
+  });
+}
+
+test("a reset database failure after password update consumes the code without replaying the password change", async () => {
+  const account = await registered();
+  await browserRequest("/forgot-password", { body: { email: account.user.email } });
+  const code = codes.get(`${account.user.email}:recovery`);
+  const update = mock.method(db.user, "update", async () => { throw new Error("private database failure"); });
+  let result;
+  try {
+    result = await browserRequest("/reset-password", { body: { email: account.user.email, code, newPassword: "replacement password" } });
+  } finally { update.mock.restore(); }
+  assert.equal(result.status, 500);
+  assert.equal(JSON.stringify(result.body).includes("private database"), false);
+  assert.equal(identities.get(users.get(account.user.id).supabaseUserId).password, "replacement password");
+  assert.equal(upstreamCalls.filter(call => call.path === "/user" && call.body.password).length, 1);
+  assert.equal((await browserRequest("/reset-password", { body: { email: account.user.email, code, newPassword: "another password" } })).status, 400);
 });
 test("OTP endpoints reject incorrect lengths, nondigits and numeric values before contacting Supabase", async () => {
   const bodies = [

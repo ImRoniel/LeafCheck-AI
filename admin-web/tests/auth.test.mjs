@@ -57,6 +57,49 @@ test('invalid login preserves the API error and never refreshes or triggers logo
   assert.equal(expired, 0)
 })
 
+test('recovery sends string codes with browser protections and accepts an empty 204 without issuing credentials', async () => {
+  const calls = []
+  mock.method(globalThis, 'fetch', async (url, init) => {
+    calls.push(url)
+    assert.equal(init.credentials, 'include')
+    assert.equal(init.headers.get('X-CSRF-Protection'), '1')
+    assert.equal(init.headers.get('X-Auth-Client'), null)
+    assert.equal(init.headers.get('Authorization'), null)
+    const body = JSON.parse(init.body)
+    if (url === '/api/auth/forgot-password') {
+      assert.deepEqual(body, { email: 'admin@example.test' })
+      return json({ message: 'If an eligible account exists, a recovery code has been sent.', resendAfter: 60 }, 202)
+    }
+    assert.equal(url, '/api/auth/reset-password')
+    assert.deepEqual(body, { email: 'admin@example.test', code: '00123456', newPassword: 'replacement password' })
+    return new Response(null, { status: 204 })
+  })
+  const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+  assert.equal((await api.apiFetch('/auth/forgot-password', { ...options, body: JSON.stringify({ email: 'admin@example.test' }) })).status, 202)
+  assert.equal((await api.apiFetch('/auth/reset-password', { ...options,
+    body: JSON.stringify({ email: 'admin@example.test', code: '00123456', newPassword: 'replacement password' }) })).status, 204)
+  assert.deepEqual(calls, ['/api/auth/forgot-password', '/api/auth/reset-password'])
+  assert.equal(api.getAccessToken(), null)
+})
+
+test('recovery errors stay inline and never refresh, expire a session or replay a request', async () => {
+  let expired = 0
+  unsubscribe = api.onSessionExpired(async () => { expired++ })
+  for (const path of ['/auth/forgot-password', '/auth/reset-password']) {
+    for (const status of [400, 401, 429, 503]) {
+      const fetch = mock.method(globalThis, 'fetch', async url => {
+        assert.equal(url, '/api' + path)
+        return json({ error: 'Recovery failed', code: 'RECOVERY_FAILED' }, status)
+      })
+      await assert.rejects(api.apiFetch(path, { method: 'POST', body: '{}' }), error => error.status === status)
+      assert.equal(fetch.mock.callCount(), 1)
+      fetch.mock.restore()
+    }
+  }
+  assert.equal(expired, 0)
+  assert.equal(api.getAccessToken(), null)
+})
+
 test('every request gets a sixty-second deadline and a timeout produces the server waking message', async () => {
   const deadline = new AbortController()
   let expired = 0

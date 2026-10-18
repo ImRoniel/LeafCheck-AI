@@ -29,7 +29,7 @@ const cookieOptions = {
   sameSite: "strict" as const,
   path: "/",
 };
-const browserSupabasePaths = new Set(["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel", "/change-password"]);
+const browserSupabasePaths = new Set(["/login", "/refresh", "/logout", "/logout-all", "/verify-admin-otp", "/admin-otp/resend", "/admin-otp/cancel", "/change-password", "/forgot-password", "/reset-password"]);
 
 function challengeContext(req: Request, res: Response): ChallengeContext {
   return { client: res.locals.client, origin: req.get("origin") ?? null, ipAddress: req.ip };
@@ -208,11 +208,14 @@ authRouter.post("/change-password", requireAuth, asyncRoute(async (req, res) => 
 for (const path of ["/logout", "/logout-all"]) {
   authRouter.post(
     path,
+    asyncRoute((_req, res, next) => {
+      // Origin/CSRF validation has run; clear the cookie even if authentication fails.
+      res.clearCookie(cookieName, cookieOptions);
+      next();
+    }),
     requireAuth,
     asyncRoute(async (req, res) => {
       bodyObject(req.body ?? {}, []);
-      // Clear browser credentials even when upstream revocation is unavailable.
-      res.clearCookie(cookieName, cookieOptions);
       if (authProvider() === "supabase") {
         const userId: string = res.locals.auth.user.id;
         await prismaPg.adminSessionVerification.deleteMany({ where: path === "/logout" ? {
@@ -284,7 +287,8 @@ function verificationType(data: Record<string, unknown>): EmailOtpType {
 for (const path of ["/forgot-password", "/reset-password", "/otp/request", "/otp/verify", "/otp/resend"]) {
   authRouter.post(path, asyncRoute(async (req, res) => {
     requireSupabase();
-    if (res.locals.client !== "native") throw new HttpError(400, "NATIVE_REQUIRED", "Use the mobile app.");
+    if (res.locals.client !== "native" && path !== "/forgot-password" && path !== "/reset-password")
+      throw new HttpError(400, "NATIVE_REQUIRED", "Use the mobile app.");
     const allowed = path === "/reset-password" ? ["email", "code", "newPassword"]
       : path === "/otp/verify" ? ["email", "code", "type", "purpose"]
       : path === "/otp/resend" ? ["email", "type", "purpose"] : ["email"];
@@ -302,6 +306,7 @@ for (const path of ["/forgot-password", "/reset-password", "/otp/request", "/otp
     if (typeof data.newPassword !== "string" || [...data.newPassword].length < 8 || [...data.newPassword].length > 128)
       throw new HttpError(400, "INVALID_INPUT", "Password must contain 8–128 characters.");
     await resetPassword(address, digits, data.newPassword);
+    if (res.locals.client === "browser") res.clearCookie(cookieName, cookieOptions);
     res.status(204).end();
   }));
 }

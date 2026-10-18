@@ -207,6 +207,44 @@ not a browser logout. Browsers with session restore can also retain session
 cookies across browser restarts, so this cookie setting cannot guarantee a new
 OTP after every restart; see [MDN's session-cookie behavior](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#expiresdate_optional).
 
+## Inactivity and password recovery
+
+Verified staff sessions sign out after five minutes without trusted `pointerdown`,
+`keydown`, or `mousemove` input. Activity timestamps and the timer live in refs;
+mouse movement does not update React state. Polling, API responses, focus, and
+visibility changes do not extend the deadline. A user action starts a fresh five
+minutes before a slow request, while login, restoration, OTP, recovery, and
+sign-out do not run the inactivity timer. Returning to an expired tab checks the
+deadline before accepting new activity. Effect cleanup supports React Strict Mode.
+
+This is a per-tab hard sign-out with no warning modal or activity sharing. An
+inactive tab can revoke the session and delete the cookie used by another tab;
+use one portal tab for this release. The existing logout flow clears local state
+and attempts server logout. The backend deletes the cookie before bearer-token
+validation, after Origin/CSRF validation. If the request cannot reach that handler,
+the frontend cannot delete the HttpOnly cookie and shows its existing server
+sign-out warning. This browser timer does not add server-side idle enforcement.
+
+The public `/forgot-password` and `/reset-password` routes use the existing
+Supabase recovery service. Requests use browser Origin/CSRF protection and never
+pretend to be native clients. Codes remain eight-digit strings, including leading
+zeros; passwords and codes stay in component memory. Navigation state carries
+only the email and resend deadline. Resend respects a minimum 60-second cooldown
+and backend 429 responses. Wrong codes stay inline without session refresh.
+
+Successful reset returns 204, clears the browser cookie, updates password age and
+the account cutoff/version, and revokes existing sessions and admin proofs. It
+returns no credentials: sign in again with the new password and administrator OTP.
+A timeout, network error, or server failure can follow a successful password
+change; the UI does not replay the request and requires a fresh code before
+another reset attempt. Ordinary unknown-account and wrong-code errors share the
+same response; provider failures and timing are not normalized to constant time.
+
+The hosted Supabase Reset Password template must display the complete
+`{{ .Token }}` and the project email OTP length must already be eight. The matching
+source is `backend/supabase/templates/reset-password.html`. Local builds and tests
+do not publish hosted templates or verify SMTP delivery.
+
 ## API utility
 
 `apiFetch(path, options)` accepts paths starting with `/`, relative to
@@ -245,9 +283,9 @@ if `VITE_API_URL` is missing.
 
 The backend supports browser password login, refresh, logout, and logout-all in
 Supabase mode after Origin and CSRF validation, including the three admin OTP
-endpoints. General registration, passwordless OTP and recovery remain native-only
-in that mode. Staff accounts must be active and linked to confirmed Supabase
-identities before they can sign in.
+endpoints and the two password recovery endpoints. General registration and
+passwordless OTP remain native-only in that mode. Staff accounts must be active
+and linked to confirmed Supabase identities before they can sign in.
 
 The Node test suite uses mocked fetch responses for token handling, retries,
 concurrency, API errors, challenge validation, table responses and permissions.

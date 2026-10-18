@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '../context/session'
 import { ApiError } from '../lib/api'
 import { useCountdown } from '../hooks/useCountdown'
+import { isRecord } from '../lib/auth'
 
 export function LoginPage() {
   const { login, user, status, sessionError, challenge } = useSession()
   const navigate = useNavigate()
+  const routeState: unknown = useLocation().state
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
@@ -45,6 +47,9 @@ export function LoginPage() {
         <p className="text-sm font-semibold text-brand">LeafCheck AI Administration</p>
         <h1 id="login-heading" className="mt-3 text-2xl font-semibold tracking-tight">Sign in</h1>
         <p className="mt-2 text-sm leading-6 text-subtle">Welcome back. Sign in to manage your platform.</p>
+        {isRecord(routeState) && routeState.passwordReset === true && <p role="status" className="notice-success mt-4">
+          Your password has been reset. Sign in and verify your email code to continue.
+        </p>}
 
         <form onSubmit={handleSubmit} aria-busy={busy} aria-describedby={error ? 'login-error' : undefined} className="mt-8 space-y-5">
           <div>
@@ -82,6 +87,9 @@ export function LoginPage() {
             {signingIn ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
+
+        <button type="button" disabled={busy} onClick={() => navigate('/forgot-password', { state: { email: email.trim().toLowerCase() } })}
+          className="mt-5 text-sm font-medium text-brand hover:underline disabled:opacity-50">Forgot password?</button>
 
         <p className="mt-6 border-t border-edge pt-5 text-xs leading-5 text-subtle">Access is limited to SuperAdmin and System Administrator accounts. Both staff roles verify an email code before signing in.</p>
       </section>

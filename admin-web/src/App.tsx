@@ -15,6 +15,8 @@ import { ProvisioningPage } from './pages/ProvisioningPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { IntegrationsPage } from './pages/IntegrationsPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 
 export default function App() {
   const { user, status } = useSession()
@@ -24,6 +26,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/login/otp" element={<AdminOtpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AdminLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />

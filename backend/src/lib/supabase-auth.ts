@@ -92,11 +92,11 @@ export async function forgotPassword(email: string) {
 }
 export async function resetPassword(email: string, code: string, password: string) {
   const expected = await mappedEmail(email);
-  if (!expected) throw new HttpError(400, "INVALID_CODE", "The code is invalid or expired.");
+  if (!expected) throw invalidOtp();
   const tokens = await verifyEmailCode(email, code, "recovery");
   try {
     const session = await authenticatedProviderSession(tokens.accessToken);
-    if (session.user.id !== expected.id) throw new HttpError(400, "INVALID_CODE", "The code is invalid or expired.");
+    if (session.user.id !== expected.id) throw invalidOtp();
     await supabasePublic.updatePassword(tokens.accessToken, password);
     await securityTransaction(async tx => {
       await tx.user.update({ where: { id: session.user.id }, data: {

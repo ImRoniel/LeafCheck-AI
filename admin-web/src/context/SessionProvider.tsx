@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { apiFetch, ApiError, getAccessToken, onSessionExpired, refreshAccessToken, setAccessToken, waitForRefresh } from '../lib/api'
 import { isAdminUser, isRecord, readAccessToken, readAdminChallenge, readChallengeTiming, readUser, type AdminChallenge, type LoginResult } from '../lib/auth'
 import { SessionContext, type AdminUser, type SessionStatus } from './session'
+import { useInactivityTimeout } from '../hooks/useInactivityTimeout'
 
 const jsonPost = { method: 'POST', headers: { 'Content-Type': 'application/json' } } as const
 const cancelled = () => new DOMException('The session has changed.', 'AbortError')
@@ -76,6 +77,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [updateChallenge])
 
   const logout = useCallback(() => performLogout(true), [performLogout])
+  useInactivityTimeout(status === 'authenticated', logout)
 
   const restoreSession = useCallback((): Promise<void> => {
     if (challengeRef.current) return Promise.resolve()
