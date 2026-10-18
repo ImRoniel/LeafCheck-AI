@@ -438,6 +438,17 @@ test('API errors retain only bounded allowlisted field messages', async () => {
   assert.deepEqual(error.fieldErrors, { email: 'Enter a valid address.', password: 'Password too weak.' })
 })
 
+test('non-JSON HTTP failures use readable messages and retain status and retry headers', async () => {
+  for (const [status, message] of [[401, /session has expired/], [403, /permission/], [404, /could not be found/],
+    [429, /Too many requests/], [502, /temporarily unavailable/]]) {
+    const error = await api.ApiError.fromResponse(new Response('Upstream failure', { status, headers: { 'Retry-After': '60' } }))
+    assert.equal(error.status, status)
+    assert.equal(error.retryAfter, 60)
+    assert.match(error.message, message)
+    assert.doesNotMatch(error.message, /HTTP|Upstream failure/)
+  }
+})
+
 test('user form validation matches email and password length boundaries without inventing provider rules', () => {
   assert.deepEqual(forms.validateUserForm({ name: '', role: 'USER', email: 'new@example.test', password: '😀'.repeat(8) }), {})
   const errors = forms.validateUserForm({ name: 'x'.repeat(101), role: 'OWNER', email: 'invalid', password: 'short' })

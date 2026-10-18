@@ -11,7 +11,7 @@ export function sensorPairingLabel(plant: Pick<Plant, "deviceId" | "simulated">)
 export function PlantSensorBadge({ plant }: { plant: Pick<Plant, "deviceId" | "simulated"> }) {
   if (!sensorPairingLabel(plant)) return null;
   return <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.badge}>
-    <Ionicons name="wifi" size={18} color="#278448" />
+    <Ionicons name="link-outline" size={18} color="#278448" />
   </View>;
 }
 

@@ -29,7 +29,7 @@ function SettingsEditor({ settings, disabled, reload, onSaved }: { settings: Pla
     </div>
     <div className="surface mt-5 p-6"><h2 className="mb-5 text-sm font-semibold">Security</h2>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><span>Staff password + email OTP</span><span className="inline-flex items-center gap-2 font-semibold text-brand"><LockKeyhole size={15} aria-hidden="true" />Required</span></div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>OTP for all accounts</span><span className="text-subtle">Planned mobile rollout</span></div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>Mobile email verification and recovery</span><span className="text-subtle">Available</span></div>
     </div>
     <p className="mt-5 text-xs text-subtle">Last changed{settings.updatedBy ? ` by ${settings.updatedBy.email}` : ''} · {formatTimestamp(settings.updatedAt)}</p>
     <div className="mt-6 flex justify-end gap-3"><button type="button" className="button-secondary" disabled={!changed || disabled} onClick={() => { setScanning(settings.aiScanningEnabled); setClaims(settings.deviceClaimsEnabled) }}>Discard</button>

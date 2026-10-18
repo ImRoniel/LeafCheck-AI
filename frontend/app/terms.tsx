@@ -21,8 +21,9 @@ export default function Terms() {
         mappings are not verified pairing.
       </Notice>
       <Notice>
-        Accounts require an email and password. Password recovery, email
-        verification, augmented reality, and account deletion are not available.
+        The mobile app supports email verification, email-code sign-in, and
+        password recovery. Augmented reality and self-service account deletion
+        are not available.
         Session credentials use native secure storage or secure browser cookies.
       </Notice>
       <Notice>

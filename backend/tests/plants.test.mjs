@@ -134,6 +134,20 @@ test("new account can create, list, view and delete its first plant", async () =
   assert.equal((await request("GET", `/${plant.id}`)).status, 404);
   assert.equal((await request("DELETE", `/${plant.id}`)).status, 404);
 });
+test("clearing a space location persists null without changing ownership or deleting the plant", async () => {
+  const created = await request("POST", "", { name: "Fern", species: "Fern", location: "Office" });
+  assert.equal(created.status, 201);
+  const plant = await created.json();
+  assert.equal((await request("PATCH", `/${plant.id}`, { location: null }, "other")).status, 404);
+  assert.equal(rows.get(plant.id).location, "Office");
+  const cleared = await request("PATCH", `/${plant.id}`, { location: null });
+  assert.equal(cleared.status, 200);
+  assert.equal(rows.get(plant.id).location, null);
+  assert.equal((await cleared.json()).location, undefined);
+  assert.equal((await request("GET", `/${plant.id}`)).status, 200);
+  await request("DELETE", `/${plant.id}`);
+});
+
 test("creation rejects invalid input and caller-controlled ownership without writes", async () => {
   const count = writes;
   for (const body of [
@@ -234,7 +248,7 @@ test("patch validation rejects invalid fields without writes and handles concurr
     { deviceId: randomUUID() },
     { imageUrl: "javascript:alert(1)" },
     { imageUrl: "https://u:p@example.test" },
-    { location: null },
+    { location: 42 },
     { minMoisture: -1 },
     { maxMoisture: 101 },
     { minMoisture: "30" },

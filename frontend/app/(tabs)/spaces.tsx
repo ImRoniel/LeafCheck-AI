@@ -17,7 +17,7 @@ export default function SpacesScreen() {
   const router = useRouter();
   const { filter } = useLocalSearchParams<{ filter?: string }>();
   const insets = useSafeAreaInsets();
-  const { spaces, plantsBySpace, addSpace, ready, error: storageError, retry, archivedSpaces, restoreSpace } = useSpaces();
+  const { spaces, plantsBySpace, backgrounds: spaceColors = {}, addSpace, ready, error: storageError, retry, archivedSpaces, restoreSpace } = useSpaces();
   const namedSpaces = spaces.filter(space => space.trim().toLowerCase() !== "unassigned");
   const unassignedPlants = spaces.filter(space => space.trim().toLowerCase() === "unassigned").flatMap(space => plantsBySpace[space] ?? []);
   const appData = useAppData();
@@ -63,7 +63,7 @@ export default function SpacesScreen() {
           const plantCount = plantsBySpace[space]?.length ?? 0;
           const countLabel = `${plantCount} ${plantCount === 1 ? "plant" : "plants"}`;
           return (
-          <View key={space} style={styles.spaceCard}>
+          <View key={space} style={{ ...styles.spaceCard, backgroundColor: spaceColors[space] ?? styles.spaceCard.backgroundColor }}>
             <Pressable style={styles.cardOpen} onPress={() => router.push({ pathname: "/(tabs)/space-detail", params: { space } })} accessibilityRole="button" accessibilityLabel={`Open ${space}`} accessibilityHint={`${countLabel}. View this space's plants.`} />
             <SpaceMenuButton style={styles.menuDots} onOpen={anchor => setManaged({ space, anchor })} label={`Manage ${space}`} />
             <View pointerEvents="box-none" style={styles.cardFooter}>

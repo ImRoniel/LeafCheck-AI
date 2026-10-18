@@ -21,18 +21,17 @@ export default function SensorChoice() {
           users can scan leaves with the AI camera without hardware.
         </Text>
         <Text style={ui.note}>
-          Care logging and automatic notifications are planned next; this setup
-          saves your preferences but does not schedule notifications yet.
+          Your care schedule is saved on this device. You can track completed
+          care in Care Tasks. Automatic notifications are not enabled.
         </Text>
       </View>
       <View style={ui.card}>
         <Text style={ui.heading}>Sensors can add live observations</Text>
         <Text style={ui.text}>
           Compatible, already-linked hardware can report soil moisture,
-          temperature, humidity, and light. New device pairing is not available
-          in this app version.
+          temperature, humidity, and light. After signing in, use Pair a Sensor
+          on your plant profile or Pair a new sensor in Settings to connect your device.
         </Text>
-        <Action label="Yes — pair a sensor (unavailable)" disabled />
       </View>
       <Action
         label={action.busy ? "Saving…" : "Start Free in Manual Mode"}

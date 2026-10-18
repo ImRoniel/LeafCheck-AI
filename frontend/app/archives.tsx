@@ -1,4 +1,5 @@
 import { Action, Notice, Screen, ui } from "@/components/screen";
+import { DiagnosticReport } from "@/components/DiagnosticReport";
 import { api } from "@/services/api";
 import { groupArchives } from "@/services/archive-groups";
 import { usePollingResource } from "@/services/use-polling-resource";
@@ -57,7 +58,7 @@ export default function Archives() {
           {expanded && <View style={s.details}>
             {entry.notificationTime && <Text style={s.meta}>Follow-up · {new Date(entry.notificationTime).toLocaleString()}{entry.notificationReason ? ` — ${entry.notificationReason}` : ""}</Text>}
             <Text style={s.detailsHeading}>Diagnostic report</Text>
-            <Text style={s.report}>{entry.rawAnalysisText || "No diagnostic text was saved."}</Text>
+            <DiagnosticReport key={entry.id} text={entry.rawAnalysisText || "No diagnostic text was saved."} readMoreLabel="Read full report" />
           </View>}
         </View>;
       })}
@@ -77,5 +78,4 @@ const s = StyleSheet.create({
   scanHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, minHeight: 44 },
   scanSummary: { flex: 1, gap: 4 }, date: { fontSize: 14, color: "#193E27" }, status: { fontSize: 12, textTransform: "capitalize" },
   details: { gap: 8, paddingBottom: 16 }, detailsHeading: { fontSize: 13, fontWeight: "600", color: "#193E27" },
-  report: { fontSize: 14, lineHeight: 21, color: "#365340" },
 });

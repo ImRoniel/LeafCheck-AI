@@ -109,7 +109,7 @@ const plant = object({
   simulated: optional(boolean),
   name: text,
   species: text,
-  location: optional(text),
+  location: optional(nullable(text)),
   healthStatus: health,
   lastScannedAt: optional(date),
   imageUrl: optional(text),

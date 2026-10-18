@@ -531,6 +531,57 @@ test('SuperAdmin registers unclaimed hardware and revokes approval with version 
   assert.deepEqual(requests.find(request => request.method === 'PATCH').body, { status: 'REVOKED', updatedAt: userVersion, reason: 'Retire physical sensor' })
 })
 
+test('duplicate hardware explains the MAC conflict and allows correcting the registration', async t => {
+  const { page, requests } = await app(t, { restored: true, handle: entry =>
+    entry.path === '/admin/devices/whitelist' && entry.method === 'POST' && entry.body.macAddress === sensor.macAddress
+      ? reply({ code: 'HARDWARE_ALREADY_REGISTERED', error: 'Hardware already registered.' }, 409) : null })
+  await page.goto(origin + '/provisioning')
+  await page.getByRole('button', { name: 'Register hardware', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Register approved hardware', exact: true })
+  await dialog.getByLabel('MAC address', { exact: true }).fill(sensor.macAddress)
+  await dialog.getByLabel('Reason', { exact: true }).fill('Prepare a defense sensor')
+  await dialog.getByRole('button', { name: 'Register hardware', exact: true }).click()
+  await dialog.getByRole('alert').filter({ hasText: 'This MAC address is already registered.' }).waitFor()
+  assert.equal(await dialog.getByText('This record changed after you opened it.', { exact: false }).count(), 0)
+  assert.equal(await dialog.getByLabel('MAC address', { exact: true }).isEnabled(), true)
+  await dialog.getByLabel('MAC address', { exact: true }).fill('11:22:33:44:55:66')
+  await dialog.getByRole('button', { name: 'Register hardware', exact: true }).click()
+  await page.getByRole('cell', { name: '11:22:33:44:55:66', exact: true }).waitFor()
+  assert.equal(requests.filter(entry => entry.path === '/admin/devices/whitelist' && entry.method === 'POST').length, 2)
+})
+
+test('provisioning distinguishes an empty registry from search and filter misses', async t => {
+  const { page, requests } = await app(t, { restored: true })
+  await page.goto(origin + '/provisioning')
+  await page.getByText('No hardware registered.', { exact: true }).waitFor()
+  await page.getByLabel('Search hardware', { exact: true }).fill('missing-sensor')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await page.getByText('No hardware matches your search.', { exact: true }).waitFor()
+  assert.ok(requests.some(entry => entry.path === '/admin/devices/whitelist' && entry.query.get('q') === 'missing-sensor'))
+  await page.getByLabel('Search hardware', { exact: true }).fill('')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await page.getByText('No hardware registered.', { exact: true }).waitFor()
+  await page.getByLabel('Approval', { exact: true }).selectOption('REVOKED')
+  await page.getByText('No hardware matches your filters.', { exact: true }).waitFor()
+})
+
+test('device details uses readable status labels while failed telemetry remains retryable', async t => {
+  const { page } = await app(t, { restored: true, handle: entry => {
+    if (entry.path === '/admin/devices/sensor-1' && entry.method === 'GET') return reply({ data: {
+      ...sensor, updatedAt: userVersion, connectionStatus: 'OFFLINE', lastReadingAt: null, readingError: true, pairing: null,
+    } })
+    if (entry.path === '/admin/devices/sensor-1/readings') return reply({ error: 'Sensor readings are temporarily unavailable.' }, 503)
+  } })
+  await page.goto(origin + '/devices')
+  await page.getByRole('button', { name: 'Manage Office sensor', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Device details', exact: true })
+  await dialog.getByText('Offline', { exact: true }).waitFor()
+  await dialog.getByText('Unavailable', { exact: true }).waitFor()
+  await dialog.getByRole('alert').filter({ hasText: 'Sensor readings are temporarily unavailable.' }).waitFor()
+  assert.equal(await dialog.getByRole('button', { name: 'Try again', exact: true }).isEnabled(), true)
+  assert.equal(await dialog.getByText('OFFLINE', { exact: true }).count(), 0)
+})
+
 test('platform settings require explicit confirmation and send only changed fields with the version', async t => {
   const { page, requests } = await app(t, { restored: true })
   await page.goto(`${origin}/settings`)
@@ -627,6 +678,13 @@ test('users table supports paginated search, creation, ban/unban and prevents se
   assert.equal(requests.at(-1).query.get('q'), 'Person 1')
   assert.equal(requests.at(-1).query.get('page'), '1')
   await page.getByRole('button', { name: 'Ban Person 1', exact: true }).click()
+  const banDialog = page.getByRole('dialog', { name: 'Ban user?', exact: true })
+  await banDialog.getByText('Are you sure you want to ban p***1@example.test?', { exact: true }).waitFor()
+  assert.equal(requests.filter(request => request.method === 'PATCH').length, 0)
+  await banDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  assert.equal(requests.filter(request => request.method === 'PATCH').length, 0)
+  await page.getByRole('button', { name: 'Ban Person 1', exact: true }).click()
+  await banDialog.getByRole('button', { name: 'Ban user', exact: true }).click()
   await page.getByRole('button', { name: 'Unban Person 1', exact: true }).waitFor()
   await page.getByRole('button', { name: 'Unban Person 1', exact: true }).click()
   await page.getByRole('button', { name: 'Ban Person 1', exact: true }).waitFor()
@@ -753,11 +811,104 @@ test('a failed ban leaves the account active and shows the backend error', async
   } })
   await page.goto(`${origin}/users`)
   await page.getByRole('button', { name: 'Ban Member', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Ban user?', exact: true }).getByRole('button', { name: 'Ban user', exact: true }).click()
   await page.getByRole('alert').filter({ hasText: 'Account changed. Review and retry.' }).waitFor()
+  await page.getByRole('dialog', { name: 'Ban user?', exact: true }).getByRole('button', { name: 'Cancel', exact: true }).click()
   const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Member', exact: true }) })
   assert.equal(await row.getByRole('cell', { name: 'Active', exact: true }).count(), 1)
   assert.equal(await row.getByRole('button', { name: 'Ban Member', exact: true }).isEnabled(), true)
   assert.equal(requests.filter(request => request.method === 'PATCH').length, 1)
+})
+
+test('a ban conflict requires reviewing the current account before another submission', async t => {
+  const { page, requests } = await app(t, { restored: true, handle: (entry, state) => {
+    if (entry.path === `/admin/users/${member.id}` && entry.method === 'PATCH') {
+      const row = state.users.find(user => user.id === member.id)
+      row.name = 'Updated member'
+      row.updatedAt = new Date(Date.parse(userVersion) + 1).toISOString()
+      return reply({ code: 'CONFLICT', error: 'This user was modified by another administrator. Please refresh.' }, 409)
+    }
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Reveal emails', exact: true }).click()
+  await page.getByRole('cell', { name: member.email, exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Ban Member', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Ban user?', exact: true })
+  await dialog.getByText(`Are you sure you want to ban ${member.email}?`, { exact: true }).waitFor()
+  await dialog.getByRole('button', { name: 'Ban user', exact: true }).click()
+  await dialog.getByRole('alert').filter({ hasText: 'modified by another administrator' }).waitFor()
+  assert.equal(await dialog.getByRole('button', { name: 'Ban user', exact: true }).isDisabled(), true)
+  assert.equal(requests.filter(entry => entry.method === 'PATCH').length, 1)
+  await dialog.getByRole('button', { name: 'Close and refresh', exact: true }).click()
+  await page.getByRole('button', { name: 'Ban Updated member', exact: true }).waitFor()
+})
+
+for (const failure of ['conflict', 'timeout']) test(`unban can retry after ${failure} and a table refresh without opening another dialog`, async t => {
+  let writes = 0;
+  const { page, requests } = await app(t, { restored: true, users: [
+    { ...admin, emailMasked: 'a***@example.test', isActive: true },
+    { ...member, emailMasked: 'm***@example.test', isActive: false },
+  ], handle: (entry, state) => {
+    if (entry.path === `/admin/users/${member.id}` && entry.method === 'PATCH' && ++writes === 1) {
+      state.users.find(user => user.id === member.id).updatedAt = new Date(Date.parse(userVersion) + 1).toISOString();
+      return failure === 'conflict' ? reply({ code: 'CONFLICT', error: 'Account changed. Refresh and retry.' }, 409)
+        : reply({ error: 'Gateway timeout' }, 504);
+    }
+  } })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Unban Member', exact: true }).click()
+  await page.getByRole('alert').waitFor()
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await page.getByRole('button', { name: 'Unban Member', exact: true }).click()
+  await page.getByRole('button', { name: 'Ban Member', exact: true }).waitFor()
+  assert.equal(requests.filter(entry => entry.method === 'PATCH').length, 2)
+  assert.equal(await page.getByRole('dialog').count(), 0)
+})
+
+test('desktop table contains maximum-length valid account text without unnecessary scrolling', async t => {
+  const email = 'a'.repeat(64) + '@' + 'b'.repeat(63) + '.' + 'c'.repeat(63) + '.' + 'd'.repeat(56) + '.test'
+  const { page } = await app(t, { restored: true, users: [
+    { ...admin, emailMasked: 'a***@example.test', isActive: true },
+    { ...member, name: 'W'.repeat(100), email, emailMasked: 'm***@example.test', isActive: true },
+  ] })
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Reveal emails', exact: true }).click()
+  const emailCell = page.getByRole('cell', { name: email, exact: true })
+  await emailCell.waitFor()
+  const region = page.getByRole('region', { name: 'User table', exact: true })
+  assert.equal(await region.evaluate(node => node.scrollWidth <= node.clientWidth), true)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  assert.equal(await emailCell.evaluate(node => node.scrollWidth <= node.clientWidth), true)
+  await screenshot(page, 'users-1920-long-email')
+})
+
+test('user columns stay readable on small laptops and overflow is contained within the table', async t => {
+  const { page } = await app(t, { restored: true })
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await page.goto(origin + '/users')
+  await page.getByRole('button', { name: 'Reveal emails', exact: true }).click()
+  await page.getByRole('cell', { name: member.email, exact: true }).waitFor()
+  for (const width of [1024, 1280, 1920]) {
+    await page.setViewportSize({ width, height: 768 })
+    const region = page.getByRole('region', { name: 'User table', exact: true })
+    const row = region.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Member', exact: true }) })
+    const cells = row.getByRole('cell')
+    assert.ok((await cells.nth(0).boundingBox()).width >= 200)
+    assert.ok((await cells.nth(1).boundingBox()).width >= 200)
+    assert.ok((await cells.nth(1).boundingBox()).height < 80)
+    assert.ok((await cells.nth(4).boundingBox()).width >= 150)
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)
+    const scroll = await region.evaluate(node => {
+      node.scrollLeft = node.scrollWidth
+      return { width: node.clientWidth, total: node.scrollWidth, left: node.scrollLeft, overflow: getComputedStyle(node).overflowX }
+    })
+    assert.equal(scroll.overflow, 'auto')
+    if (width === 1024) { assert.ok(scroll.total > scroll.width); assert.ok(scroll.left > 0) }
+    if (width === 1920) { assert.equal(scroll.total, scroll.width); assert.equal(scroll.left, 0) }
+    await region.evaluate(node => { node.scrollLeft = 0 })
+    await screenshot(page, `users-${width}`)
+  }
 })
 
 test('a lost admin verification signs out instead of refreshing or repeatedly requesting admin data', async t => {
@@ -1090,6 +1241,7 @@ test('failed refresh shows a session-expired alert during logout and on the logi
   await page.getByRole('button', { name: 'Ban Member', exact: true }).waitFor()
   failRefresh = true
   await page.getByRole('button', { name: 'Ban Member', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Ban user?', exact: true }).getByRole('button', { name: 'Ban user', exact: true }).click()
   await page.getByRole('alert').filter({ hasText: 'Your session has expired. Please log in again.' }).waitFor()
   assert.equal(new URL(page.url()).pathname, '/users')
   releaseLogout()

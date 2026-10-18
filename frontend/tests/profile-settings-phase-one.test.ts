@@ -222,7 +222,8 @@ test("device manager reads the account inventory including unlinked and demo dev
   const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
   await h.overview.refresh(); await h.settle();
   assert.equal(h.requests[0].url, "https://settings.test/api/devices/overview");
-  for (const value of ["LC-A50528", "LC-000001", "DEMO:44444444", "Not linked to a plant", "Demo sensor"]) assert.match(h.text, new RegExp(value));
+  for (const value of ["LC-A50528", "LC-000001", "44444444", "Not linked to a plant", "Demo sensor"]) assert.match(h.text, new RegExp(value));
+  assert.doesNotMatch(h.text, /DEMO:/);
   assert.doesNotMatch(h.text, /Local demo assignments|Save local mapping/);
   h.press("Pair a new sensor"); assert.deepEqual(h.routes, ["/device-connection/scanner"]);
 });

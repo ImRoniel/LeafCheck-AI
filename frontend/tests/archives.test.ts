@@ -32,6 +32,7 @@ function harness(filter?: unknown) {
     if (name === "react/jsx-runtime") return requireModule(name);
     if (name === "react-native") return { Text: "Text", View: "View", Pressable: "Pressable", ActivityIndicator: "ActivityIndicator", StyleSheet: { create: (styles: unknown) => styles } };
     if (name === "@/components/screen") return { Action: "Action", Notice: "Notice", Screen: "Screen", ui: {} };
+    if (name === "@/components/DiagnosticReport") return { DiagnosticReport: "DiagnosticReport" };
     if (name === "@expo/vector-icons") return { Ionicons: "Icon" };
     if (name === "expo-router") return { useLocalSearchParams: () => ({ plantId: filter }) };
     if (name === "@/services/api") return { api };
@@ -68,6 +69,7 @@ test("reports and follow-up details stay collapsed until a scan row is opened", 
   const row = elements(node).find(item => item.type === "Pressable" && item.props.accessibilityLabel?.startsWith("Show scan details for Monstera"));
   row?.props.onPress?.(); const expanded = screen.render();
   assert.match(JSON.stringify(expanded), /Report new|Follow-up/);
+  assert.equal(elements(expanded).find(item => item.type === "DiagnosticReport")?.props.text, "Report new");
   assert.equal(elements(expanded).filter(item => item.props.accessibilityState?.expanded).length, 1);
 });
 test("invalid plant filters do not request the all-plant archive list", async () => {

@@ -198,6 +198,7 @@ scanRouter.post("/", async (req: Request, res: Response) => {
       plantId: context.plant.id, pairingId: context.session.id, capturedAt: new Date().toISOString(),
     }) : null;
     console.log("[Scan] Step 4: Fetching specs and telemetry concurrently...");
+    let telemetryUnavailable = false;
     const [specs, latestReading] = await Promise.all([
       // 4a. PlantSpecCache lookup (with Perenual fallback)
       (async () => {
@@ -261,19 +262,36 @@ scanRouter.post("/", async (req: Request, res: Response) => {
         return cached;
       })(),
 
-      // 4b. Latest MongoDB SensorReading
-      sessionContext
-        ? prisma.sensorReading.findFirst({
-            where: { plantId: sessionContext.plantId, pairingId: sessionContext.pairingId, contextVersion: 1 },
-            orderBy: [{ timestamp: "desc" }, { id: "desc" }],
-          })
-        : Promise.resolve(null),
+      // 4b. Optional telemetry must not wait for a stalled MongoDB connection.
+      (async () => {
+        if (!sessionContext) return null;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await Promise.race([
+            prisma.sensorReading.findFirst({
+              where: { plantId: sessionContext.plantId, pairingId: sessionContext.pairingId, contextVersion: 1 },
+              orderBy: [{ timestamp: "desc" }, { id: "desc" }],
+            }),
+            new Promise<never>((_resolve, reject) => {
+              timer = setTimeout(() => reject(new Error("Sensor telemetry deadline exceeded.")), 5_000);
+            }),
+          ]);
+        } catch {
+          telemetryUnavailable = true;
+          console.warn("[Scan] Sensor telemetry unavailable; continuing with image-only diagnosis.");
+          return null;
+        } finally {
+          clearTimeout(timer);
+        }
+      })(),
     ]);
 
     // ── Step 5: Calculate telemetry freshness ─────────────────────────────
     let freshnessContext: string;
     if (!latestReading) {
-      freshnessContext = sessionContext
+      freshnessContext = telemetryUnavailable
+        ? "Sensor telemetry is temporarily unavailable. Environmental analysis is based on image only."
+        : sessionContext
         ? "No telemetry data found for this plant's active pairing session. Environmental analysis is based on image only."
         : sensorDevice
           ? "No active pairing session is available for this plant. Environmental analysis is based on image only."
@@ -544,14 +562,24 @@ scanRouter.get("/archives", async (req: Request, res: Response) => {
 scanRouter.get("/tasks", async (req: Request, res: Response) => {
   const userId = res.locals.auth.user.id;
   try {
-    const tasks = await prismaPg.careTask.findMany({
-      where: { userId, ...(res.locals.guidancePlantId ? { plantId: res.locals.guidancePlantId as string } : {}) },
-      orderBy: [{ status: "asc" }, { dueDate: "asc" }],
-      take: 50,
-      include: {
+    const where = { userId, ...(res.locals.guidancePlantId ? { plantId: res.locals.guidancePlantId as string } : {}) };
+    const tasks = await prismaPg.$transaction(async tx => {
+      const include = {
         plant: { select: { id: true, name: true, species: true } },
-      },
-    });
+      } as const;
+      const orderBy = [{ dueDate: "asc" }, { id: "asc" }] as const;
+      // Fill the bounded result with pending work before completed history.
+      // One snapshot prevents duplicates if a task completes between queries.
+      const pending = await tx.careTask.findMany({
+        where: { ...where, status: "PENDING" }, orderBy: [...orderBy], take: 50, include,
+      });
+      if (pending.length === 50) return pending;
+      const history = await tx.careTask.findMany({
+        where: { ...where, status: { not: "PENDING" } },
+        orderBy: [...orderBy], take: 50 - pending.length, include,
+      });
+      return [...pending, ...history];
+    }, { isolationLevel: "RepeatableRead" });
     res.json(tasks);
   } catch (error) {
     console.error("[Scan] Tasks error:", error);

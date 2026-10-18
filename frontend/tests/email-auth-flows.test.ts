@@ -566,6 +566,26 @@ for (const type of ["signup", "magiclink"] as const) {
   }
 }
 
+test("signup OTP offers a return to password login even while verification is pending", async () => {
+  const routes: unknown[] = [];
+  let cancellations = 0;
+  let finish!: () => void;
+  const app = screen("app/otp-verification.tsx", {
+    "@/context/auth": { useAuth: () => ({ status: "verificationRequired",
+      pendingVerification: { email: "person@example.test", purpose: "registration" },
+      cancelVerification() { cancellations++; },
+      async verifyOtp() { await new Promise<void>(resolve => { finish = resolve; }); },
+    }) },
+    "expo-router": { useLocalSearchParams: () => ({ email: "person@example.test", type: "signup" }),
+      useRouter: () => ({ replace: (route: unknown) => routes.push(route) }) },
+  });
+  app.fill("Email code", "00123456"); app.press("Verify code");
+  app.press("Return to login");
+  assert.equal(cancellations, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(routes)), [{ pathname: "/login", params: { email: "person@example.test" } }]);
+  finish(); await flush(); app.unmount();
+});
+
 test("OTP verification and resend display progress on the operation being performed", async (t) => {
   t.mock.timers.enable({ apis: ["Date", "setTimeout"] });
   let finish!: () => void;

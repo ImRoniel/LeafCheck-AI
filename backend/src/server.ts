@@ -45,15 +45,19 @@ app.use(
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 300,
+    // Dashboard telemetry polls once per linked plant. Leave room for those
+    // reads and shared-network staff activity; auth and AI have tighter quotas.
+    limit: 1000,
     standardHeaders: "draft-8",
     legacyHeaders: false,
     identifier: "global",
     message: { error: "Too many requests. Please try again later." },
   }),
 );
-app.use(
-  "/api/scan",
+// Only analysis submissions share the scan quota. Saved reports and care tasks
+// must remain available after that quota is exhausted.
+app.post(
+  ["/api/scan", "/api/ai/analyze"],
   rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 10,
@@ -67,7 +71,7 @@ app.use(
   "/api/auth",
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 20,
+    limit: 100,
     standardHeaders: "draft-8",
     legacyHeaders: false,
     identifier: "auth",

@@ -24,12 +24,17 @@ before(async () => {
   process.env.PORT = "0";
   for (const name of ["telemetry", "plants", "devices", "ai", "scan", "auth", "users"]) {
     const router = express.Router();
+    if (name === "plants") router.get("/:id/telemetry", (_req, res) => res.json({ paired: false }));
     if (name === "scan") {
-      router.post("/", (_req, res) => {
+      router.get(["/tasks", "/archives"], (_req, res) => res.json([]));
+      router.patch("/tasks/:id", (_req, res) => res.json({ status: "COMPLETED" }));
+      router.post("/", (req, res) => {
         scanCalls++;
+        if (req.body?.imageBase64 === "valid-scan-fixture") return res.status(201).json({ success: true });
         res.status(400).json({ error: "Mock scan validation failure" });
       });
     }
+    if (name === "ai") router.post("/analyze", (_req, res) => res.status(400).json({ error: "Mock analysis validation failure" }));
     mock.module(new URL(`../src/routes/${name}.js`, import.meta.url).href, {
       namedExports: { [`${name}Router`]: router },
     });
@@ -118,7 +123,7 @@ test("headers, preflight, independent quotas, and rejection before body parsing"
   });
   assert.equal(oversized.status, 413);
   assert.equal((await oversized.json()).code, "BODY_TOO_LARGE");
-  for (let i = 0; i < 19; i++) {
+  for (let i = 0; i < 99; i++) {
     const response = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -202,8 +207,8 @@ test("headers, preflight, independent quotas, and rejection before body parsing"
   assert.equal(scanBlocked.headers.get("access-control-allow-origin"), null);
   assert.equal(scanCalls, 10);
 
-  // 33 requests counted globally so far; preflight is handled by CORS.
-  for (let i = 0; i < 267; i++) {
+  // 113 requests counted globally so far; preflight is handled by CORS.
+  for (let i = 0; i < 887; i++) {
     const response = await fetch(`${baseUrl}/missing`);
     assert.equal(response.status, 404);
     await response.json();
@@ -216,4 +221,45 @@ test("headers, preflight, independent quotas, and rejection before body parsing"
   );
   assert.ok(Number(globalBlocked.headers.get("retry-after")) > 0);
   assert.equal(globalBlocked.headers.get("x-content-type-options"), "nosniff");
+});
+
+test("saved report reads and task updates do not consume or depend on the shared analysis quota", async () => {
+  const headers = { "X-Forwarded-For": "198.51.100.42", "Content-Type": "application/json" };
+  for (let i = 0; i < 15; i++) {
+    for (const path of ["/api/scan/tasks", "/api/scan/archives"]) {
+      assert.equal((await fetch(baseUrl + path, { headers })).status, 200);
+    }
+    assert.equal((await fetch(baseUrl + "/api/scan/tasks", { method: "POST", headers, body: "{}" })).status, 404);
+  }
+  for (let i = 0; i < 10; i++) {
+    const path = i % 2 ? "/api/ai/analyze" : "/api/scan";
+    assert.equal((await fetch(baseUrl + path, { method: "POST", headers, body: "{}" })).status, 400);
+  }
+  for (const path of ["/api/scan", "/api/ai/analyze"]) {
+    assert.equal((await fetch(baseUrl + path, { method: "POST", headers, body: "{" })).status, 429);
+  }
+  for (const path of ["/api/scan/tasks", "/api/scan/archives"]) {
+    assert.equal((await fetch(baseUrl + path, { headers })).status, 200);
+  }
+  assert.equal((await fetch(baseUrl + "/api/scan/tasks/example", { method: "PATCH", headers, body: '{"status":"COMPLETED"}' })).status, 200);
+});
+
+test("multi-device dashboard polling, task refresh and a scan fit within the shared network budget", async () => {
+  const headers = { "X-Forwarded-For": "198.51.100.212", "Content-Type": "application/json" };
+  for (let round = 0; round < 30; round++) {
+    for (let index = 0; index < 16; index++) {
+      const response = await fetch(`${baseUrl}/api/plants/plant-${index}/telemetry`, { headers });
+      assert.equal(response.status, 200);
+      await response.arrayBuffer();
+    }
+    if (round % 2 === 0) for (const path of ["/api/scan/tasks", "/api/scan/archives"]) {
+      const response = await fetch(baseUrl + path, { headers });
+      assert.equal(response.status, 200);
+      await response.arrayBuffer();
+    }
+  }
+  assert.equal((await fetch(baseUrl + "/api/scan/tasks", { headers })).status, 200);
+  const scan = await fetch(baseUrl + "/api/scan", { method: "POST", headers, body: '{"imageBase64":"valid-scan-fixture"}' });
+  assert.equal(scan.status, 201);
+  assert.deepEqual(await scan.json(), { success: true });
 });

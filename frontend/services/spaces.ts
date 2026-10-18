@@ -1,14 +1,16 @@
 import type { LocalState, LocalSpace } from "../types/local-state";
 import type { Plant } from "../types/plant";
 export const spaceBackgrounds = ["#E8F2E8", "#E3EFEF", "#F3EBD8", "#EDE6F1", "#F5E5DE"] as const;
-export function isUnassignedPlant(plant: Plant) {
-  return !plant.location?.trim() || plant.location.trim().toLowerCase() === "unassigned";
+export function isUnassignedPlant(plant: Plant, metadata: readonly LocalSpace[] = []) {
+  const location = plant.location?.trim().toLowerCase();
+  return !location || location === "unassigned" || metadata.some(space =>
+    space.status === "deleted" && space.name.toLowerCase() === location);
 }
 export function assignLocalPlant(state: LocalState, plantId: string, space: string): LocalState {
   const destination = groupSpaces(state.spaces, state.guestPlants).spaces;
   if (!destination.includes(space) || space.trim().toLowerCase() === "unassigned") throw new Error("This space is unavailable.");
   const plant = state.guestPlants.find(item => item.id === plantId);
-  if (!plant || !isUnassignedPlant(plant)) throw new Error("This plant is no longer unassigned. Refresh your plants and try again.");
+  if (!plant || !isUnassignedPlant(plant, state.spaces)) throw new Error("This plant is no longer unassigned. Refresh your plants and try again.");
   return { ...state, guestPlants: state.guestPlants.map(item => item.id === plantId
     ? { ...item, location: space, updatedAt: new Date().toISOString() } : item) };
 }
@@ -16,7 +18,7 @@ export function groupSpaces(metadata: LocalSpace[], plants: Plant[]) {
   const groups = new Map<string, Plant[]>();
   metadata.forEach(s => { if (!s.status) groups.set(s.name, []); });
   plants.forEach(plant => {
-    const raw = plant.location?.trim() || "Unassigned";
+    const raw = isUnassignedPlant(plant, metadata) ? "Unassigned" : plant.location!.trim();
     const match = metadata.find(s => s.name.toLowerCase() === raw.toLowerCase());
     if (match?.status) return;
     const name = match?.name ?? raw;
@@ -42,13 +44,16 @@ export function createSpace(state: LocalState, raw: string, background: string, 
   }] };
 }
 export function manageSpace(state: LocalState, name: string, status?: "archived" | "deleted") {
-  if (name === "Unassigned") throw new Error("Unassigned is not a space to manage.");
+  if (name.trim().toLowerCase() === "unassigned") throw new Error("Unassigned is not a space to manage.");
   const existing = state.spaces.find(s => s.name === name);
   const space: LocalSpace = existing ?? {
     id: `space-${Date.now()}-${Math.random().toString(36).slice(2)}`, name,
     theme: "living", light: "medium", createdAt: new Date().toISOString(),
   };
-  return { ...state, spaces: [...state.spaces.filter(s => s.id !== space.id), { ...space, status }] };
+  return { ...state, spaces: [...state.spaces.filter(s => s.id !== space.id), { ...space, status }],
+    guestPlants: status === "deleted" ? state.guestPlants.map(plant =>
+      plant.location?.trim().toLowerCase() === name.toLowerCase()
+        ? { ...plant, location: null, updatedAt: new Date().toISOString() } : plant) : state.guestPlants };
 }
 export function validateManualPlant(plants: Plant[], raw: string, species: string) {
   const name = raw.trim().replace(/\s+/g, " ");

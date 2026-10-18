@@ -25,6 +25,15 @@ export function onSessionExpired(handler: () => Promise<void>): () => void {
   }
 }
 
+function httpErrorMessage(status: number): string {
+  if (status === 401) return 'Your session has expired. Please log in again.'
+  if (status === 403) return 'You do not have permission to perform this action.'
+  if (status === 404) return 'This item could not be found. Refresh and try again.'
+  if (status === 429) return 'Too many requests. Please wait a moment and try again.'
+  if (status >= 500) return 'The server is temporarily unavailable. Please try again shortly.'
+  return 'The request could not be completed. Please check your information and try again.'
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
@@ -55,8 +64,8 @@ export class ApiError extends Error {
     }
     return new ApiError(
       response.status,
-      isRecord(payload) && typeof payload.error === 'string'
-        ? payload.error : response.statusText || `API request failed (${response.status}).`,
+      isRecord(payload) && typeof payload.error === 'string' && payload.error.trim()
+        ? payload.error : httpErrorMessage(response.status),
       isRecord(payload) && typeof payload.code === 'string' ? payload.code : undefined,
       Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter : undefined,
       fieldErrors,

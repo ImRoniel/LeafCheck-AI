@@ -23,7 +23,7 @@ export interface Plant {
   simulated?: boolean;
   name: string;
   species: string;
-  location?: string;
+  location?: string | null;
   minMoisture?: number;
   maxMoisture?: number;
   healthStatus: HealthStatus;

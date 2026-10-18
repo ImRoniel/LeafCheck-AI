@@ -5,7 +5,7 @@ import { useSession } from '../context/session'
 import { useAdminResource } from '../hooks/useAdminResource'
 import { readDeviceDetails, readTelemetryReadings } from '../lib/operations'
 import { hasPermission } from '../lib/permissions'
-import { formatTimestamp } from '../lib/format'
+import { formatAuditAction, formatTimestamp } from '../lib/format'
 import { Modal } from './Modal'
 import { RequestError } from './AdminTable'
 import { StatusBadge } from './StatusBadge'
@@ -31,7 +31,7 @@ export function DeviceDetailsPanel({ deviceId, onClose, onChanged, diagnostics =
     {detail.loading ? <p role="status" className="text-sm text-subtle">Loading device details...</p> : device && <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h3 className="text-xl font-semibold">{device.name}</h3><p className="mt-2 font-mono text-sm text-subtle">{device.macAddress}</p></div>
-        <StatusBadge tone={device.simulated ? 'info' : device.connectionStatus === 'ONLINE' ? 'success' : 'neutral'} dot>{device.simulated ? 'Simulated device' : device.connectionStatus.replaceAll('_', ' ')}</StatusBadge>
+        <StatusBadge tone={device.simulated ? 'info' : device.connectionStatus === 'ONLINE' ? 'success' : 'neutral'} dot>{device.simulated ? 'Simulated device' : formatAuditAction(device.connectionStatus)}</StatusBadge>
       </div>
       <dl className="my-5 grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-sm"><dt className="text-subtle">Linked plant</dt><dd>{device.pairing?.plantName ?? (device.plants.map(plant => plant.name).join(', ') || 'Unlinked')}</dd>
         <dt className="text-subtle">Last measurement</dt><dd>{device.lastReadingAt ? formatTimestamp(device.lastReadingAt) : 'Unavailable'}</dd>

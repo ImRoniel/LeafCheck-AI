@@ -112,8 +112,8 @@ function CareForm({
         autoCapitalize="none"
       />
       <Notice>
-        Saved on this device only. Automatic reminders and care logs will be
-        added in the next implementation step.
+        Saved on this device only. Track your completed care in Care Tasks.
+        Automatic reminders are not enabled.
       </Notice>
       <Action
         label={action.busy ? "Saving…" : "Save schedule"}

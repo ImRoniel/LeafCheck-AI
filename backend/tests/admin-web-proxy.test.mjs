@@ -166,3 +166,25 @@ test("production CORS accepts explicitly opted-in localhost and the proxy reject
   assert.equal((await denied.json()).code, "ORIGIN_REJECTED");
   assert.equal(denied.headers.get("access-control-allow-origin"), null);
 });
+
+test("the localhost opt-in rejects malicious browser origins before admin reads or mutations", async () => {
+  const beforeReads = inventoryReads;
+  const authorization = `Bearer ${await tokenFor("ADMIN")}`;
+  for (const Origin of ["https://evil.test", "http://localhost.evil.test:5174", "http://localhost:5173",
+    "http://127.0.0.1:5174", "null"]) {
+    for (const method of ["GET", "POST", "OPTIONS"]) {
+      const response = await network(`${backendUrl}/api/admin/users`, {
+        method,
+        headers: { Origin, Authorization: authorization, "X-CSRF-Protection": "1", "X-Auth-Client": "native",
+          "Sec-Fetch-Site": "cross-site", "Content-Type": "application/json",
+          ...(method === "OPTIONS" ? { "Access-Control-Request-Method": "POST" } : {}),
+        },
+        ...(method === "POST" ? { body: "{}" } : {}),
+      });
+      assert.equal(response.status, 403);
+      assert.equal((await response.json()).code, "ORIGIN_REJECTED");
+      assert.equal(response.headers.get("access-control-allow-origin"), null);
+    }
+  }
+  assert.equal(inventoryReads, beforeReads);
+});

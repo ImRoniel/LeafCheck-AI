@@ -41,6 +41,17 @@ are forbidden. Claiming devices and mutating plants/pairings/demo telemetry thro
 mobile-facing routes are also denied for LEAD_DEV. USER ownership checks remain
 in effect on those routes. Hardware ingestion retains its separate existing policy.
 
+## Telemetry hardware trust boundary
+
+`POST /api/telemetry` relies on MAC/Device ID whitelisting: hardware must be
+approved in the provisioning registry and claimed before its readings are
+accepted. The fixed ESP32 firmware does not send a cryptographic device
+credential, so uploads lack cryptographic hardware attestation. Knowing an
+approved, claimed identifier is sufficient to impersonate that sensor; the
+whitelist does not authenticate the physical sender. This is an acknowledged
+firmware constraint for the defense, not a guarantee of telemetry authenticity.
+Use controlled hardware and network access during the demonstration.
+
 ## Authentication contracts
 
 All browser auth mutations require an exact allowed Origin and

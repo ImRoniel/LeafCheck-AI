@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { ReactNode } from "react";
+import { loadComponent } from "./startup-test-helpers";
 import { createApiClient } from "../services/api";
 import {
     chronologicalReadings,
@@ -29,6 +31,38 @@ test("hardware history uses the paired device UUID and parses all 66 normalized 
   const ordered = chronologicalReadings(history.data);
   assert.equal(ordered[0].id, "65");
   assert.equal(metricSeries(ordered, "lightLevel")[0].value, 10.83);
+  assert.equal(metricSeries(ordered, "soilMoistureRaw")[0].value, 2652);
+});
+
+test("raw soil series keeps zero ADC and separates calibrated percentages from raw readings", () => {
+  const base = { id: "raw", deviceId: "sensor", timestamp: "2026-10-18T00:00:00Z", temperature: 25, humidity: 50, lightLevel: null };
+  const readings = [
+    { ...base, soilMoisture: null, soilMoistureRaw: 0 },
+    { ...base, id: "percentage", soilMoisture: 0, soilMoistureRaw: 2000 },
+    { ...base, id: "missing", soilMoisture: null, soilMoistureRaw: null },
+  ];
+  assert.deepEqual(metricSeries(readings, "soilMoistureRaw").map(point => point.value), [0, null, null]);
+  assert.deepEqual(metricSeries(readings, "soilMoisture").map(point => point.value), [null, 0, null]);
+});
+
+test("history renders physical moisture as ADC without mixing it into a percentage chart", () => {
+  const readings = [{ id: "raw", deviceId: "sensor", timestamp: "2026-10-18T00:00:00Z", temperature: 25,
+    humidity: 50, lightLevel: null, soilMoisture: null as number | null, soilMoistureRaw: 2652 }];
+  const History = loadComponent<(props: { plantId: string }) => ReactNode>("components/telemetry-history.tsx", {
+    react: { useState: () => [0, () => {}] },
+    "react-native": { ScrollView: "ScrollView", Text: "Text", View: "View" },
+    "./screen": { Action: "Action", Notice: "Notice", ui: {} },
+    "@/services/telemetry-series": { chronologicalReadings, metricSeries },
+    "@/hooks/use-telemetry-history": { useTelemetryHistory: () => ({ readings, loading: false, error: null, refreshData: async () => {} }) },
+  }, [], {}, "TelemetryHistory");
+  const physical = JSON.stringify(History({ plantId: "plant" }));
+  assert.match(physical, /2652 ADC/);
+  assert.doesNotMatch(physical, /2652 %/);
+  assert.match(physical, /Moisture · Raw ADC/);
+  readings.push({ ...readings[0], id: "calibrated", soilMoisture: 50, soilMoistureRaw: 2000 });
+  const mixed = JSON.stringify(History({ plantId: "plant" }));
+  assert.match(mixed, /50 %/); assert.match(mixed, /2652 ADC/);
+  assert.doesNotMatch(mixed, /2000 ADC/);
 });
 
 test("all 193 samples are chronological without mutating API order or losing null/zero light", () => {

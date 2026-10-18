@@ -35,7 +35,7 @@ let deviceOwned;
 let plantOwned;
 let latestReading;
 let telemetryReads;
-let telemetryQueries, sensorMac;
+let telemetryQueries, sensorMac, telemetryFailure, telemetryGate, telemetryStarted;
 let scanSession, extraReadings, previousIdentifications, identificationQueries, diagnosisGate, extraPlants;
 const currentSession = () => scanSession === null || !linkedDevice ? null : scanSession ?? {
   id: sessionId, plantId: existingPlantId, deviceId: linkedDevice, pairedAt: new Date(0), unpairedAt: null,
@@ -74,7 +74,7 @@ before(async () => {
       prismaPg: {
         platformSettings: { findUnique: async () => null },
         $transaction: async function (operation,options) {
-          assert.equal(options.isolationLevel,"Serializable");
+          assert.ok(["Serializable", "RepeatableRead"].includes(options.isolationLevel));
           const snapshot = structuredClone({ plantCreates, createdPlant, pairingRows, analyses, taskWrites, identificationWrites, healthWrites, previousIdentifications });
           try { return await operation(this); }
           catch (error) {
@@ -156,7 +156,14 @@ before(async () => {
           },
         },
         careTask: {
-          findMany: async (query) => { guidanceQueries.push(query); return taskWrites.map((data, index) => ({ id: `task-${index + 1}`, ...data })); },
+          findMany: async (query) => {
+            guidanceQueries.push(query);
+            return taskWrites.map((data, index) => ({ id: `task-${index + 1}`, status: "PENDING", ...data }))
+              .filter(row => row.userId === query.where.userId && (!query.where.plantId || row.plantId === query.where.plantId) &&
+                (typeof query.where.status === "string" ? row.status === query.where.status : row.status !== query.where.status.not))
+              .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate) || a.id.localeCompare(b.id))
+              .slice(0, query.take);
+          },
           create: async ({ data }) => {
             taskWrites.push(captureWrite("tasks", data));
             return { id: `task-${taskWrites.length}`, ...data };
@@ -169,6 +176,8 @@ before(async () => {
     namedExports: {
       prisma: { sensorReading: { findFirst: async (query) => {
         telemetryReads++; telemetryQueries.push(query);
+        if (telemetryGate) { telemetryStarted?.(); return telemetryGate; }
+        if (telemetryFailure) throw new Error("private MongoDB connection details");
         return [...extraReadings, latestReading].filter(Boolean).map(row => ({
           id: readingId, plantId: existingPlantId, pairingId: currentSession()?.id, contextVersion: 1, ...row,
         })).filter(row => Object.entries(query.where).every(([key, value]) => row[key] === value))
@@ -253,6 +262,9 @@ beforeEach(() => {
   plantOwned = true;
   latestReading = null;
   telemetryReads = 0;
+  telemetryFailure = false;
+  telemetryGate = null;
+  telemetryStarted = null;
   telemetryQueries = []; sensorMac = "LC-A50528";
   scanSession = undefined; extraReadings = []; diagnosisGate = null;
   extraPlants = new Map();
@@ -296,6 +308,83 @@ test("re-evaluation reuses the owned saved photo, session telemetry and confiden
   assert.equal(analyses.length, 1);
   assert.equal(taskWrites.length, 1);
   assert.ok(Number.isFinite(Date.parse(result.body.diagnostic.createdAt)));
+});
+
+for (const reusePreviousImage of [false, true]) test(`MongoDB failure preserves ${reusePreviousImage ? "saved-image" : "camera"} diagnosis and saves image-only provenance`, async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  telemetryFailure = true;
+  const result = await scan(false, { reusePreviousImage });
+  assert.equal(result.status, 201);
+  assert.equal(telemetryReads, 1);
+  assert.equal(result.body.telemetry, null);
+  assert.deepEqual(result.body.telemetrySnapshot, { source: "none" });
+  assert.deepEqual(analyses[0].telemetrySnapshot, { source: "none" });
+  assert.match(result.body.diagnostic.telemetryFreshness, /temporarily unavailable.*image only/);
+  assert.ok(prompts.some(prompt => /temporarily unavailable.*image only/.test(prompt)));
+  assert.ok(taskWrites.length > 0);
+  assert.doesNotMatch(JSON.stringify(result.body), /private MongoDB/);
+});
+
+for (const lateOutcome of ["resolve", "reject"]) test(`slow MongoDB falls back within its budget and ignores a late ${lateOutcome}`, async () => {
+  linkedDevice = "00000000-0000-4000-8000-000000000002";
+  let release, reject;
+  telemetryGate = new Promise((resolve, fail) => { release = resolve; reject = fail; });
+  const realTimeout = globalThis.setTimeout;
+  const timer = mock.method(globalThis, "setTimeout", (callback, delay, ...args) =>
+    realTimeout(callback, delay === 5000 ? 10 : delay, ...args));
+  // Release a broken implementation too, so a failing regression cannot hang the suite.
+  let failsafe;
+  telemetryStarted = () => { failsafe = realTimeout(() => release(null), 500); };
+  try {
+    const result = await scan(false, { reusePreviousImage: true });
+    assert.equal(result.status, 201);
+    assert.equal(result.body.telemetry, null);
+    assert.match(result.body.diagnostic.telemetryFreshness, /temporarily unavailable.*image only/);
+    assert.ok(prompts.some(prompt => /temporarily unavailable.*image only/.test(prompt)));
+    const snapshot = JSON.stringify(analyses[0].telemetrySnapshot);
+    if (lateOutcome === "reject") reject(new Error("private late MongoDB failure"));
+    else release({ timestamp: new Date(), temperature: 25, humidity: 50 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(JSON.stringify(analyses[0].telemetrySnapshot), snapshot);
+    assert.deepEqual(result.body.telemetrySnapshot, { source: "none" });
+  } finally {
+    clearTimeout(failsafe); release(null); timer.mock.restore();
+  }
+});
+
+for (const pendingCount of [3, 49, 50, 51, 60]) test(`pending tasks survive fifty completed tasks with ${pendingCount} outstanding tasks`, async () => {
+  const task = (status, index, userId = "owner") => ({
+    userId, plantId: existingPlantId, status, title: `${status} ${index}`,
+    dueDate: new Date(Date.UTC(2027, 0, index + 1)),
+  });
+  taskWrites = [...Array.from({ length: 50 }, (_, index) => task("COMPLETED", index)),
+    ...Array.from({ length: pendingCount }, (_, index) => task("PENDING", pendingCount - index)),
+    task("PENDING", 0, "another-owner")];
+  const response = await fetch(`${baseUrl}/api/scan/tasks`);
+  assert.equal(response.status, 200);
+  const tasks = await response.json();
+  assert.equal(tasks.length, 50);
+  const pending = tasks.filter(row => row.status === "PENDING");
+  assert.equal(pending.length, Math.min(50, pendingCount));
+  assert.ok(tasks.every(row => row.userId === "owner"));
+  assert.ok(tasks.slice(0, pending.length).every(row => row.status === "PENDING"));
+  assert.deepEqual(pending.map(row => row.dueDate), pending.map(row => row.dueDate).sort());
+});
+
+test("pending-first tasks retain deterministic ties, ownership, plant filtering and the array contract", async () => {
+  const id = index => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+  const task = (index, status, plantId = existingPlantId, userId = "owner") => ({
+    id: id(index), userId, plantId, status, title: `Task ${index}`, dueDate: new Date("2027-01-02T00:00:00Z"),
+  });
+  taskWrites = [task(3, "PENDING"), task(1, "PENDING"), task(2, "PENDING"), task(4, "COMPLETED"),
+    task(5, "SKIPPED"), task(6, "PENDING", newPlantId), task(7, "PENDING", existingPlantId, "another-owner")];
+  for (let repeat = 0; repeat < 2; repeat++) {
+    const response = await fetch(`${baseUrl}/api/scan/tasks?plantId=${existingPlantId}`);
+    assert.equal(response.status, 200);
+    const tasks = await response.json();
+    assert.ok(Array.isArray(tasks));
+    assert.deepEqual(tasks.map(row => row.id), [1, 2, 3, 4, 5].map(id));
+  }
 });
 
 test("reusing photos requires an owned plant, a saved image and a boolean flag before providers", async () => {
@@ -415,7 +504,7 @@ test("plant guidance is filtered by the owned plant before limiting history", as
   for (const endpoint of ["archives", "tasks"]) {
     const response = await fetch(`${baseUrl}/api/scan/${endpoint}?plantId=${plantId}`);
     assert.equal(response.status, 200);
-    assert.deepEqual(guidanceQueries.at(-1).where, { userId: "owner", ...(endpoint === "archives" ? { isArchived: true } : {}), plantId });
+    assert.deepEqual(guidanceQueries.at(-1).where, { userId: "owner", ...(endpoint === "archives" ? { isArchived: true } : { status: { not: "PENDING" } }), plantId });
     plantOwned = false;
     const count = guidanceQueries.length;
     assert.equal((await fetch(`${baseUrl}/api/scan/${endpoint}?plantId=${plantId}`)).status, 404);

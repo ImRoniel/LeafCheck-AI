@@ -8,11 +8,11 @@ export function chronologicalReadings(readings: SensorReading[]) {
 
 export function metricSeries(
   readings: SensorReading[],
-  metric: "soilMoisture" | "temperature" | "humidity" | "lightLevel",
+  metric: "soilMoisture" | "soilMoistureRaw" | "temperature" | "humidity" | "lightLevel",
 ) {
   return readings.map((reading) => ({
     id: reading.id,
     timestamp: reading.timestamp,
-    value: reading[metric],
+    value: metric === "soilMoistureRaw" && reading.soilMoisture != null ? null : reading[metric],
   }));
 }

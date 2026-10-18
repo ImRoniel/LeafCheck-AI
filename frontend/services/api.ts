@@ -1,5 +1,5 @@
 import type { AIDiagnosisRequest, HealthStatus, ScanRequest } from "../types";
-import { ApiError, asApiError } from "./errors";
+import { ApiError, asApiError, httpErrorMessage } from "./errors";
 import { platformOS } from "./platform";
 import { parseChallenge, parseRegistration, parseTokens, parseUser, type SessionBridge } from "./session";
 import type { EmailOtpType } from "./email-otp";
@@ -37,7 +37,7 @@ export interface CreatePlantInput {
   minMoisture?: number;
   maxMoisture?: number;
 }
-export type UpdatePlantInput = Partial<CreatePlantInput>;
+export type UpdatePlantInput = Omit<Partial<CreatePlantInput>, "location"> & { location?: string | null };
 
 function validatePlantInput(body: UpdatePlantInput, partial = false) {
   v.object({})(body, "plant");
@@ -61,6 +61,7 @@ function validatePlantInput(body: UpdatePlantInput, partial = false) {
     ["imageUrl", 2048],
   ] as const) {
     const value = body[key];
+    if (partial && key === "location" && value === null) continue;
     if (
       value === undefined &&
       (partial || (key !== "name" && key !== "species"))
@@ -223,7 +224,7 @@ export function createApiClient(
             if (!response.ok)
               throw new ApiError(
                 "http",
-                `HTTP ${response.status}`,
+                httpErrorMessage(response.status),
                 response.status,
               );
             throw new ApiError("validation", "Response is not valid JSON");
@@ -233,7 +234,7 @@ export function createApiClient(
               "http",
               typeof (payload as { error?: unknown })?.error === "string"
                 ? (payload as { error: string }).error
-                : `HTTP ${response.status}`,
+                : httpErrorMessage(response.status),
               response.status,
               payload,
             );

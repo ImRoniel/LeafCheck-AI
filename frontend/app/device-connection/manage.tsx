@@ -83,7 +83,7 @@ export default function ManageDevices() {
       const status = overviewReadingStatus(entry, now, Boolean(overview.error));
       return <View key={entry.device.id} style={s.card}>
         <Text accessibilityRole="header" style={s.name}>{entry.device.name}</Text>
-        <Text style={s.id}>{entry.device.macAddress}</Text>
+        <Text style={s.id}>{entry.demo ? entry.device.macAddress.replace(/^DEMO:/, "") : entry.device.macAddress}</Text>
         <Text style={[s.badge, entry.demo && s.demo]}>{entry.demo ? "Demo sensor · simulated readings" : "Physical sensor"}</Text>
         <Text style={ui.text}>{status === "waiting" && !entry.plants.length ? "Waiting for first reading" : sensorStatusLabel(status)}</Text>
         <Text style={s.meta}>{entry.telemetry ? `Last reading · ${new Date(entry.telemetry.timestamp).toLocaleString()}` : status === "error" ? "Last reading unavailable" : "No readings received yet"}</Text>

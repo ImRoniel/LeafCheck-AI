@@ -24,10 +24,11 @@ export function ActionModal({ title, description, children, confirmLabel, danger
     try { await onSubmit(reason.trim(), controller.signal) }
     catch (cause) {
       if (controller.signal.aborted) return
-      const stale = cause instanceof ApiError && cause.status === 409
+      const duplicateHardware = cause instanceof ApiError && cause.status === 409 && cause.code === 'HARDWARE_ALREADY_REGISTERED'
+      const stale = cause instanceof ApiError && cause.status === 409 && !duplicateHardware
       const uncertain = cause instanceof TypeError || (cause instanceof ApiError && (cause.code === 'REQUEST_TIMEOUT' || [408, 502, 504].includes(cause.status)))
       setReview(stale || uncertain)
-      setError(stale ? 'This record changed after you opened it. Refresh and review the current values before trying again.' : uncertain
+      setError(duplicateHardware ? 'This MAC address is already registered.' : stale ? 'This record changed after you opened it. Refresh and review the current values before trying again.' : uncertain
         ? 'The request result is unknown. Refresh and check whether the change completed before trying again.' : errorMessage(cause))
     } finally {
       pending.current = null

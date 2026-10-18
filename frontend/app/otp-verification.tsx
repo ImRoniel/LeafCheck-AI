@@ -80,6 +80,11 @@ export default function OtpVerification() {
       <Pressable accessibilityRole="link" style={authStyles.linkButton} onPress={back}>
         <Text style={authStyles.link}>Use a different email</Text>
       </Pressable>
+      {flow.type === "signup" && <Text style={authStyles.note}>Already verified your email? Return to login and sign in with your password.</Text>}
+      <AuthButton title="Return to login" variant="secondary" onPress={() => {
+        auth.cancelVerification();
+        router.replace({ pathname: "/login", params: { email: flow.email } });
+      }} />
     </> : <>
       <Notice>Request a new code to continue.</Notice>
       <AuthButton title={source?.type === "signup" ? "Return to registration" : "Return to login"} onPress={back} />

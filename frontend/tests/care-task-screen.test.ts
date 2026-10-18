@@ -149,6 +149,19 @@ async function harness(guest = true, width = 390, reducedMotion = false) {
     failLocal: (value: boolean) => { fail = value; }, localReady: (value: boolean) => { localReady = value; }, failRemote: (value: boolean) => { remoteFail = value; }, refreshed: () => refreshed, filterAnimations: () => filterAnimations };
 }
 
+test("the bounded scan-task list discloses incomplete history at the fifty-task boundary", async () => {
+  for (const guest of [true, false]) {
+    const h = await harness(guest);
+    h.remote.tasks = Array.from({ length: 49 }, (_, index) => ({ ...h.task(), id: `task-${index}` }));
+    assert.ok(!h.render().some(node => String(node.props.children).includes("up to 50 saved scan tasks")));
+    h.remote.tasks.push({ ...h.task(), id: "task-49" });
+    h.completedView();
+    assert.equal(h.render().some(node => String(node.props.children).includes("up to 50 saved scan tasks")), !guest);
+    assert.equal(h.render().some(node => node.props.children === "No matching tasks in the loaded list"), !guest);
+    assert.equal(h.render().some(node => node.props.children === "No completed tasks yet"), guest);
+  }
+});
+
 test("guest completion and undo persist, failed writes retain tasks, and details open the selected space", async () => {
   const h = await harness();
   h.remote.tasks = [h.task()];

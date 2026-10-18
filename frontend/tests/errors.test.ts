@@ -113,3 +113,9 @@ test("request timeouts use the same connection message", async () => {
       error.message === CONNECTION_ERROR_MESSAGE,
   );
 });
+
+test("non-JSON gateway failures show a readable retry message and retain the HTTP status", async () => {
+  const api = createApiClient({ fetch: async () => new Response("Bad Gateway", { status: 502 }) });
+  await assert.rejects(api.fetchUserPlants(), (error: unknown) => error instanceof ApiError &&
+    error.status === 502 && /temporarily unavailable/i.test(error.message) && !/HTTP|502/.test(error.message));
+});

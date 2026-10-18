@@ -126,6 +126,7 @@ export default function CareTasks() {
   const section = (title: string, tasks: readonly (GardenCareTask | CareCompletion)[], defaultExpanded = true) =>
     <TaskSection key={`${filters.status}:${filters.period}:${title}`} title={title} count={tasks.length} defaultExpanded={defaultExpanded}>{tasks.map(item)}</TaskSection>;
   const visibleCount = (showPending ? pendingCount : 0) + (showCompleted ? groups.completed.length : 0);
+  const scanTasksLimited = !data.guest && remote.tasks.length >= 50;
   return <View style={s.page}>
     <Screen fill backgroundColor="#FFFFFF" refresh={refresh} loading={data.loading || remote.loading || (!local.ready && !local.error)}>
     <TaskSummaryHeader pending={allPending.length} dueToday={dueToday.length} ready={countsReady} />
@@ -134,6 +135,7 @@ export default function CareTasks() {
     {(data.loading || remote.loading || (!local.ready && !local.error)) && <View style={s.loading}><ActivityIndicator size="small" color="#278448" /><Text style={s.details}>{countsReady ? "Refreshing tasks…" : "Loading care tasks…"}</Text></View>}
     {!!data.error && <><Notice>{data.error}{data.loaded ? " Showing saved plants." : ""}</Notice><Action label="Retry loading plants" onPress={() => void data.refresh()} /></>}
     {!!remote.error && !data.guest && <><Notice>Scan tasks could not refresh. Saved tasks may be out of date; local checks are available.</Notice><Action label="Retry scan tasks" onPress={() => void remote.refresh().catch(() => undefined)} /></>}
+    {scanTasksLimited && <Notice>Showing up to 50 saved scan tasks, with pending tasks first. Additional tasks and completed history may be outside this list. Open a plant to narrow its scan tasks.</Notice>}
     {!!local.error && <><Notice>Local care could not load. Your saved data has not been replaced.</Notice><Action label="Retry local care" onPress={() => void local.retry()} /></>}
     {!!error && <><Notice>{error}</Notice><Action label="Refresh care tasks" onPress={refresh} /></>}
     {disabled && (saving || remote.saving) && <Text accessibilityLiveRegion="polite" style={s.source}>Saving task…</Text>}
@@ -158,8 +160,8 @@ export default function CareTasks() {
       {showCompleted && section("Completed", groups.completed)}
       {clearEmpty && !visibleCount && <View style={s.empty}>
         <Ionicons name="leaf-outline" size={32} color="#299B57" />
-        <Text style={s.emptyTitle}>{filters.period !== "All dates" ? "No tasks in this view" : filters.status === "completed" ? "No completed tasks yet" : "All caught up"}</Text>
-        <Text style={s.emptyText}>{filters.period !== "All dates" ? "Try All dates to see your other care tasks." : filters.status === "completed" ? "Completed care will appear here." : "No pending tasks."}</Text>
+        <Text style={s.emptyTitle}>{scanTasksLimited ? "No matching tasks in the loaded list" : filters.period !== "All dates" ? "No tasks in this view" : filters.status === "completed" ? "No completed tasks yet" : "All caught up"}</Text>
+        <Text style={s.emptyText}>{scanTasksLimited ? "Additional scan tasks may be outside these 50 results. Open a plant to narrow its tasks." : filters.period !== "All dates" ? "Try All dates to see your other care tasks." : filters.status === "completed" ? "Completed care will appear here." : "No pending tasks."}</Text>
       </View>}
     </>}
   </Screen>

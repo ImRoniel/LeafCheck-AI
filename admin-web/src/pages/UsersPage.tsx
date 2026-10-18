@@ -14,7 +14,7 @@ import { userFieldErrors, validateUserForm, type UserField, type UserFieldErrors
 import { ForceLogoutModal } from '../components/ForceLogoutModal'
 import { hasPermission } from '../lib/permissions'
 
-type UserDialog = { kind: 'create' } | { kind: 'edit' | 'delete'; user: UserRow }
+type UserDialog = { kind: 'create' } | { kind: 'edit' | 'delete' | 'ban'; user: UserRow }
 const userLabel = (row: UserRow) => row.name ?? row.email ?? row.emailMasked
 
 export function UsersPage() {
@@ -37,6 +37,7 @@ export function UsersPage() {
   const busy = mutation !== null
   const editing = dialog?.kind === 'edit' ? dialog.user : null
   const deleting = dialog?.kind === 'delete' ? dialog.user : null
+  const banning = dialog?.kind === 'ban' ? dialog.user : null
 
   function openDialog(next: UserDialog) { setMutationError(null); setStaleEdit(false); setFieldErrors({}); setDeleteText(''); setDialog(next) }
   useEffect(() => () => mutationController.current?.abort(), [])
@@ -84,7 +85,7 @@ export function UsersPage() {
 
   async function saveUser(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
-    if (mutationPending.current || staleEdit || !dialog || dialog.kind === 'delete') return
+    if (mutationPending.current || staleEdit || !dialog || (dialog.kind !== 'create' && dialog.kind !== 'edit')) return
     const form = event.currentTarget
     const fields = new FormData(form)
     const creating = dialog.kind === 'create'
@@ -128,7 +129,7 @@ export function UsersPage() {
   }
 
   async function toggleBan(row: UserRow): Promise<void> {
-    if (mutationPending.current || row.id === user?.id) return
+    if (mutationPending.current || (dialog?.kind === 'ban' && staleEdit) || row.id === user?.id) return
     mutationPending.current = true
     const controller = new AbortController()
     mutationController.current = controller
@@ -140,6 +141,7 @@ export function UsersPage() {
         signal: controller.signal,
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: !row.isActive, updatedAt: row.updatedAt }),
       })
+      setDialog(null)
       setNotice(userLabel(row) + (row.isActive ? ' banned successfully.' : ' unbanned successfully.'))
       reload()
     } catch (cause) {
@@ -195,22 +197,22 @@ export function UsersPage() {
           </form>
           <button type="button" className="button-secondary" aria-pressed={revealEmails} onClick={() => setRevealEmails(value => !value)}>{revealEmails ? <EyeOff size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />}{revealEmails ? 'Hide emails' : 'Reveal emails'}</button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-w-full overflow-x-auto" role="region" aria-label="User table" tabIndex={0}>
           <table className="w-full min-w-4xl" aria-busy={loading || refreshing}>
             <caption className="sr-only">Users and account access</caption>
-            <thead className="border-b border-edge bg-panel-muted"><tr>{['Name', 'Email', 'Role', 'Status', 'Actions'].map(label => <th key={label} scope="col" className="table-head">{label}</th>)}</tr></thead>
+            <thead className="border-b border-edge bg-panel-muted"><tr>{['Name', 'Email', 'Role', 'Status', 'Actions'].map(label => <th key={label} scope="col" className={`table-head ${label === 'Name' ? 'min-w-[200px]' : label === 'Email' ? 'min-w-[260px]' : label === 'Actions' ? 'min-w-[150px]' : ''}`}>{label}</th>)}</tr></thead>
             <tbody>
               {loading ? <TableMessage columns={5}>Loading users...</TableMessage> : error ? <TableMessage columns={5}>Users could not be loaded.</TableMessage> : !result?.data.length ? <TableMessage columns={5}>No users found.</TableMessage> : result.data.map(row => (
                 <tr key={row.id} className="table-row">
-                  <td className="table-cell"><span className="flex items-center gap-2.5"><span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-panel-muted text-[10px] font-semibold text-secondary">{initials(userLabel(row))}</span><span className="font-semibold text-foreground">{row.name ?? 'Unnamed user'}</span></span></td>
-                  <td className="table-cell break-all"><span className="flex items-center gap-2"><Mail size={14} className="shrink-0 text-subtle" aria-hidden="true" />{revealEmails ? row.email ?? row.emailMasked : row.emailMasked}</span></td>
+                  <td className="table-cell min-w-[200px]"><span className="flex items-center gap-2.5"><span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-panel-muted text-[10px] font-semibold text-secondary">{initials(userLabel(row))}</span><span className="min-w-0 max-w-[240px] break-all font-semibold text-foreground">{row.name ?? 'Unnamed user'}</span></span></td>
+                  <td className="table-cell min-w-[260px]"><span className="flex items-start gap-2"><Mail size={14} className="mt-0.5 shrink-0 text-subtle" aria-hidden="true" /><span className="min-w-0 max-w-[320px] break-all">{revealEmails ? row.email ?? row.emailMasked : row.emailMasked}</span></span></td>
                   <td className="table-cell"><StatusBadge tone={row.role === 'ADMIN' ? 'info' : 'neutral'}>{row.role === 'USER' ? 'User' : roleLabels[row.role]}</StatusBadge></td>
                   <td className="table-cell"><StatusBadge tone={row.isActive ? 'success' : 'danger'} dot>{row.isActive ? 'Active' : 'Banned'}</StatusBadge></td>
-                  <td className="table-cell">
+                  <td className="table-cell min-w-[150px]">
                     <div className="flex items-center gap-0.5 whitespace-nowrap">
                       <button type="button" disabled={busy} aria-label={'Edit ' + userLabel(row)} onClick={() => openDialog({ kind: 'edit', user: row })} className="button-quiet"><Pencil size={13} aria-hidden="true" />Edit</button>
                       {row.id === user?.id ? <span className="ml-2 text-xs text-subtle">Your account</span> : <>
-                        <button type="button" disabled={busy} aria-label={(row.isActive ? 'Ban ' : 'Unban ') + userLabel(row)} onClick={() => { void toggleBan(row) }} className="button-quiet">{row.isActive ? <Ban size={13} aria-hidden="true" /> : <Undo2 size={13} aria-hidden="true" />}{mutation === row.id ? 'Saving...' : row.isActive ? 'Ban' : 'Unban'}</button>
+                        <button type="button" disabled={busy} aria-label={(row.isActive ? 'Ban ' : 'Unban ') + userLabel(row)} aria-haspopup={row.isActive ? 'dialog' : undefined} onClick={() => { if (row.isActive) openDialog({ kind: 'ban', user: row }); else void toggleBan(row) }} className="button-quiet">{row.isActive ? <Ban size={13} aria-hidden="true" /> : <Undo2 size={13} aria-hidden="true" />}{mutation === row.id ? 'Saving...' : row.isActive ? 'Ban' : 'Unban'}</button>
                         <button type="button" disabled={busy} aria-label={'Delete ' + userLabel(row)} onClick={() => openDialog({ kind: 'delete', user: row })} className="button-quiet text-danger-fg hover:bg-danger-bg hover:text-danger-fg"><Trash2 size={13} aria-hidden="true" />Delete</button>
                         {user && hasPermission(user.role, 'sessions.revoke') && <button type="button" disabled={busy} aria-label={'Force Logout ' + userLabel(row)} onClick={() => setRevoking(row)} className="button-quiet"><LogOut size={13} aria-hidden="true" />Force Logout</button>}
                       </>}
@@ -225,7 +227,7 @@ export function UsersPage() {
       </div>
       <p className="mt-3 text-xs leading-5 text-subtle">{revealEmails ? 'Full email addresses are visible to your SuperAdmin session.' : 'Email addresses are masked by default. Reveal them when you need the full address.'} <span className="sm:hidden">Swipe the table to view all columns.</span></p>
 
-      {dialog && dialog.kind !== 'delete' && (
+      {dialog && (dialog.kind === 'create' || dialog.kind === 'edit') && (
         <Modal title={editing ? 'Edit user' : 'Create a user'} description={editing ? 'Update the account name and role. Role changes sign out the affected account.' : 'Create an account and choose its access and status.'} onClose={closeDialog} busy={busy}>
           <form onSubmit={saveUser} aria-busy={busy} noValidate>
             <fieldset disabled={busy || staleEdit} className="space-y-4">
@@ -276,6 +278,17 @@ export function UsersPage() {
             {staleEdit && <button type="button" className="button-secondary" onClick={() => { closeDialog(); reload() }}>Close and refresh</button>}
             <div className="mt-6 flex justify-end gap-2 border-t border-edge pt-5"><button type="button" onClick={closeDialog} className="button-secondary">Cancel</button><button type="submit" disabled={busy || staleEdit} className="button-primary">{mutation === 'save' ? 'Saving...' : editing ? 'Save changes' : 'Create account'}</button></div>
           </form>
+        </Modal>
+      )}
+      {banning && (
+        <Modal title="Ban user?" description={`Are you sure you want to ban ${banning.email ?? banning.emailMasked}?`} onClose={closeDialog} busy={busy}>
+          <p className="text-sm leading-6 text-secondary">This account will lose access until a SuperAdmin unbans it.</p>
+          {mutationError && <div className="mt-4"><RequestError message={mutationError} /></div>}
+          {staleEdit && <button type="button" className="button-secondary" onClick={() => { closeDialog(); reload() }}>Close and refresh</button>}
+          <div className="mt-6 flex justify-end gap-2 border-t border-edge pt-5">
+            <button type="button" onClick={closeDialog} className="button-secondary">Cancel</button>
+            <button type="button" disabled={busy || staleEdit} onClick={() => { void toggleBan(banning) }} className="button-danger"><Ban size={15} aria-hidden="true" />{busy ? 'Banning...' : 'Ban user'}</button>
+          </div>
         </Modal>
       )}
       {deleting && (

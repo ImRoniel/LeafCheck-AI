@@ -135,7 +135,7 @@ export function parseLocalState(value: unknown): LocalState {
         p.id.startsWith("guest-") &&
         text(p.name, 100) &&
         text(p.species) &&
-        (p.location === undefined ||
+        (p.location === undefined || p.location === null ||
           (typeof p.location === "string" && p.location.length <= 100)) &&
         p.deviceId === undefined &&
         p.simulated === undefined &&

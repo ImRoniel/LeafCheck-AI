@@ -11,6 +11,7 @@ export const measurement = (value: number | null | undefined, unit: string) =>
   value == null ? "Unavailable" : `${value} ${unit}`;
 const metrics = [
   { key: "soilMoisture", title: "Moisture", unit: "%", max: 100 },
+  { key: "soilMoistureRaw", title: "Moisture · Raw ADC", unit: "ADC", max: 4095 },
   { key: "temperature", title: "Temperature", unit: "°C", max: 40 },
   { key: "humidity", title: "Humidity", unit: "%", max: 100 },
   { key: "lightLevel", title: "Light", unit: "lux", max: 15000 },
@@ -22,6 +23,11 @@ export function TelemetryHistory({ plantId }: { plantId: string }) {
   const { readings, pagination, loading, error, refreshData } =
     useTelemetryHistory(plantId, { limit, offset });
   const ordered = chronologicalReadings(readings);
+  const hasPercentage = ordered.some(reading => reading.soilMoisture != null);
+  const hasRaw = ordered.some(reading => reading.soilMoisture == null && reading.soilMoistureRaw != null);
+  // Keep mixed demo/physical histories on separate scales; ADC is not a percent.
+  const visibleMetrics = metrics.filter(metric => metric.key === "soilMoisture" ? hasPercentage || !hasRaw
+    : metric.key === "soilMoistureRaw" ? hasRaw : true);
   return (
     <View style={{ gap: 12 }}>
       <Text style={ui.heading}>Reading history</Text>
@@ -44,7 +50,7 @@ export function TelemetryHistory({ plantId }: { plantId: string }) {
         <Notice>No readings on this page.</Notice>
       )}
       {!!ordered.length &&
-        metrics.map((metric) => {
+        visibleMetrics.map((metric) => {
           const points = metricSeries(ordered, metric.key);
           const values = points.flatMap((point) =>
             point.value == null ? [] : [point.value],

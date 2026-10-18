@@ -94,6 +94,22 @@ function setup(
   session.bind(api);
   return { session, api, credential: () => credential };
 }
+test("a fresh native install signs out silently without a refresh request", async () => {
+  let calls = 0;
+  const { session } = setup(async () => { calls++; throw new Error("No session should be requested"); }, true, {
+    get: async () => null, set: async () => {}, remove: async () => {},
+  });
+  await session.restore();
+  assert.equal(session.snapshot().status, "signedOut");
+  assert.equal(session.snapshot().error, null);
+  assert.equal(calls, 0);
+});
+test("a browser without a session signs out silently after bootstrap rejects the missing cookie", async () => {
+  const { session } = setup(async () => json({ error: "Unauthorized" }, 401), false);
+  await session.restore();
+  assert.equal(session.snapshot().status, "signedOut");
+  assert.equal(session.snapshot().error, null);
+});
 test("native restore persists rotation before profile and publishes only validated identity", async () => {
   const calls: RequestInit[] = [];
   const { session, credential } = setup(async (url, init) => {

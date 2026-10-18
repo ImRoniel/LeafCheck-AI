@@ -204,12 +204,17 @@ export function createSessionCoordinator(
     if (state.token && state.token !== staleToken) return;
     if (refreshFlight) return refreshFlight;
     const generation = state.generation;
+    const browserBootstrap = !native && state.status === "restoring" && !state.token;
     const work = coordination.run(async () => {
       check(generation);
       let submitted = false;
       try {
         const credential = native ? await store(() => storage.get()) : null;
         check(generation);
+        if (native && !credential && state.status === "restoring" && !state.token) {
+          boundary("signedOut");
+          return;
+        }
         if (native && !credential)
           throw new ApiError("http", "Please sign in again", 401);
         submitted = true;
@@ -222,7 +227,7 @@ export function createSessionCoordinator(
           const e = asApiError(error);
           // A consumed native token must never be resubmitted after an ambiguous result.
           if (submitted || e.status === 401 || e.status === 403)
-            invalidate("Session could not be renewed. Please sign in again.");
+            invalidate(browserBootstrap && e.status === 401 ? undefined : "Session could not be renewed. Please sign in again.");
           else
             publish({
               status: "error",

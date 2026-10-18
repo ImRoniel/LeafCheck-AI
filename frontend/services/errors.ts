@@ -9,6 +9,15 @@ export type ApiErrorKind =
 export const CONNECTION_ERROR_MESSAGE =
   "Unable to connect to the server. Please check your internet connection and try again.";
 
+export function httpErrorMessage(status: number): string {
+  if (status === 401) return "Your session has expired. Please sign in again.";
+  if (status === 403) return "You do not have permission to perform this action.";
+  if (status === 404) return "This item could not be found. Refresh and try again.";
+  if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status >= 500) return "The server is temporarily unavailable. Please try again shortly.";
+  return "The request could not be completed. Please check your information and try again.";
+}
+
 // Replace the entire diagnostic rather than leaving fragments of internal setup advice.
 export function sanitizeErrorMessage(message: string): string {
   const connectionDiagnostic =

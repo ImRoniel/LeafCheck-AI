@@ -453,7 +453,7 @@ test("Guest cards open the selected space, retain detail manual-add flows and ar
   assert.equal(card.props.style.width, 354);
   assert.equal(card.props.style.minHeight, 178);
   assert.equal(card.props.style.maxWidth, "100%");
-  assert.equal(card.props.style.backgroundColor, "#FFFFFF");
+  assert.equal(card.props.style.backgroundColor, "#E8F2E8");
   assert.ok(card.props.style.shadowOpacity > 0);
   assert.ok(!elements(card).some(node => node.props.children === "Add a Plant"));
   const footer = elements(card).find(node => node.type === "View" && node.props.style?.flexWrap === "wrap")!;
@@ -565,7 +565,7 @@ test("unassigned plants appear only in a horizontal overflow carousel and preser
       { ...base, id: "monstera", name: "Monstera", location: undefined, healthStatus: "warning", imageUrl: "https://images.test/monstera.jpg" },
       { ...base, id: "snake", name: "Snake", location: "  " },
       { ...base, id: "basil", name: "Basil", location: "Unassigned", healthStatus: "critical" },
-      { ...base, id: "aloe", name: "Aloe", location: undefined, healthStatus: "unknown" }];
+      { ...base, id: "aloe", name: "Aloe", location: null, healthStatus: "unknown" }];
     const module = load("app/(tabs)/spaces.tsx", {
       react: state.react,
       "@/components/space-management": { SpaceManagement: "SpaceManagement" },
@@ -986,12 +986,13 @@ async function addToSpaceHarness(guest: boolean, withUnassigned = true) {
     const body = JSON.parse(String(init?.body)) as UpdatePlantInput;
     requests.push({ method: init?.method ?? "GET", url: String(url), body });
     if (failWrite) throw new Error("Unable to save plant move.");
-    return new Response(JSON.stringify(init?.method === "PATCH" ? { ...loose, ...body }
+    const target = collection.find(plant => String(url).endsWith(`/${plant.id}`));
+    return new Response(JSON.stringify(init?.method === "PATCH" ? { ...target, ...body }
       : { ...loose, ...body, id: "44444444-4444-4444-8444-444444444444", healthStatus: "unknown", deviceId: undefined }),
       { status: init?.method === "PATCH" ? 200 : 201 });
   } });
   const app = {
-    guest, loaded: true, get plants() { return guest ? store.snapshot().data.guestPlants : collection; },
+    guest, loaded: true, loading: false, error: null as string | null, get plants() { return guest ? store.snapshot().data.guestPlants : collection; },
     refresh: async () => { refreshes++; },
     updatePlant: async (id: string, input: UpdatePlantInput) => {
       const plant = await api.updatePlant(id, input); collection = collection.map(item => item.id === id ? plant : item);
@@ -1079,6 +1080,80 @@ test("failed existing-plant assignment stays open without creating a duplicate, 
     await assert.rejects(h.context.useSpaces().assignPlant("Unassigned", h.loose.id), /space is unavailable/);
     await assert.rejects(h.context.useSpaces().assignPlant("Balcony", "not-owned"), /no longer unassigned/);
   }
+});
+
+test("deleting a space preserves its plants in Unassigned and persists the move for guests and accounts", async () => {
+  for (const guest of [true, false]) {
+    const h = await addToSpaceHarness(guest);
+    const assigned = h.app.plants.find(plant => plant.location === "Balcony")!;
+    await h.context.useSpaces().deleteSpace("Balcony");
+    assert.equal(h.app.plants.length, 2);
+    assert.equal(h.app.plants.find(plant => plant.id === assigned.id)?.location, null);
+    assert.equal(h.context.useSpaces().spaces.includes("Balcony"), false);
+    assert.equal(h.context.useSpaces().plantsBySpace.Unassigned.length, 2);
+    if (guest) {
+      assert.deepEqual(h.requests, []);
+      const reloaded = createLocalStateStore(h.storage, h.key); await reloaded.load();
+      assert.equal(reloaded.snapshot().data.guestPlants.find(plant => plant.id === assigned.id)?.location, null);
+      assert.equal(spaces.groupSpaces(reloaded.snapshot().data.spaces, reloaded.snapshot().data.guestPlants).plantsBySpace.Unassigned.length, 2);
+    } else {
+      assert.deepEqual(h.requests, [{ method: "PATCH", url: `https://plants.test/api/plants/${assigned.id}`, body: { location: null } }]);
+    }
+  }
+});
+
+test("failed space deletion keeps the remaining plants visible and can be retried", async () => {
+  for (const guest of [true, false]) {
+    const h = await addToSpaceHarness(guest); h.fail(true);
+    await assert.rejects(h.context.useSpaces().deleteSpace("Balcony"));
+    assert.equal(h.context.useSpaces().plantsBySpace.Balcony.length, 1);
+    assert.equal(h.context.useSpaces().unassignedPlants.length, 1);
+    h.fail(false); await h.context.useSpaces().deleteSpace("Balcony");
+    assert.equal(h.context.useSpaces().plantsBySpace.Unassigned.length, 2);
+  }
+});
+
+for (const condition of ["not-loaded", "refreshing", "failed-refresh"]) test(`space deletion waits for an authoritative account collection: ${condition}`, async () => {
+  const h = await addToSpaceHarness(false);
+  const descriptor = Object.getOwnPropertyDescriptor(h.app, "plants"); assert.ok(descriptor);
+  if (condition === "not-loaded") {
+    h.app.loaded = false;
+    Object.defineProperty(h.app, "plants", { configurable: true, get: () => [] });
+  } else if (condition === "refreshing") h.app.loading = true;
+  else h.app.error = "Collection could not refresh.";
+  await assert.rejects(h.context.useSpaces().deleteSpace("Balcony"), /Refresh your plants/);
+  assert.deepEqual(h.requests, []);
+  assert.equal(h.store.snapshot().data.spaces[0].status, undefined);
+  Object.defineProperty(h.app, "plants", descriptor);
+  h.app.loaded = true; h.app.loading = false; h.app.error = null;
+  await h.context.useSpaces().deleteSpace("Balcony");
+  assert.equal(h.context.useSpaces().plantsBySpace.Unassigned.length, 2);
+});
+
+test("plants hidden by legacy deleted-space metadata remain available in Unassigned", async () => {
+  const h = await addToSpaceHarness(true);
+  await h.store.update(state => ({ ...state, spaces: state.spaces.map(space => ({ ...space, status: "deleted" })) }));
+  assert.equal(h.context.useSpaces().plantsBySpace.Unassigned.length, 2);
+  assert.equal(h.context.useSpaces().unassignedPlants.length, 2);
+});
+
+test("an interrupted account space deletion preserves both moved and remaining plants until retry", async () => {
+  const h = await addToSpaceHarness(false);
+  await h.app.createPlant({ name: "Pothos", species: "Epipremnum aureum", location: "Balcony" });
+  const move = h.app.updatePlant;
+  let moves = 0;
+  h.app.updatePlant = async (id, input) => {
+    if (++moves === 2) h.fail(true);
+    return move(id, input);
+  };
+  await assert.rejects(h.context.useSpaces().deleteSpace("Balcony"));
+  assert.equal(h.context.useSpaces().plantsBySpace.Unassigned.length, 2);
+  assert.equal(h.context.useSpaces().plantsBySpace.Balcony.length, 1);
+  assert.equal(h.app.plants.length, 3);
+  h.fail(false); h.app.updatePlant = move;
+  await h.context.useSpaces().deleteSpace("Balcony");
+  assert.equal(h.context.useSpaces().plantsBySpace.Unassigned.length, 3);
+  assert.equal(h.context.useSpaces().spaces.includes("Balcony"), false);
 });
 
 test("explicit create-instead and empty fallback both create a new plant directly inside the selected space", async () => {
@@ -1312,7 +1387,7 @@ test("sensor badges ignore pointer events and distinguish physical, demo and abs
     assert.equal(badge.props.pointerEvents, "none");
     assert.equal(badge.props.accessible, false);
     assert.equal(badge.props.importantForAccessibility, "no-hide-descendants");
-    assert.deepEqual(elements(badge).filter(node => node.type === "Icon").map(node => node.props.name), ["wifi"]);
+    assert.deepEqual(elements(badge).filter(node => node.type === "Icon").map(node => node.props.name), ["link-outline"]);
   }
 });
 

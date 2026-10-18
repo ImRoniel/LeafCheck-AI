@@ -91,7 +91,7 @@ function plantFields(value: unknown, partial = false) {
   return {
     name: text("name", 100, true),
     species: text("species", 200, true),
-    location: text("location", 100),
+    location: partial && body.location === null ? null : text("location", 100),
     imageUrl,
     minMoisture: moisture("minMoisture"),
     maxMoisture: moisture("maxMoisture"),
