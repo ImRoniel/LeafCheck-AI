@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, beforeEach, mock, test } from "node:test";
 
-let server, base, plants, devices, histories, attempts, version, conflictCount, conflictError, failUpdate, vanish, deviceChecks, concurrencyGate;
+let server, base, plants, devices, provisions, histories, attempts, version, conflictCount, conflictError, failUpdate, vanish, deviceChecks, concurrencyGate;
 const owner = "owner";
 const a = randomUUID(), b = randomUUID(), hardware = randomUUID(), previous = randomUUID();
 const row = (id, userId = owner, deviceId = null) => ({ id, userId, deviceId, name: "Fern", species: "Fern", minMoisture: 30, maxMoisture: 80, healthStatus: "unknown", createdAt: new Date("2026-01-01"), updatedAt: new Date("2026-01-01") });
 const find = (rows, where) => rows.get(where.id)?.userId === where.userId ? { ...rows.get(where.id) } : null;
-const matchesHistory = (row, where) => where.OR.some(filter => Object.entries(filter).every(([key,value]) => row[key] === value))
+const matchesHistory = (row, where) => (where.OR ? where.OR.some(filter => Object.entries(filter).every(([key,value]) => row[key] === value))
+  : row.deviceId === where.deviceId)
   && (where.unpairedAt === null ? row.unpairedAt === null : row.unpairedAt !== null);
 const client = {
   plant: { findFirst: async ({where}) => find(plants, where) },
@@ -19,6 +20,7 @@ const client = {
     const revision = version;
     const local = new Map([...plants].map(([id, plant]) => [id, {...plant}]));
     const localHistory = structuredClone(histories);
+    const localDevices = structuredClone(devices), localProvisions = structuredClone(provisions);
     if (concurrencyGate && concurrencyGate.arrivals < 2) {
       concurrencyGate.arrivals++;
       if (concurrencyGate.arrivals === 2) concurrencyGate.release();
@@ -26,7 +28,8 @@ const client = {
     }
     const tx = {
       plant: {
-        findFirst: async ({where}) => vanish ? null : find(local, where),
+        findFirst: async ({where}) => vanish ? null : where.deviceId
+          ? [...local.values()].find(plant => plant.deviceId === where.deviceId) ?? null : find(local, where),
         async updateMany({where, data}) {
           assert.ok([a,b].includes(where.id.not));
           let count = 0;
@@ -41,7 +44,17 @@ const client = {
           Object.assign(plant, data); local.set(plant.id, plant); return plant;
         },
       },
-      device: { findFirst: async ({where}) => { deviceChecks++; return find(devices, where); } },
+      device: {
+        findFirst: async ({where}) => { deviceChecks++; return find(localDevices, where); },
+        update: async ({where,data}) => {
+          const device = find(localDevices, where); if (!device) throw Object.assign(new Error("gone"), {code:"P2025"});
+          Object.assign(device,data); localDevices.set(device.id,device); return device;
+        },
+      },
+      deviceProvision: { updateMany: async ({where,data}) => {
+        const affected = [...localProvisions.values()].filter(row => row.claimedDeviceId === where.claimedDeviceId);
+        affected.forEach(row => Object.assign(row,data)); return {count:affected.length};
+      } },
       devicePairingHistory: {
         findMany: async ({where}) => localHistory.filter(row => matchesHistory(row, where)),
         findFirst: async ({where}) => localHistory.filter(row => matchesHistory(row, where)).sort((a,b) => b.unpairedAt-a.unpairedAt)[0] ?? null,
@@ -60,7 +73,7 @@ const client = {
       conflictCount = Math.max(0, conflictCount - 1);
       throw conflictError ?? Object.assign(new Error("serialization conflict"), {code:"P2034"});
     }
-    plants = local; histories = localHistory; version++;
+    plants = local; histories = localHistory; devices = localDevices; provisions = localProvisions; version++;
     return result;
   },
 };
@@ -79,7 +92,8 @@ before(async () => {
 });
 beforeEach(() => {
   plants = new Map([[a,row(a)], [b,row(b,owner,hardware)]]);
-  devices = new Map([[hardware,{id:hardware,userId:owner}], [previous,{id:previous,userId:owner}]]);
+  devices = new Map([[hardware,{id:hardware,userId:owner,macAddress:"LC-A50528",name:"Window"}], [previous,{id:previous,userId:owner,macAddress:"LC-000001",name:"Spare"}]]);
+  provisions = new Map([[hardware,{claimedDeviceId:hardware}], [previous,{claimedDeviceId:previous}]]);
   histories = [{id:randomUUID(), plantId:b, deviceId:hardware, pairedAt:new Date("2026-01-01"), unpairedAt:null}];
   attempts = version = conflictCount = deviceChecks = 0; failUpdate = vanish = false; concurrencyGate = null;
   conflictError = null;
@@ -112,10 +126,17 @@ test("auto-unpairs all previous holders, replaces the target association and pre
   assert.equal(histories[1].unpairedAt.getTime(),histories[2].pairedAt.getTime());
   assert.equal(histories[2].plantId,a);
 });
-test("unpair is repeatable, returns existing omitted-null contract and never checks a device", async () => {
+test("explicit physical unpair releases ownership and provisioning once while preserving history", async () => {
+  for(let i=0;i<2;i++) {const response = await request({deviceId:null},b); assert.equal(response.status,200); assert.equal((await response.json()).deviceId,undefined); assert.equal(plants.get(b).deviceId,null);}
+  assert.equal(deviceChecks,2); assert.equal(devices.get(hardware).userId,null);
+  assert.equal(provisions.get(hardware).claimedDeviceId,null); assert.equal(histories.length,1); assert.ok(histories[0].unpairedAt);
+});
+test("unpair refuses to release a device with another surviving holder and rolls back", async () => {
   plants.set(a,row(a,owner,hardware));
-  for(let i=0;i<2;i++) {const response = await request({deviceId:null}); assert.equal(response.status,200); assert.equal((await response.json()).deviceId,undefined); assert.equal(plants.get(a).deviceId,null);}
-  assert.equal(deviceChecks,0); assert.equal(plants.get(b).deviceId,hardware);
+  const response = await request({deviceId:null}); assert.equal(response.status,409);
+  assert.equal((await response.json()).code,"DEVICE_STILL_PAIRED");
+  assert.equal(plants.get(a).deviceId,hardware); assert.equal(devices.get(hardware).userId,owner);
+  assert.equal(provisions.get(hardware).claimedDeviceId,hardware);
 });
 test("failure after auto-unpair rolls back both plants and sanitizes storage errors", async () => {
   const before = structuredClone(histories);

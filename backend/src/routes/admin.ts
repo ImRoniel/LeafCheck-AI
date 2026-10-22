@@ -296,8 +296,8 @@ adminRouter.get("/devices", requirePermission("devices.read"), asyncRoute(async 
     const demo = device.macAddress.startsWith("DEMO:");
     const inventory = {
       id: device.id, name: device.name, macAddress: device.macAddress,
-      ...(operational ? {} : { owner: { id: device.user.id, name: device.user.name,
-        email: device.user.email, emailMasked: maskedEmail(device.user.email), isActive: device.user.isActive } }),
+      ...(operational ? {} : { owner: device.user ? { id: device.user.id, name: device.user.name,
+        email: device.user.email, emailMasked: maskedEmail(device.user.email), isActive: device.user.isActive } : null }),
       plants: device.plants, source: demo ? "DEMO" : "PHYSICAL", storedStatus: device.status,
       createdAt: device.createdAt, updatedAt: device.updatedAt,
     };

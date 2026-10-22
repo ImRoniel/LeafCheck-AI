@@ -19,7 +19,13 @@ export async function deployIntegrationPostgres(runPrisma) {
       .filter(name => name.endsWith("_admin_features_v2"));
     const passwordMigrations = (await readdir(join(prismaDirectory, "migrations")))
       .filter(name => name.endsWith("_password_policy_warning"));
-    const prePassword = passwordMigrations.length ? current.replace(/^\s*passwordChangedAt\s+[^\n]*\r?\n/gm, "") : current;
+    const transferMigrations = (await readdir(join(prismaDirectory, "migrations")))
+      .filter(name => name.endsWith("_device_ownership_transfer"));
+    const preTransfer = transferMigrations.length ? current.replace(/\nmodel Device \{[\s\S]*?\n\}/, device => device
+      .replace(/^\s*(?:claimVersion|claimedAt)\s+[^\n]*\r?\n/gm, "")
+      .replace(/userId\s+String\?/, "userId String")
+      .replace(/user\s+User\?([^\n]*)onDelete: SetNull/, "user User$1onDelete: Cascade")) : current;
+    const prePassword = passwordMigrations.length ? preTransfer.replace(/^\s*passwordChangedAt\s+[^\n]*\r?\n/gm, "") : preTransfer;
     const preFeatures = featureMigrations.length ? prePassword
       .replace(/\nenum DeviceProvisionStatus \{[\s\S]*?\n\}\n/g, "\n")
       .replace(/\nmodel (?:DeviceProvision|PlatformSettings) \{[\s\S]*?\n\}\n/g, "\n")
@@ -44,6 +50,8 @@ export async function deployIntegrationPostgres(runPrisma) {
     for (const migration of featureMigrations)
       await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
     for (const migration of passwordMigrations)
+      await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
+    for (const migration of transferMigrations)
       await cp(join(prismaDirectory, "migrations", migration), join(temporary, "migrations", migration), { recursive: true });
     await cp(join(prismaDirectory, "migrations/migration_lock.toml"), join(temporary, "migrations/migration_lock.toml"));
     await writeFile(schema, current);

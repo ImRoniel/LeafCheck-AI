@@ -62,8 +62,17 @@ function harness(file: string, guest = false, exportName = "default") {
     if (init?.method === "PATCH") {
       await gate?.promise;
       if (writeFailure) return Response.json({ error: "Sensor update unavailable" }, { status: 503 });
-      serverEntries = serverEntries.map(entry => ({ ...entry, plants: entry.plants.filter(plant => plant.id !== plantId) }));
-      return Response.json({ id: plantId, name: "Fern", species: "Fern", healthStatus: "healthy", createdAt: now, updatedAt: now });
+      const targetPlantId = String(url).split("/").at(-2)!;
+      serverEntries = serverEntries.flatMap(entry => entry.plants.some(plant => plant.id === targetPlantId)
+        ? entry.demo ? [{ ...entry, plants: entry.plants.filter(plant => plant.id !== targetPlantId) }] : [] : [entry]);
+      return Response.json({ id: targetPlantId, name: "Fern", species: "Fern", healthStatus: "healthy", createdAt: now, updatedAt: now });
+    }
+    if (init?.method === "POST" && String(url).endsWith("/release")) {
+      await gate?.promise;
+      if (writeFailure) return Response.json({ error: "Sensor update unavailable" }, { status: 503 });
+      const targetDeviceId = String(url).split("/").at(-2)!;
+      serverEntries = serverEntries.filter(entry => entry.device.id !== targetDeviceId);
+      return new Response(null,{status:204});
     }
     if (refreshFailure) return Response.json({ error: "Inventory unavailable" }, { status: 503 });
     return Response.json(serverEntries);
@@ -228,48 +237,88 @@ test("device manager reads the account inventory including unlinked and demo dev
   h.press("Pair a new sensor"); assert.deepEqual(h.routes, ["/device-connection/scanner"]);
 });
 
-test("unlink calls the real API once, refreshes both collections and retains the owned device", async t => {
+test("physical unpair calls the API once, refreshes both collections and removes the released device", async t => {
   const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
-  const pending = h.blockWrite(), label = "Unlink LC-A50528 from Fern";
+  const pending = h.blockWrite(), label = "Unpair and release LC-A50528 from Fern";
   h.press(label); h.press(label);
-  assert.match(h.text, /Unlinking/); assert.equal(h.requests.length, 1);
+  assert.match(h.text, /Unpairing/); assert.equal(h.requests.length, 1);
   assert.equal(h.requests[0].url, `https://settings.test/api/plants/${plantId}/pair-device`);
   assert.equal(h.requests[0].method, "PATCH"); assert.deepEqual(h.requests[0].body, { deviceId: null });
   pending.resolve(); await h.settle();
-  assert.match(h.text, /Sensor unlinked from Fern/); assert.equal(h.button(label), undefined);
-  assert.equal(h.overview.entries.length, 3); assert.equal(h.overview.entries[0].plants.length, 0);
-  assert.equal(h.overview.entries[2].plants[0].name, "Rose"); assert.equal(h.stats.plantRefreshes, 1);
+  assert.match(h.text, /Sensor unpaired from Fern and released from your account/); assert.equal(h.button(label), undefined);
+  assert.equal(h.overview.entries.length, 2); assert.doesNotMatch(h.text,/LC-A50528/);
+  assert.equal(h.overview.entries[1].plants[0].name, "Rose"); assert.equal(h.stats.plantRefreshes, 1);
 });
 
 test("failed unlink retains the pairing and permits recovery after refreshing", async t => {
   const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
-  const label = "Unlink LC-A50528 from Fern";
+  const label = "Unpair and release LC-A50528 from Fern";
   h.failWrite(true); h.press(label); await h.settle();
-  assert.match(h.text, /Could not confirm unlinking/); assert.equal(h.overview.entries[0].plants.length, 1);
-  assert.ok(h.button(label)); assert.doesNotMatch(h.text, /Sensor unlinked from Fern/);
+  assert.match(h.text, /Could not confirm unpairing/); assert.equal(h.overview.entries[0].plants.length, 1);
+  assert.ok(h.button(label)); assert.doesNotMatch(h.text, /Sensor unpaired from Fern/);
   h.failWrite(false); h.press("Refresh sensors"); await h.settle(); h.press(label); await h.settle();
   assert.equal(h.button(label), undefined); assert.equal(h.stats.plantRefreshes, 2);
 });
 
 test("an acknowledged unlink remains visible when inventory refresh fails, then refresh recovers", async t => {
   const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
-  h.failRefresh(true); h.press("Unlink LC-A50528 from Fern"); await h.settle();
-  assert.match(h.text, /Sensor unlinked from Fern/); assert.match(h.text, /Couldn’t refresh the inventory/);
-  assert.equal(h.button("Unlink LC-A50528 from Fern"), undefined);
+  h.failRefresh(true); h.press("Unpair and release LC-A50528 from Fern"); await h.settle();
+  assert.match(h.text, /Sensor unpaired from Fern/); assert.match(h.text, /Couldn’t refresh the inventory/);
+  assert.equal(h.button("Unpair and release LC-A50528 from Fern"), undefined);
   assert.equal(h.overview.entries[0].plants.length, 1); // The cached API snapshot still has the old link.
   h.failRefresh(false); h.press("Refresh sensors"); await h.settle();
-  assert.equal(h.overview.entries[0].plants.length, 0); assert.equal(h.overview.error, null);
+  assert.equal(h.overview.entries.length, 2); assert.equal(h.overview.error, null);
   assert.doesNotMatch(h.text, /Couldn’t refresh the inventory/);
 });
 
 for (const boundary of ["blur", "signout", "unmount"] as const) test(`pending unlink is cancelled on ${boundary} and late responses cannot publish success`, async t => {
   const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
-  const pending = h.blockWrite(); h.press("Unlink LC-A50528 from Fern");
+  const pending = h.blockWrite(); h.press("Unpair and release LC-A50528 from Fern");
   if (boundary === "blur") h.activity(false);
   if (boundary === "signout") h.signOut();
   if (boundary === "unmount") h.dispose();
   assert.equal(h.requests[0].signal?.aborted, true);
   pending.resolve(); await h.settle();
   assert.equal(h.stats.plantRefreshes, 0); assert.equal(h.stats.writesAfterDispose, 0);
-  assert.doesNotMatch(h.text, /Sensor unlinked from Fern/);
+  assert.doesNotMatch(h.text, /Sensor unpaired from Fern/);
+});
+
+test("an already-unlinked physical sensor can be released while demo sensors retain unlink behavior", async t => {
+  const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
+  const label = "Release LC-000001 from your account";
+  const pending = h.blockWrite(); h.press(label); h.press("Releasing sensor…");
+  assert.equal(h.requests.length,1); assert.equal(h.requests[0].method,"POST");
+  assert.equal(h.requests[0].url,"https://settings.test/api/devices/33333333-3333-4333-8333-333333333333/release");
+  assert.deepEqual(h.requests[0].body,{});
+  pending.resolve(); await h.settle();
+  assert.equal(h.button(label),undefined); assert.match(h.text,/Another account can now claim LC-000001/);
+  assert.equal(h.overview.entries.length,2); assert.equal(h.stats.plantRefreshes,1);
+  h.press("Unlink DEMO:44444444-4444-4444-8444-444444444444 from Rose"); await h.settle();
+  assert.equal(h.overview.entries.length,2);
+  assert.equal(h.overview.entries.find(entry => entry.demo)?.plants.length,0);
+  assert.equal(h.render().filter(node => String(node.props.label ?? "").startsWith("Release DEMO:")).length,0);
+});
+
+test("failed release retains the sensor; a confirmed release stays hidden through a failed refresh", async t => {
+  const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
+  const label = "Release LC-000001 from your account";
+  h.failWrite(true); h.press(label); await h.settle();
+  assert.match(h.text,/Could not confirm releasing/); assert.ok(h.button(label));
+  h.failWrite(false); h.failRefresh(true); h.press(label); await h.settle();
+  assert.match(h.text,/Sensor released from your account/); assert.match(h.text,/Couldn’t refresh the inventory/);
+  assert.equal(h.button(label),undefined); assert.equal(h.overview.entries.length,3);
+  h.failRefresh(false); h.press("Refresh sensors"); await h.settle();
+  assert.equal(h.overview.entries.length,2); assert.equal(h.overview.error,null);
+});
+
+for (const boundary of ["blur", "signout", "unmount"] as const) test(`pending release is cancelled on ${boundary} without publishing late success`, async t => {
+  const h = harness("app/device-connection/manage.tsx"); t.after(h.dispose);
+  const pending = h.blockWrite(); h.press("Release LC-000001 from your account");
+  if (boundary === "blur") h.activity(false);
+  if (boundary === "signout") h.signOut();
+  if (boundary === "unmount") h.dispose();
+  assert.equal(h.requests[0].signal?.aborted,true);
+  pending.resolve(); await h.settle();
+  assert.equal(h.stats.plantRefreshes,0); assert.equal(h.stats.writesAfterDispose,0);
+  assert.doesNotMatch(h.text,/Sensor released from your account/);
 });

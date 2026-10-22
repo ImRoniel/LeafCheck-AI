@@ -6,6 +6,7 @@ import { serializeDevice } from "../lib/device.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
 import { ownedPlant, resourceId } from "../lib/ownership.js";
 import { pairPlantDevice } from "../lib/plant-pairing.js";
+import { unpairPlantAndReleaseDevice } from "../lib/device-release.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import { Plant } from "../types/plant.js";
@@ -162,9 +163,9 @@ plantsRouter.patch(
   asyncRoute(async (req, res) => {
     const { deviceId } = bodyObject(req.body, ["deviceId"]);
     const targetDevice = deviceId === null ? null : resourceId(deviceId);
-    const plant = await pairPlantDevice(
-      resourceId(req.params.id), res.locals.auth.user.id, targetDevice,
-    );
+    const plant = targetDevice === null
+      ? await unpairPlantAndReleaseDevice(resourceId(req.params.id), res.locals.auth.user.id)
+      : await pairPlantDevice(resourceId(req.params.id), res.locals.auth.user.id, targetDevice);
     res.json(serializePlant(plant));
   }),
 );

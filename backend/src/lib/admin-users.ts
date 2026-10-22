@@ -108,6 +108,8 @@ export async function deleteAdminUser(id: string, actor: AdminActor) {
   await securityTransaction(async tx => {
     await authorize(tx, actor);
     // Concurrent retries are idempotent and preserve the original audit trail.
+    // Devices survive account deletion so other plants' transfer history keeps its source.
+    await tx.deviceProvision.updateMany({ where: { claimedDevice: { userId: id } }, data: { claimedDeviceId: null } });
     const deleted = await tx.user.deleteMany({ where: { id, isActive: false } });
     if (!deleted.count && await tx.user.findUnique({ where: { id }, select: { id: true } }))
       throw new HttpError(409, "ADMIN_CONFLICT", "The account changed during deletion. Review its status and retry.");

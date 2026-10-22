@@ -10,6 +10,7 @@ import { Request, Response, Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { ownedDevice } from "../lib/ownership.js";
+import { deviceTelemetryWhere } from "../lib/device-telemetry.js";
 import { prismaPg } from "../lib/prisma-pg.js";
 import { prisma } from "../lib/prisma.js";
 import type { HardwareTelemetryPayload } from "../types/sensor.js";
@@ -23,6 +24,7 @@ telemetryRouter.get(
   ["/:deviceId/latest", "/:deviceId/history"],
   requireAuth,
   asyncRoute(async (req, res, next) => {
+    res.locals.telemetryAsOf = new Date();
     res.locals.device = await ownedDevice(req.params.deviceId, res.locals.auth.user.id);
     next();
   }),
@@ -140,16 +142,17 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
         where: { macAddress },
       });
       if (!device) return null;
-      const pairing = await tx.devicePairingHistory.findFirst({
+      const pairing = device.userId === null ? null : await tx.devicePairingHistory.findFirst({
         where: { deviceId: device.id, unpairedAt: null },
         select: { id: true, plantId: true },
       });
       return Object.freeze({
         macAddress: device.macAddress,
+        claimVersion: device.userId === null ? null : device.claimVersion ?? 0,
         plantId: pairing?.plantId ?? null,
         pairingId: pairing?.id ?? null,
         contextVersion: 1,
-        timestamp: new Date(),
+        timestamp: new Date(Math.max(Date.now(), device.claimedAt?.getTime() ?? 0)),
       });
     });
 
@@ -173,6 +176,7 @@ telemetryRouter.post("/", async (req: Request, res: Response) => {
     const reading = await prisma.sensorReading.create({
       data: {
         deviceId: context.macAddress,
+        claimVersion: context.claimVersion,
         plantId: context.plantId,
         pairingId: context.pairingId,
         contextVersion: context.contextVersion,
@@ -208,11 +212,10 @@ telemetryRouter.get(
   async (req: Request, res: Response) => {
     const device: Awaited<ReturnType<typeof ownedDevice>> = res.locals.device;
     const isDemo = device.macAddress.startsWith("DEMO:");
-    const deviceId = isDemo ? device.id : device.macAddress;
 
     try {
       const reading = await prisma.sensorReading.findFirst({
-        where: { deviceId },
+        where: deviceTelemetryWhere(device, res.locals.telemetryAsOf),
         orderBy: { timestamp: "desc" },
       });
 
@@ -241,7 +244,7 @@ telemetryRouter.get(
     const device: Awaited<ReturnType<typeof ownedDevice>> = res.locals.device;
     const isDemo = device.macAddress.startsWith("DEMO:");
     // Match the identity used by the plant's live telemetry query.
-    const deviceId = isDemo ? device.id : device.macAddress;
+    const where = deviceTelemetryWhere(device, res.locals.telemetryAsOf);
     const limit = Math.min(
       Math.max(parseInt(req.query.limit as string) || 50, 1),
       200,
@@ -251,12 +254,12 @@ telemetryRouter.get(
     try {
       const [readings, total] = await Promise.all([
         prisma.sensorReading.findMany({
-          where: { deviceId },
+          where,
           orderBy: { timestamp: "desc" },
           take: limit,
           skip: offset,
         }),
-        prisma.sensorReading.count({ where: { deviceId } }),
+        prisma.sensorReading.count({ where }),
       ]);
 
       res.json({

@@ -20,10 +20,11 @@ export default function ManageDevices() {
   const work = useRef<AbortController | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [confirmed, setConfirmed] = useState<{ generation: number; links: string[] }>({ generation: auth.generation, links: [] });
+  const [confirmed, setConfirmed] = useState<{ generation: number; links: string[]; releases: string[] }>({ generation: auth.generation, links: [], releases: [] });
   const authenticated = auth.status === "authenticated";
   const linkKey = (deviceId: string, plantId: string) => `${deviceId}:${plantId}`;
-  const entries = overview.entries.map(entry => ({ ...entry, plants: entry.plants.filter(plant =>
+  const entries = overview.entries.filter(entry => confirmed.generation !== auth.generation || !confirmed.releases.includes(entry.device.id))
+    .map(entry => ({ ...entry, plants: entry.plants.filter(plant =>
     confirmed.generation !== auth.generation || !confirmed.links.includes(linkKey(entry.device.id, plant.id))) }));
 
   useEffect(() => {
@@ -34,11 +35,12 @@ export default function ManageDevices() {
   // Keep a committed unlink visible until the inventory acknowledges it, even
   // when a pre-mutation poll or a failed refresh still contains the old link.
   useEffect(() => {
-    if (!overview.ready || confirmed.generation !== auth.generation || !confirmed.links.length) return;
+    if (!overview.ready || confirmed.generation !== auth.generation || (!confirmed.links.length && !confirmed.releases.length)) return;
     const links = confirmed.links.filter(key => overview.entries.some(entry =>
       entry.plants.some(plant => linkKey(entry.device.id, plant.id) === key)));
-    if (links.length === confirmed.links.length) return;
-    const timer = setTimeout(() => setConfirmed(current => current === confirmed ? { ...current, links } : current), 0);
+    const releases = confirmed.releases.filter(id => overview.entries.some(entry => entry.device.id === id));
+    if (links.length === confirmed.links.length && releases.length === confirmed.releases.length) return;
+    const timer = setTimeout(() => setConfirmed(current => current === confirmed ? { ...current, links, releases } : current), 0);
     return () => clearTimeout(timer);
   }, [overview.entries, overview.ready, confirmed, auth.generation]);
 
@@ -46,7 +48,7 @@ export default function ManageDevices() {
   const unlink = async (deviceId: string, plantId: string) => {
     const entry = entries.find(item => item.device.id === deviceId);
     const plant = entry?.plants.find(item => item.id === plantId);
-    if (!authenticated || !active || work.current || !overview.ready || overview.error || !plant) return;
+    if (!authenticated || !active || work.current || !overview.ready || overview.error || !entry || !plant) return;
     const abort = new AbortController();
     work.current = abort; setBusyKey(linkKey(deviceId, plantId)); setMessage("");
     try {
@@ -55,14 +57,40 @@ export default function ManageDevices() {
       if (result.id !== plantId || result.deviceId) throw new Error("Unlink was not confirmed.");
       setConfirmed(current => ({ generation: auth.generation, links: [
         ...(current.generation === auth.generation ? current.links : []), linkKey(deviceId, plantId),
-      ] }));
-      setMessage(`Sensor unlinked from ${plant.name}.`);
+      ], releases: [...(current.generation === auth.generation ? current.releases : []), ...(entry.demo ? [] : [deviceId])] }));
+      if (!entry.demo && data.pendingDevice?.id === deviceId) data.clearPendingDevice();
+      const success = entry.demo ? `Sensor unlinked from ${plant.name}.` : `Sensor unpaired from ${plant.name} and released from your account.`;
+      setMessage(success);
       const results = await Promise.allSettled([overview.refresh(), data.refresh()]);
       if (!abort.signal.aborted && work.current === abort && results[0].status === "rejected") {
-        setMessage(`Sensor unlinked from ${plant.name}. Couldn’t refresh the inventory. Refresh sensors to confirm the latest status.`);
+        setMessage(`${success} Couldn’t refresh the inventory. Refresh sensors to confirm the latest status.`);
       }
     } catch {
-      if (!abort.signal.aborted && work.current === abort) setMessage("Could not confirm unlinking. Refresh sensors before retrying.");
+      if (!abort.signal.aborted && work.current === abort) setMessage("Could not confirm unpairing. Refresh sensors before retrying.");
+    } finally {
+      if (work.current === abort) { work.current = null; if (!abort.signal.aborted) setBusyKey(null); }
+    }
+  };
+
+  const release = async (deviceId: string) => {
+    const entry = entries.find(item => item.device.id === deviceId);
+    if (!authenticated || !active || work.current || !overview.ready || overview.error || !entry || entry.demo || entry.plants.length) return;
+    const abort = new AbortController();
+    work.current = abort; setBusyKey(deviceId); setMessage("");
+    try {
+      await api.releaseDevice(deviceId, { signal: abort.signal });
+      if (abort.signal.aborted || work.current !== abort) return;
+      setConfirmed(current => ({ generation: auth.generation,
+        links: current.generation === auth.generation ? current.links : [],
+        releases: [...(current.generation === auth.generation ? current.releases : []), deviceId] }));
+      if (data.pendingDevice?.id === deviceId) data.clearPendingDevice();
+      const success = `Sensor released from your account. Another account can now claim ${entry.device.macAddress}.`;
+      setMessage(success);
+      const results = await Promise.allSettled([overview.refresh(), data.refresh()]);
+      if (!abort.signal.aborted && work.current === abort && results[0].status === "rejected")
+        setMessage(`${success} Couldn’t refresh the inventory. Refresh sensors to confirm the latest status.`);
+    } catch {
+      if (!abort.signal.aborted && work.current === abort) setMessage("Could not confirm releasing this sensor. Refresh sensors before retrying.");
     } finally {
       if (work.current === abort) { work.current = null; if (!abort.signal.aborted) setBusyKey(null); }
     }
@@ -92,12 +120,14 @@ export default function ManageDevices() {
           <Pressable accessibilityRole="button" accessibilityLabel={`Open ${plant.name}`} onPress={() => router.push({ pathname: "/plant-profile", params: { id: plant.id } })} style={s.plantLink}>
             <Text style={s.plant}>{plant.name} ›</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Unlink ${entry.device.macAddress} from ${plant.name}`} disabled={disabled}
+          <Pressable accessibilityRole="button" accessibilityLabel={`${entry.demo ? "Unlink" : "Unpair and release"} ${entry.device.macAddress} from ${plant.name}`} disabled={disabled}
             accessibilityState={{ disabled, busy: busyKey === linkKey(entry.device.id, plant.id) }}
             onPress={() => void unlink(entry.device.id, plant.id)} style={[s.unlink, disabled && s.disabled]}>
-            <Text style={s.unlinkText}>{busyKey === linkKey(entry.device.id, plant.id) ? "Unlinking…" : "Unlink"}</Text>
+            <Text style={s.unlinkText}>{busyKey === linkKey(entry.device.id, plant.id) ? "Unpairing…" : entry.demo ? "Unlink" : "Unpair and release"}</Text>
           </Pressable>
         </View>)}
+        {!entry.demo && !entry.plants.length && <Action label={busyKey === entry.device.id ? "Releasing sensor…" : `Release ${entry.device.macAddress} from your account`}
+          variant="secondary" disabled={disabled} onPress={() => void release(entry.device.id)} />}
       </View>;
     })}
     <Action label="Pair a new sensor" disabled={!active || busyKey !== null} onPress={() => router.push("/device-connection/scanner")} />

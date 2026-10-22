@@ -1,6 +1,7 @@
 import express from "express";
 import assert from "node:assert/strict";
 import { after, before, beforeEach, mock, test } from "node:test";
+import { matchesWhere } from "./helpers/mongo-filter.mjs";
 
 const deviceId = "00000000-0000-4000-8000-000000000002";
 const now = new Date("2026-10-12T00:00:00.000Z");
@@ -28,13 +29,13 @@ before(async () => {
     namedExports: { prisma: { sensorReading: {
       findMany: async (query) => {
         queries.push(query);
-        return readings.filter(row => row.deviceId === query.where.deviceId)
+        return readings.filter(row => matchesWhere(row, query.where))
           .sort((a, b) => b.timestamp - a.timestamp)
           .slice(query.skip, query.skip + query.take);
       },
       count: async (query) => {
         queries.push(query);
-        return readings.filter(row => row.deviceId === query.where.deviceId).length;
+        return readings.filter(row => matchesWhere(row, query.where)).length;
       },
     } } },
   });
@@ -59,9 +60,12 @@ test("hardware history resolves the authorized UUID to MAC for both page and cou
   const response = await request("?limit=200&offset=0");
   assert.equal(response.status, 200);
   const body = await response.json();
+  const where = queries[0].where;
+  assert.equal(where.deviceId, "LC-A50528"); assert.ok(where.timestamp.lte instanceof Date);
+  assert.deepEqual(where.OR, [{claimVersion:0},{claimVersion:null},{claimVersion:{isSet:false}}]);
   assert.deepEqual(queries, [
-    { where: { deviceId: "LC-A50528" }, orderBy: { timestamp: "desc" }, take: 200, skip: 0 },
-    { where: { deviceId: "LC-A50528" } },
+    { where, orderBy: { timestamp: "desc" }, take: 200, skip: 0 },
+    { where },
   ]);
   assert.deepEqual(body.pagination, { total: 66, limit: 200, offset: 0, hasMore: false });
   assert.equal(body.data.length, 66);
@@ -116,4 +120,13 @@ test("anonymous, foreign, and invalid device requests stop before Mongo queries"
   assert.equal((await request("", "other")).status, 404);
   assert.equal((await request("", "owner", "LC-A50528")).status, 400);
   assert.deepEqual(queries, []);
+});
+
+test("a transferred device's page and count include only its current claim within the ownership boundary", async () => {
+  device.claimVersion = 2; device.claimedAt = new Date(now.getTime() - 60000);
+  readings = [sample(0,{claimVersion:2}),sample(0,{claimVersion:1}),sample(0),sample(0,{claimVersion:null}),
+    sample(2,{claimVersion:2}),sample(0,{claimVersion:2,timestamp:new Date(Date.now()+60000)})];
+  const body = await (await request()).json();
+  assert.equal(body.pagination.total,1); assert.equal(body.data.length,1); assert.equal(body.data[0].id,"0");
+  assert.equal(queries[0].where.claimVersion,2); assert.equal(queries[1].where.claimVersion,2);
 });

@@ -347,6 +347,10 @@ export function createApiClient(
       if (deviceId !== null) v.uuid(deviceId, "deviceId");
       return request(`/api/plants/${id(plantId)}/pair-device`, v.parsePairedPlant, options, "PATCH", { deviceId });
     },
+    releaseDevice: (deviceId: string, options?: RequestOptions) => {
+      v.uuid(deviceId, "deviceId");
+      return request<void>(`/api/devices/${id(deviceId)}/release`, () => undefined, options, "POST", {});
+    },
     fetchPlantTelemetry: (plantId: string, options?: RequestOptions) => {
       v.uuid(plantId, "plantId");
       return request(`/api/plants/${id(plantId)}/telemetry`, v.parsePlantTelemetry, options);

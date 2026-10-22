@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { serializeDevice } from "../lib/device.js";
+import { releaseDevice } from "../lib/device-release.js";
+import { deviceTelemetryWhere } from "../lib/device-telemetry.js";
 import { requireAuth } from "../lib/auth.js";
 import { requireDeviceWrite } from "../lib/permissions.js";
 import { asyncRoute, bodyObject, HttpError } from "../lib/http.js";
@@ -27,6 +29,7 @@ function overviewErrorDetails(error: unknown) {
 
 /** All owned devices, including unlinked devices; telemetry errors stay local to a row. */
 devicesRouter.get("/overview", asyncRoute(async (_req, res) => {
+  const asOf = new Date();
   const userId: string = res.locals.auth.user.id;
   const devices = await prismaPg.device.findMany({
     where: { userId }, orderBy: [{ name: "asc" }, { id: "asc" }],
@@ -44,7 +47,7 @@ devicesRouter.get("/overview", asyncRoute(async (_req, res) => {
       let stage = "mongodb-lookup";
       try {
         const reading = await prisma.sensorReading.findFirst({
-          where: { deviceId: demo ? device.id : device.macAddress }, orderBy: { timestamp: "desc" },
+          where: deviceTelemetryWhere(device, asOf), orderBy: { timestamp: "desc" },
         });
         stage = "serialize-reading";
         return { device: serializeDevice(device), plants, demo, readingError: false,
@@ -75,16 +78,33 @@ devicesRouter.post("/claim", requireDeviceWrite, asyncRoute(async (req, res) => 
     await assertDeviceClaimsEnabled(tx);
     const provision = await approvedHardware(macAddress, tx);
     const existing = await tx.device.findUnique({ where: { macAddress } });
-    if (existing?.userId !== undefined && existing.userId !== userId)
+    if (existing && existing.userId !== null && existing.userId !== userId)
       throw new HttpError(409, "DEVICE_ALREADY_CLAIMED", "Device already claimed.");
     if (provision.claimedDeviceId && provision.claimedDeviceId !== existing?.id)
       throw new HttpError(409, "DEVICE_ALREADY_CLAIMED", "Device already claimed.");
+    if (existing?.userId === null) {
+      const [plant, pairing] = await Promise.all([
+        tx.plant.findFirst({ where: { deviceId: existing.id }, select: { id: true } }),
+        tx.devicePairingHistory.findFirst({ where: { deviceId: existing.id, unpairedAt: null }, select: { id: true } }),
+      ]);
+      if (plant || pairing) throw new HttpError(409, "DEVICE_STILL_PAIRED", "This sensor still has an active plant assignment.");
+    }
     const device = existing
-      ? name === undefined ? existing : await tx.device.update({ where: { id: existing.id, userId }, data: { name } })
-      : await tx.device.create({ data: { macAddress, name: name ?? macAddress, userId, status: "OFFLINE" } });
+      ? existing.userId === null
+        ? await tx.device.update({ where: { id: existing.id, userId: null }, data: {
+          userId, name: name ?? macAddress, claimVersion: { increment: 1 }, claimedAt: new Date(),
+        } })
+        : name === undefined ? existing : await tx.device.update({ where: { id: existing.id, userId }, data: { name } })
+      : await tx.device.create({ data: { macAddress, name: name ?? macAddress, userId, status: "OFFLINE", claimVersion: 1, claimedAt: new Date() } });
     if (provision.claimedDeviceId !== device.id)
       await tx.deviceProvision.update({ where: { id: provision.id }, data: { claimedDeviceId: device.id } });
     return { device, created: !existing };
   }, error => isSerializationConflict(error) || prismaErrorCode(error) === "P2002");
   res.status(result.created ? 201 : 200).json(serializeDevice(result.device));
+}));
+
+devicesRouter.post("/:id/release", requireDeviceWrite, asyncRoute(async (req, res) => {
+  bodyObject(req.body, []);
+  await releaseDevice(req.params.id as string, res.locals.auth.user.id);
+  res.status(204).end();
 }));

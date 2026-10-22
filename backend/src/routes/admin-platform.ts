@@ -80,8 +80,8 @@ adminPlatformRouter.post("/devices/whitelist", requirePermission("devices.provis
     const existing = await tx.deviceProvision.findUnique({ where: { macAddress } });
     if (existing) throw new HttpError(409, "HARDWARE_ALREADY_REGISTERED", "This hardware is already registered. Refresh the inventory to update it.");
     // Linking a previously registered device retains its owner and entire history.
-    const device = await tx.device.findUnique({ where: { macAddress }, select: { id: true } });
-    const created = await tx.deviceProvision.create({ data: { macAddress, label: provisionLabel, status: "APPROVED", claimedDeviceId: device?.id, createdById: actor.actorId } });
+    const device = await tx.device.findUnique({ where: { macAddress }, select: { id: true, userId: true } });
+    const created = await tx.deviceProvision.create({ data: { macAddress, label: provisionLabel, status: "APPROVED", claimedDeviceId: device?.userId ? device.id : null, createdById: actor.actorId } });
     await writeAudit(actor, "HARDWARE_PROVISIONED", created.id, { reason: why, before: null, after: { macAddress, label: created.label, status: created.status, claimedDeviceId: created.claimedDeviceId } }, tx);
     return created;
   }).catch((error: unknown) => {

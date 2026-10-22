@@ -148,8 +148,11 @@ model Device {
   id         String   @id @default(uuid())
   name       String
   macAddress String   @unique
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Version zero belongs to the original, pre-transfer owner. Claims advance it.
+  claimVersion Int    @default(0)
+  claimedAt  DateTime?
   status     String   @default("OFFLINE")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

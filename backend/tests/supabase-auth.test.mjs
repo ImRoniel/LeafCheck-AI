@@ -19,6 +19,7 @@ const issuer = `${process.env.SUPABASE_URL}/auth/v1`;
 const signingKey = new TextEncoder().encode("a-different-provider-signing-secret-for-tests");
 const users = new Map(), identities = new Map(), sessions = new Map(), refreshTokens = new Map(), codes = new Map();
 const challenges = new Map(), verifications = new Map(), auditLogs = new Map(), devices = new Map();
+const provisions = new Map();
 const preservedId = "2da2cd1a-e594-43cc-a165-552342882246";
 let server, base, network, sequence = 10000000, upstreamCalls = [], asymmetric, publicJwk;
 let algorithm = "HS256", refuseRevocation = false, autoConfirm = false;
@@ -33,6 +34,10 @@ const db = {
   adminSessionVerification: memoryModel(verifications, { unique: ["supabaseSessionId"], defaults: () => ({ verifiedAt: new Date(), authVersion: 0 }) }),
   auditLog: memoryModel(auditLogs, { resolveUser: id => users.get(id), defaults: () => ({ createdAt: new Date(), targetId: null, ipAddress: null }) }),
   device: memoryModel(devices, { resolveUser: id => users.get(id) }),
+  deviceProvision: { updateMany: async ({where,data}) => {
+    const affected = [...provisions.values()].filter(row => devices.get(row.claimedDeviceId)?.userId === where.claimedDevice.userId);
+    affected.forEach(row => Object.assign(row,data)); return {count:affected.length};
+  } },
   // Provider auth must not write either legacy table.
   authSession: { create() { throw new Error("Legacy session write forbidden"); }, updateMany() { throw new Error("Legacy revocation forbidden"); } },
   refreshToken: { create() { throw new Error("Legacy token write forbidden"); }, deleteMany() { throw new Error("Legacy token deletion forbidden"); } },
@@ -40,7 +45,7 @@ const db = {
 let transactionFlight = Promise.resolve();
 db.$transaction = callback => {
   const operation = transactionFlight.then(async () => {
-    const tables = [users, challenges, verifications, auditLogs];
+    const tables = [users, challenges, verifications, auditLogs, provisions];
     const copies = tables.map(table => structuredClone([...table.entries()]));
     try { return await callback(db); }
     catch (error) { tables.forEach((table, index) => { table.clear(); for (const [key, value] of copies[index]) table.set(key, value); }); throw error; }
@@ -189,6 +194,7 @@ beforeEach(() => {
   process.env.AUTH_PROVIDER = "supabase";
   users.clear(); identities.clear(); sessions.clear(); refreshTokens.clear(); codes.clear(); upstreamCalls = [];
   challenges.clear(); verifications.clear(); auditLogs.clear(); devices.clear();
+  provisions.clear();
   algorithm = "HS256"; refuseRevocation = false; autoConfirm = false;
   passwordUpdateError = null; skipPasswordRevocation = false;
   users.set(preservedId, { id: preservedId, email: "cuaresmaroniel27@gmail.com", password: "preserve-exact-hash",
@@ -589,8 +595,12 @@ test("user deletion removes provider and application identities and logs complet
   const admin = await verifiedAdministrator();
   const target = await registered("delete@example.test");
   const providerId = users.get(target.user.id).supabaseUserId;
+  const ownedDeviceId = randomUUID();
+  devices.set(ownedDeviceId,{id:ownedDeviceId,userId:target.user.id});
+  provisions.set(ownedDeviceId,{id:ownedDeviceId,claimedDeviceId:ownedDeviceId});
   assert.equal((await adminRequest(`/users/${target.user.id}`, admin.accessToken, "DELETE")).status, 204);
   assert.equal(users.has(target.user.id), false); assert.equal(identities.has(providerId), false);
+  assert.equal(provisions.get(ownedDeviceId).claimedDeviceId,null);
   assert.equal((await request("/api/users/me", undefined, target.accessToken, "GET")).status, 401);
   assert.ok([...auditLogs.values()].some(row => row.action === "USER_DELETED" && row.targetId === target.user.id));
 });

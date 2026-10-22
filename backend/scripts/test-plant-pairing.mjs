@@ -86,7 +86,9 @@ try {
   run(process.execPath, [prisma, "generate", "--schema=prisma/schema.postgres.prisma"], env);
   const deployment = await deployIntegrationPostgres(args => run(process.execPath, [prisma, ...args], env));
   process.stdout.write(deployment.replaceAll(password,"[redacted]"));
-  const files = process.argv.includes("--plant-telemetry")
+  const files = process.argv.includes("--device-transfer")
+    ? ["tests/integration/device-transfer.test.mjs"]
+    : process.argv.includes("--plant-telemetry")
     ? ["tests/integration/plant-telemetry.test.mjs"]
     : ["tests/integration/plant-pairing.test.mjs", "tests/integration/ingestion-context.test.mjs"];
   console.log("Disposable PostgreSQL/MongoDB ready; running telemetry integration checks.");
